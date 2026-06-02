@@ -1,0 +1,343 @@
+{% extends "base.html" %}
+
+{% block title %}{{ crud_config.title if crud_config else 'Gestão' }}{% endblock %}
+
+{% block content %}
+<div class="pagetitle">
+  <h1>{{ crud_config.title if crud_config else 'Gestão' }}</h1>
+  <nav>
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{{ url_for('web.dashboard') }}">Home</a></li>
+      <li class="breadcrumb-item active">{{ crud_config.resource|capitalize if crud_config else 'Recurso' }}</li>
+    </ol>
+  </nav>
+</div>
+
+<section class="section">
+  <div class="row">
+    <div class="col-lg-12">
+      <div class="card">
+        <div class="card-body">
+          <div class="toolbar mb-3 mt-3">
+            {% if crud_config.list.buttons.new.enabled %}
+              {% if not crud_config.list.buttons.new.permission or current_user[crud_config.list.buttons.new.permission] %}
+                <button class="btn btn-{{ crud_config.list.buttons.new.color|default('primary') }}" id="btn-new">
+                  <i class="bi {{ crud_config.list.buttons.new.icon }}"></i> {{ crud_config.list.buttons.new.label }}
+                </button>
+              {% endif %}
+            {% endif %}
+            {% if crud_config.list.export.enabled %}
+              {% for fmt in crud_config.list.export.formats %}
+                <button class="btn btn-primary export-btn" data-format="{{ fmt }}">
+                  <i class="bi bi-file-earmark-{{ fmt }}"></i> Exportar {{ fmt.upper() }}
+                </button>
+              {% endfor %}
+            {% endif %}
+            {% if crud_config.list.buttons.save_layout.enabled %}
+              <button class="btn btn-{{ crud_config.list.buttons.save_layout.color|default('secondary') }}" id="save-layout-btn">
+                <i class="bi {{ crud_config.list.buttons.save_layout.icon }}"></i> {{ crud_config.list.buttons.save_layout.label }}
+              </button>
+            {% endif %}
+          </div>
+
+          {% if crud_config.list.filters.enabled %}
+          <div class="filters mb-3">
+            <div class="row">
+              {% for col in crud_config.list.table.columns if col.filterable %}
+                <div class="col-md-2">
+                  <input type="text" class="form-control filter-input" data-column="{{ loop.index0 }}" placeholder="Filtrar por {{ col.name|lower }}...">
+                </div>
+              {% endfor %}
+              <div class="col-md-2">
+                <button class="btn btn-outline-secondary clear-filters" type="button">
+                  <i class="bi bi-x-circle"></i> Limpar
+                </button>
+              </div>
+            </div>
+          </div>
+          {% endif %}
+
+          <table id="data-table" class="table table-striped" style="width:100%">
+            <thead>
+              <tr>
+                {% for col in crud_config.list.table.columns if col.default_visible %}
+                  <th data-field="{{ col.field }}" data-sortable="{{ col.sortable|lower }}">{{ col.name }}</th>
+                {% endfor %}
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Modal para formulário -->
+<div class="modal fade" id="formModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="formModalLabel">Novo Registro</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="mainForm">
+          <input type="hidden" id="recordId" name="id">
+          {% for field in crud_config.form.fields|sort(attribute='order') %}
+            <div class="mb-3">
+              <label for="{{ field.name }}" class="form-label">{{ field.label }}{% if field.required %} *{% endif %}</label>
+              {% if field.type == 'textarea' %}
+                <textarea class="form-control" id="{{ field.name }}" name="{{ field.name }}" rows="3" {% if field.required %}required{% endif %}></textarea>
+              {% else %}
+                <input type="{{ field.type }}" class="form-control" id="{{ field.name }}" name="{{ field.name }}" {% if field.required %}required{% endif %}>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-{{ crud_config.form.buttons.cancel.color|default('secondary') }}" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-{{ crud_config.form.buttons.save.color|default('primary') }}" id="saveBtn">Salvar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal para detalhe -->
+<div class="modal fade" id="detailModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Detalhes</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="detailContent"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  console.log('crud_config:', {{ crud_config|tojson }});
+
+  // Configurações dos botões (cores e ícones)
+  const buttonConfig = {
+    view: { color: '{{ crud_config.list.buttons.view.color|default("info") }}', icon: '{{ crud_config.list.buttons.view.icon|default("bi-eye") }}' },
+    edit: { color: '{{ crud_config.list.buttons.edit.color|default("secondary") }}', icon: '{{ crud_config.list.buttons.edit.icon|default("bi-pencil") }}' },
+    delete: { color: '{{ crud_config.list.buttons.delete.color|default("danger") }}', icon: '{{ crud_config.list.buttons.delete.icon|default("bi-trash") }}' }
+  };
+  const resource = '{{ crud_config.resource }}';
+
+  // Lista de campos do formulário (para preenchimento)
+  const formFields = [
+    {% for field in crud_config.form.fields %}
+      '{{ field.name }}',
+    {% endfor %}
+  ];
+
+  // Lista de campos do detalhe (label e nome)
+  const detailFields = [
+    {% for field in crud_config.detail.fields %}
+      { name: '{{ field.name }}', label: '{{ field.label }}' },
+    {% endfor %}
+  ];
+
+  let dataTable;
+
+  function fetchData() {
+    console.log('Fetching /api/' + resource + '/');
+    fetch(`/api/${resource}/`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          const items = data.data.items;
+          const visibleFields = [
+            {% for col in crud_config.list.table.columns if col.default_visible %}
+              '{{ col.field }}',
+            {% endfor %}
+          ];
+          const tableData = items.map(item => {
+            const row = visibleFields.map(field => {
+              if (field === 'stock') return `${item.available}/${item.quantity}`;
+              return item[field] || '—';
+            });
+            let actions = '';
+            {% if crud_config.list.buttons.view.enabled %}
+              actions += `<button class="btn btn-sm btn-outline-${buttonConfig.view.color} view-btn" data-id="${item.id}"><i class="bi ${buttonConfig.view.icon}"></i></button>`;
+            {% endif %}
+            {% if crud_config.list.buttons.edit.enabled and (not crud_config.list.buttons.edit.permission or current_user[crud_config.list.buttons.edit.permission]) %}
+              actions += `<button class="btn btn-sm btn-outline-${buttonConfig.edit.color} edit-btn" data-id="${item.id}"><i class="bi ${buttonConfig.edit.icon}"></i></button>`;
+            {% endif %}
+            {% if crud_config.list.buttons.delete.enabled and (not crud_config.list.buttons.delete.permission or current_user[crud_config.list.buttons.delete.permission]) %}
+              actions += `<button class="btn btn-sm btn-outline-${buttonConfig.delete.color} delete-btn" data-id="${item.id}"><i class="bi ${buttonConfig.delete.icon}"></i></button>`;
+            {% endif %}
+            row.push(actions);
+            return row;
+          });
+          if (dataTable) {
+            dataTable.clear().rows.add(tableData).draw();
+          } else {
+            dataTable = new simpleDatatables.DataTable("#data-table", {
+              data: tableData,
+              perPage: {{ crud_config.list.pagination.default_per_page }},
+              perPageSelect: {{ crud_config.list.pagination.per_page_options|tojson }},
+              labels: {
+                placeholder: "Buscar...",
+                perPage: "{select} itens por página",
+                noRows: "Nenhum registro encontrado",
+                info: "Mostrando {start} a {end} de {rows} registros"
+              }
+            });
+            setupFilters();
+          }
+        } else {
+          console.error('API error:', data.error);
+        }
+      })
+      .catch(err => console.error('Fetch error:', err));
+  }
+
+  function setupFilters() {
+    const filterInputs = document.querySelectorAll('.filter-input');
+    filterInputs.forEach(input => {
+      input.addEventListener('keyup', function() {
+        if (dataTable) dataTable.filterColumn(parseInt(this.dataset.column), this.value);
+      });
+    });
+    document.querySelector('.clear-filters')?.addEventListener('click', () => {
+      filterInputs.forEach(inp => inp.value = '');
+      if (dataTable) dataTable.clearFilters();
+    });
+  }
+
+  function openFormModal(id = null) {
+    console.log('openFormModal', id);
+    const modal = new bootstrap.Modal(document.getElementById('formModal'));
+    document.getElementById('mainForm').reset();
+    document.getElementById('recordId').value = '';
+    document.getElementById('formModalLabel').innerText = id ? 'Editar Registro' : 'Novo Registro';
+    if (id) {
+      fetch(`/api/${resource}/${id}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            const item = data.data;
+            document.getElementById('recordId').value = item.id;
+            formFields.forEach(fieldName => {
+              const el = document.getElementById(fieldName);
+              if (el) el.value = item[fieldName] || '';
+            });
+          }
+        })
+        .catch(err => console.error('Erro ao carregar dados:', err));
+    }
+    modal.show();
+  }
+
+  function viewRecord(id) {
+    console.log('viewRecord', id);
+    fetch(`/api/${resource}/${id}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          const item = data.data;
+          let html = '';
+          // Itera sobre a lista de campos do detalhe (sem redeclaração de variável)
+          detailFields.forEach(field => {
+            let val = item[field.name];
+            if (field.name === 'created_at' && val) val = new Date(val).toLocaleString();
+            html += `<p><strong>${field.label}:</strong> ${val || 'N/A'}</p>`;
+          });
+          document.getElementById('detailContent').innerHTML = html;
+          new bootstrap.Modal(document.getElementById('detailModal')).show();
+        }
+      })
+      .catch(err => console.error('Erro ao carregar detalhe:', err));
+  }
+
+  function deleteRecord(id) {
+    if (confirm('Excluir permanentemente este registro?')) {
+      fetch(`/api/${resource}/${id}`, { method: 'DELETE' })
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            fetchData();
+          } else {
+            alert('Erro ao excluir: ' + (data.error || ''));
+          }
+        })
+        .catch(err => alert('Erro na requisição: ' + err));
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOMContentLoaded - inicializando eventos');
+
+    // Botão "Novo"
+    const btnNew = document.getElementById('btn-new');
+    if (btnNew) {
+      btnNew.addEventListener('click', () => openFormModal());
+      console.log('Evento "Novo" adicionado');
+    } else {
+      console.error('btn-new não encontrado');
+    }
+
+    // Botões de exportação
+    const exportBtns = document.querySelectorAll('.export-btn');
+    exportBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const format = btn.dataset.format;
+        if (dataTable) {
+          dataTable.export({ type: format, filename: resource, tableName: resource });
+        } else {
+          alert('Tabela não carregada ainda. Aguarde.');
+        }
+      });
+    });
+
+    // Botão salvar layout
+    const saveLayoutBtn = document.getElementById('save-layout-btn');
+    if (saveLayoutBtn) {
+      saveLayoutBtn.addEventListener('click', () => {
+        const order = [];
+        document.querySelectorAll('#data-table thead th').forEach(th => {
+          if (th.innerText !== 'Ações') order.push(th.innerText);
+        });
+        fetch(`/api/user_layout/${resource}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ columns_order: order, visible_columns: order })
+        })
+          .then(() => alert('Layout salvo!'))
+          .catch(() => alert('Erro ao salvar layout'));
+      });
+    }
+
+    // Delegação de eventos para botões dinâmicos (edit, view, delete)
+    document.body.addEventListener('click', (e) => {
+      const editBtn = e.target.closest('.edit-btn');
+      const viewBtn = e.target.closest('.view-btn');
+      const deleteBtn = e.target.closest('.delete-btn');
+      if (editBtn) {
+        e.preventDefault();
+        openFormModal(editBtn.dataset.id);
+      } else if (viewBtn) {
+        e.preventDefault();
+        viewRecord(viewBtn.dataset.id);
+      } else if (deleteBtn) {
+        e.preventDefault();
+        deleteRecord(deleteBtn.dataset.id);
+      }
+    });
+
+    // Carrega os dados da tabela
+    fetchData();
+  });
+</script>
+{% endblock %}

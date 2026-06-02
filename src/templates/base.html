@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="pt-BR"
+  data-theme="{% if current_user.is_authenticated and current_user.modo_escuro %}dark{% else %}light{% endif %}">
+
+<head>
+  <meta charset="utf-8">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+  <title>{% block title %}Pyteca{% endblock %}</title>
+  <meta content="" name="description">
+  <meta content="" name="keywords">
+
+  <!-- Anti-flash theme (applies BEFORE first paint for non-auth users) -->
+  <script>
+    (function () {
+      try {
+        var root = document.documentElement;
+        // If server already set dark (authenticated user), do nothing.
+        if (root.getAttribute('data-theme') !== 'dark') {
+          var saved = localStorage.getItem('theme');
+          if (saved === 'dark' || saved === 'light') {
+            root.setAttribute('data-theme', saved);
+          }
+        }
+      } catch (e) { }
+    })();
+  </script>
+
+  <!-- Favicons -->
+  <link href="{{ url_for('static', filename='img/nova_logo.png') }}" rel="icon">
+  <link href="{{ url_for('static', filename='img/apple-touch-icon.png') }}" rel="apple-touch-icon">
+
+  <!-- Google Fonts -->
+  <link href="https://fonts.gstatic.com" rel="preconnect">
+  <link
+    href="https://fonts.googleapis.com/css?family=Open+Sans:300,300i,400,400i,600,600i,700,700i|Nunito:300,300i,400,400i,600,600i,700,700i|Poppins:300,300i,400,400i,500,500i,600,600i,700,700i"
+    rel="stylesheet">
+
+  <!-- Vendor CSS Files -->
+  <link href="{{ url_for('static', filename='css/vendor/bootstrap.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='css/vendor/bootstrap-icons.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='css/vendor/boxicons.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='css/vendor/quill.snow.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='css/vendor/quill.bubble.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='css/vendor/remixicon.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='css/vendor/simple-datatables.css') }}" rel="stylesheet">
+  <!--
+
+   OLD BKP
+  <link href="{{ url_for('static', filename='vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='vendor/boxicons/css/boxicons.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='vendor/quill/quill.snow.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='vendor/quill/quill.bubble.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='vendor/remixicon/remixicon.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='vendor/simple-datatables/style.css') }}" rel="stylesheet">
+  -->
+
+  <!-- Template Main CSS File -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style_dark.css') }}">
+
+  <!-- Global Theme Variables (light/dark support) -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/themes.css') }}">
+
+  <!-- Global Component Library -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
+
+  {% block extra_css %}{% endblock %}
+</head>
+
+<body id="app-body">
+  <!-- ======= Header ======= -->
+  <header id="header" class="header fixed-top d-flex align-items-center">
+    <div class="d-flex align-items-center justify-content-between">
+      <a href="{{ url_for('web.index') }}" class="logo d-flex align-items-center">
+        <img src="{{ url_for('static', filename='img/nova_logo.png') }}" alt="">
+        <span class="d-none d-lg-block">Pyteca 1.0</span>
+      </a>
+      <i class="bi bi-list toggle-sidebar-btn"></i>
+    </div><!-- End Logo -->
+
+    <div class="search-bar">
+      <form class="search-form d-flex align-items-center" method="POST" action="#">
+        <input type="text" name="query" placeholder="Pesquisar" title="Digite para pesquisar">
+        <button type="submit" title="Pesquisar"><i class="bi bi-search"></i></button>
+      </form>
+    </div><!-- End Search Bar -->
+
+    <nav class="header-nav ms-auto">
+      <ul class="d-flex align-items-center">
+        <li class="nav-item d-block d-lg-none">
+          <a class="nav-link nav-icon search-bar-toggle " href="#">
+            <i class="bi bi-search"></i>
+          </a>
+        </li><!-- End Search Icon-->
+
+        <!-- Notifications Dropdown -->
+        <li class="nav-item dropdown">
+          <a class="nav-link nav-icon" href="#" data-bs-toggle="dropdown" id="notificationDropdown">
+            <i class="bi bi-bell"></i>
+            <span class="badge bg-primary badge-number" id="notificationBadge">{{ unread_notifications_count }}</span>
+          </a>
+
+          <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow notifications" id="notificationsMenu">
+            <li class="dropdown-header">
+              <span id="notificationsCount">Carregando notificações...</span>
+              <a href="#" onclick="markAllAsRead()" class="text-decoration-none">
+                <span class="badge bg-primary">Marcar todas como lida</span>
+              </a>
+            </li>
+            <li>
+              <hr class="dropdown-divider">
+            </li>
+
+            <!-- Notifications List -->
+            <div id="notificationsList" style="max-height: 400px; overflow-y: auto;">
+              <div class="text-center p-3">
+                <div class="spinner-border spinner-border-sm" role="status"></div>
+                <span class="ms-2">Carregando...</span>
+              </div>
+            </div>
+
+            <li>
+              <hr class="dropdown-divider">
+            </li>
+            <li class="dropdown-footer">
+              <a href="#" onclick="loadMoreNotifications()">Carregar mais</a>
+              <a href="/notifications" class="float-end">Ver todas</a>
+            </li>
+          </ul>
+        </li>
+
+        <li class="nav-item dropdown pe-3">
+          <a class="nav-link nav-profile d-flex align-items-center pe-0" href="#" data-bs-toggle="dropdown">
+            <img
+              src="{{ url_for('static', filename=current_user.foto_perfil.replace('\\', '/')) if (current_user.is_authenticated and current_user.foto_perfil) else url_for('static', filename='img/foto-padrao-perfil.png') }}"
+              alt="Profile" class="rounded-circle profile-img">
+            <span class="d-none d-md-block dropdown-toggle ps-2">
+              {{ current_user.nome or current_user.username if current_user.is_authenticated else 'Usuário' }}
+            </span>
+          </a><!-- End Profile Image Icon -->
+
+          <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow profile">
+            <li class="dropdown-header">
+              <h6>{{ (current_user.nome_completo or current_user.nome or current_user.username) if
+                current_user.is_authenticated else 'Usuário' }}</h6>
+              <span>{{ current_user.cargo or 'Pyteca 1.0' if current_user.is_authenticated else 'Pyteca 1.0'
+                }}</span>
+            </li>
+            <li>
+              <hr class="dropdown-divider">
+            </li>
+            <li>
+              <a class="dropdown-item d-flex align-items-center" href="{{ url_for('web.profile') }}">
+                <i class="bi bi-person"></i>
+                <span>Meu Perfil</span>
+              </a>
+            </li>
+            <li>
+              <hr class="dropdown-divider">
+            </li>
+            <li>
+              <a class="dropdown-item d-flex align-items-center" href="#" onclick="logout()">
+                <i class="bi bi-box-arrow-right"></i>
+                <span>Sair</span>
+              </a>
+            </li>
+          </ul><!-- End Profile Dropdown Items -->
+        </li><!-- End Profile Nav -->
+      </ul>
+    </nav><!-- End Icons Navigation -->
+  </header><!-- End Header -->
+
+  <!-- ======= Sidebar ======= -->
+  <aside id="sidebar" class="sidebar">
+    <ul class="sidebar-nav" id="sidebar-nav">
+
+
+      <!-- Menu dinâmico -->
+      {% block sidebar_menu %}
+      {% if menu_items %}
+      {% for item in menu_items %}
+      {% if item.children %}
+      <!-- Item com submenu -->
+      <li class="nav-item">
+        <a class="nav-link collapsed" data-bs-target="#nav-{{ loop.index }}" data-bs-toggle="collapse"
+          href="{{ safe_url_for(item.endpoint) if item.endpoint else '#' }}">
+          {% if item.icon %}<i class="{{ item.icon }}"></i>{% endif %}
+          <span>{{ item.name }}</span>
+          <i class="bi bi-chevron-down ms-auto"></i>
+        </a>
+        <ul id="nav-{{ loop.index }}" class="nav-content collapse" data-bs-parent="#sidebar-nav">
+          {% for child in item.children %}
+          {% if child.children %}
+          <!-- Subitem com submenu (nível 3) -->
+          <li>
+            <a class="nav-link collapsed" data-bs-target="#nav-{{ loop.parent.index }}-{{ loop.index }}"
+              data-bs-toggle="collapse" href="{{ safe_url_for(child.endpoint) if child.endpoint else '#' }}">
+              {% if child.icon %}<i class="{{ child.icon }}"></i>{% endif %}
+              <span>{{ child.name }}</span>
+              <i class="bi bi-chevron-down ms-auto"></i>
+            </a>
+            <ul id="nav-{{ loop.parent.index }}-{{ loop.index }}" class="nav-content collapse">
+              {% for subchild in child.children %}
+              <li>
+                <a href="{{ safe_url_for(subchild.endpoint) if subchild.endpoint else '#' }}">
+                  {% if subchild.icon %}<i class="{{ subchild.icon }}"></i>{% endif %}
+                  <span>{{ subchild.name }}</span>
+                </a>
+              </li>
+              {% endfor %}
+            </ul>
+          </li>
+          {% else %}
+          <!-- Subitem simples -->
+          <li>
+            <a href="{{ safe_url_for(child.endpoint) if child.endpoint else '#' }}">
+              {% if child.icon %}<i class="{{ child.icon }}"></i>{% endif %}
+              <span>{{ child.name }}</span>
+            </a>
+          </li>
+          {% endif %}
+          {% endfor %}
+        </ul>
+      </li>
+      {% else %}
+      <!-- Item simples -->
+      <li class="nav-item">
+        <a class="nav-link" href="{{ safe_url_for(item.endpoint) if item.endpoint else '#' }}">
+          {% if item.icon %}<i class="{{ item.icon }}"></i>{% endif %}
+          <span>{{ item.name }}</span>
+        </a>
+      </li>
+      {% endif %}
+      {% endfor %}
+      {% endif %}
+      {% endblock %}
+
+      
+    </ul>
+  </aside><!-- End Sidebar-->
+
+  <main id="main" class="main">
+    {% block content %}{% endblock %}
+  </main><!-- End #main -->
+
+  <!-- ======= Footer ======= -->
+  <footer id="footer" class="footer">
+    <div class="copyright">
+      &copy; Copyright <strong><span>Pyteca 1.0</span></strong>. Todos os direitos reservados.
+    </div>
+    <div class="credits">
+      Desenvolvido por <a href="#">Christopher N. S. M. Mauricio</a>
+    </div>
+  </footer><!-- End Footer -->
+
+  <a href="#" class="back-to-top d-flex align-items-center justify-content-center">
+    <i class="bi bi-arrow-up-short"></i>
+  </a>
+
+  <!-- Vendor JS Files -->
+  <script src="{{ url_for('static', filename='vendor/apexcharts/apexcharts.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='vendor/chart.js/chart.umd.js') }}"></script>
+  <script src="{{ url_for('static', filename='vendor/echarts/echarts.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='vendor/simple-datatables/simple-datatables.js') }}"></script>
+  <script src="{{ url_for('static', filename='vendor/php-email-form/validate.js') }}"></script>
+
+  <script src="{{ url_for('static', filename='vendor/tinymce/tinymce.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='vendor/quill/quill.js') }}"></script>
+
+  <!-- Template Main JS File -->
+  <script src="{{ url_for('static', filename='js/web.js') }}"></script>
+
+  <script>
+    function logout() {
+      fetch('/auth/logout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      })
+        .then(response => response.json())
+        .then(data => {
+          if (data.message) {
+            window.location.href = '/login';
+          }
+        })
+        .catch(error => {
+          console.error('Erro:', error);
+          window.location.href = '/login';
+        });
+    }
+  </script>
+
+  <!-- Sistema de Notificações -->
+  <script>
+    class NotificationSystem {
+      constructor() {
+        this.currentPage = 1;
+        this.hasMore = true;
+        this.isLoading = false;
+        this.init();
+      }
+
+      init() {
+        this.loadNotifications();
+        this.setupEventListeners();
+        setInterval(() => this.loadNotifications(true), 30000);
+      }
+
+      setupEventListeners() {
+        document.getElementById('notificationDropdown').addEventListener('show.bs.dropdown', () => {
+          this.loadNotifications();
+        });
+        this.setupWebSocket();
+      }
+
+      async loadNotifications(silent = false) {
+        if (this.isLoading) return;
+
+        this.isLoading = true;
+        if (!silent) {
+          this.showLoading();
+        }
+
+        try {
+          const response = await fetch(`/api/notifications?page=${this.currentPage}&per_page=10`);
+          const data = await response.json();
+
+          if (response.ok) {
+            this.updateNotificationBadge(data.unread_count);
+
+            if (!silent) {
+              this.renderNotifications(data.notifications);
+              this.updateNotificationsCount(data.total, data.unread_count);
+              this.hasMore = data.current_page < data.pages;
+            }
+          } else {
+            this.showError('Erro ao carregar notificações');
+          }
+        } catch (error) {
+          console.error('Erro ao carregar notificações:', error);
+          if (!silent) {
+            this.showError('Erro de conexão');
+          }
+        } finally {
+          this.isLoading = false;
+          if (!silent) {
+            this.hideLoading();
+          }
+        }
+      }
+
+      renderNotifications(notifications) {
+        const container = document.getElementById('notificationsList');
+
+        if (notifications.length === 0) {
+          container.innerHTML = `
+                <div class="text-center p-3 text-muted">
+                    <i class="bi bi-bell-slash display-6"></i>
+                    <p class="mt-2 mb-0">Nenhuma notificação</p>
+                </div>
+            `;
+          return;
+        }
+
+        container.innerHTML = notifications.map(notification => `
+            <li class="notification-item ${notification.is_read ? '' : 'unread'}"
+                data-notification-id="${notification.id}">
+                <div class="d-flex">
+                    <div class="flex-shrink-0 me-3">
+                        <i class="bi ${notification.icon || 'bi-bell'} ${this.getNotificationColor(notification.notification_type)}"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                        ${notification.title ? `<h6 class="mb-1">${notification.title}</h6>` : ''}
+                        <p class="mb-1">${notification.message}</p>
+                        <small class="text-muted">${notification.time_ago}</small>
+                    </div>
+                    <div class="flex-shrink-0 ms-2">
+                        <div class="btn-group btn-group-sm">
+                            ${!notification.is_read ? `
+                                <button class="btn btn-outline-primary btn-sm"
+                                        onclick="markAsRead(${notification.id})"
+                                        title="Marcar como lida">
+                                    <i class="bi bi-check"></i>
+                                </button>
+                            ` : ''}
+                            <button class="btn btn-outline-danger btn-sm"
+                                    onclick="deleteNotification(${notification.id})"
+                                    title="Excluir">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                ${notification.action_url ? `
+                    <div class="mt-2">
+                        <a href="${this.buildActionUrl(notification)}"
+                           class="btn btn-sm btn-outline-secondary w-100">
+                            <i class="bi bi-arrow-right"></i> Ver detalhes
+                        </a>
+                    </div>
+                ` : ''}
+            </li>
+            <li><hr class="dropdown-divider"></li>
+        `).join('');
+      }
+
+      getNotificationColor(type) {
+        const colors = {
+          'info': 'text-primary',
+          'success': 'text-success',
+          'warning': 'text-warning',
+          'error': 'text-danger',
+          'system': 'text-secondary'
+        };
+        return colors[type] || 'text-primary';
+      }
+
+      buildActionUrl(notification) {
+        if (!notification.action_url) return '#';
+        let url = notification.action_url;
+        const params = notification.action_params || {};
+        const urlParams = new URLSearchParams(params);
+        return url + (url.includes('?') ? '&' : '?') + urlParams.toString();
+      }
+
+      updateNotificationBadge(count) {
+        const badge = document.getElementById('notificationBadge');
+        if (badge) {
+          badge.textContent = count;
+          badge.style.display = count > 0 ? 'inline' : 'none';
+        }
+      }
+
+      updateNotificationsCount(total, unread) {
+        const countElement = document.getElementById('notificationsCount');
+        if (countElement) {
+          countElement.innerHTML = `
+                Você tem <strong>${unread}</strong> notificaç${unread === 1 ? 'ão' : 'ões'} não lida${unread === 1 ? '' : 's'}
+            `;
+        }
+      }
+
+      showLoading() {
+        const container = document.getElementById('notificationsList');
+        container.innerHTML = `
+            <div class="text-center p-3">
+                <div class="spinner-border spinner-border-sm" role="status"></div>
+                <span class="ms-2">Carregando...</span>
+            </div>
+        `;
+      }
+
+      hideLoading() { }
+
+      showError(message) {
+        const container = document.getElementById('notificationsList');
+        container.innerHTML = `
+            <div class="text-center p-3 text-danger">
+                <i class="bi bi-exclamation-triangle"></i>
+                <p class="mt-2 mb-0">${message}</p>
+                <button class="btn btn-sm btn-outline-primary mt-2" onclick="notificationSystem.loadNotifications()">
+                    Tentar novamente
+                </button>
+            </div>
+        `;
+      }
+
+      setupWebSocket() { }
+    }
+
+    async function markAsRead(notificationId) {
+      try {
+        const response = await fetch(`/api/notifications/${notificationId}/read`, {
+          method: 'PUT'
+        });
+
+        if (response.ok) {
+          const notificationElement = document.querySelector(`[data-notification-id="${notificationId}"]`);
+          if (notificationElement) {
+            notificationElement.classList.remove('unread');
+            notificationElement.querySelector('.btn-group')?.remove();
+          }
+          notificationSystem.loadNotifications(true);
+        }
+      } catch (error) {
+        console.error('Erro ao marcar como lida:', error);
+        alert('Erro ao marcar notificação como lida');
+      }
+    }
+
+    async function markAllAsRead() {
+      if (!confirm('Marcar todas as notificações como lidas?')) return;
+
+      try {
+        const response = await fetch('/api/notifications/read-all', {
+          method: 'PUT'
+        });
+
+        if (response.ok) {
+          notificationSystem.loadNotifications();
+          alert('Todas as notificações marcadas como lidas!');
+        }
+      } catch (error) {
+        console.error('Erro ao marcar todas como lidas:', error);
+        alert('Erro ao marcar notificações como lidas');
+      }
+    }
+
+    async function deleteNotification(notificationId) {
+      if (!confirm('Excluir esta notificação?')) return;
+
+      try {
+        const response = await fetch(`/api/notifications/${notificationId}`, {
+          method: 'DELETE'
+        });
+
+        if (response.ok) {
+          const notificationElement = document.querySelector(`[data-notification-id="${notificationId}"]`);
+          if (notificationElement) {
+            notificationElement.nextElementSibling?.remove();
+            notificationElement.remove();
+          }
+          notificationSystem.loadNotifications(true);
+        }
+      } catch (error) {
+        console.error('Erro ao excluir notificação:', error);
+        alert('Erro ao excluir notificação');
+      }
+    }
+
+    function loadMoreNotifications() {
+      notificationSystem.currentPage++;
+      notificationSystem.loadNotifications();
+    }
+
+    const notificationSystem = new NotificationSystem();
+  </script>
+
+  <!-- Auth flag injected as pure JS (prevents JS linters from complaining about Jinja inside JS) -->
+  <script>
+
+    window.APP_IS_AUTH = {{ (current_user.is_authenticated) | tojson }};
+  </script>
+
+  <!-- Sistema de Tema Escuro (no Jinja inside JS) -->
+  <script>
+    function toggleTheme() {
+      const root = document.documentElement;
+
+      // Prevent ugly transition flashes while switching
+      root.classList.add('theme-switching');
+
+      const current = root.getAttribute('data-theme') || 'light';
+      const next = (current === 'light') ? 'dark' : 'light';
+
+      root.setAttribute('data-theme', next);
+      try { localStorage.setItem('theme', next); } catch (e) { }
+
+      window.setTimeout(() => root.classList.remove('theme-switching'), 120);
+
+      // Persist to server when logged in
+      if (window.APP_IS_AUTH) {
+        fetch('/api/auth/update_theme', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ modo_escuro: next === 'dark' })
+        }).catch(err => console.error('Erro ao salvar preferência de tema:', err));
+      }
+    }
+  </script>
+
+  {% block extra_js %}{% endblock %}
+</body>
+
+</html>

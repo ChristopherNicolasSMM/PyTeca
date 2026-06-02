@@ -1,0 +1,223 @@
+/**
+ * Global Theme Variables
+ * Light and dark theme CSS variables for entire BrewStation application
+ */
+
+/* =====================
+   LIGHT THEME (Default)
+   ===================== */
+:root {
+  /* Primary Colors */
+  --color-primary: #4154f1;
+  --color-primary-hover: #364ce1;
+  --color-primary-light: #6170f7;
+  --color-success: #51cf66;
+  --color-warning: #ffc107;
+  --color-danger: #dc3545;
+  --color-info: #00bcd4;
+
+  /* Background Colors */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f6f9ff;
+  --bg-tertiary: #f0f4ff;
+  --bg-hover: #f9faff;
+  --bg-panel: #ffffff;
+  --bg-card: #ffffff;
+
+  /* Text Colors */
+  --text-primary: #012970;
+  --text-secondary: #444444;
+  --text-tertiary: #595959;
+  --text-light: #666666;
+  --text-muted: #777777;
+
+  /* Border & Dividers */
+  --border-color: #e8eef7;
+  --border-light: #f0f4ff;
+  --shadow-color: rgba(0, 0, 0, 0.1);
+  --shadow-light: rgba(0, 0, 0, 0.05);
+
+  /* Component Specific */
+  --table-header-bg: #f8faff;
+  --table-row-hover: #f9faff;
+  --tab-active-border: #4154f1;
+  --tab-inactive-color: #444444;
+  --input-border: #dee2e6;
+  --input-focus-border: #4154f1;
+  --input-bg: #ffffff;
+
+  /* Spacing & Typography */
+  --border-radius: 8px;
+  --border-radius-lg: 12px;
+  --border-radius-sm: 4px;
+  --transition-speed: 0.3s;
+  --transition-timing: ease-in-out;
+
+  /* Opacity Levels */
+  --opacity-hover: 0.9;
+  --opacity-disabled: 0.6;
+  --opacity-subtle: 0.08;
+  --opacity-faint: 0.03;
+
+  /* Bootstrap Variables for Light Theme */
+  --bs-body-bg: #f6f9ff;
+  --bs-body-color: #444444;
+  --bs-border-color: #e8eef7;
+  --bs-heading-color: #012970;
+  --bs-link-color: #4154f1;
+  --bs-link-hover-color: #717ff5;
+}
+
+/* Light theme body styles */
+body {
+  background: var(--bs-body-bg);
+  color: var(--bs-body-color);
+}
+
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+  transition: color var(--transition-speed) var(--transition-timing);
+}
+
+a:hover {
+  color: var(--color-primary-hover);
+}
+
+p {
+  color: var(--text-secondary);
+}
+
+.section {
+  background: var(--bg-secondary);
+}
+
+.card {
+  background: var(--bg-card);
+  border-color: var(--border-color);
+  color: var(--text-secondary);
+}
+
+.card-header {
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
+}
+
+.alert {
+  border-color: var(--border-color);
+}
+
+/* =====================
+   DARK THEME
+   ===================== */
+html[data-theme="dark"] {
+  /* Primary Colors - Adjusted for dark contrast */
+  --color-primary: #60a5fa;
+  --color-primary-hover: #93c5fd;
+  --color-primary-light: #93c5fd;
+  --color-success: #4ade80;
+  --color-warning: #facc15;
+  --color-danger: #f87171;
+  --color-info: #22d3ee;
+
+  /* Background Colors */
+  --bg-primary: #0b1220;
+  --bg-secondary: #1f2735;
+  --bg-tertiary: #2d3548;
+  --bg-hover: #374151;
+  --bg-panel: #1f2735;
+  --bg-card: #1f2735;
+
+  /* Text Colors */
+  --text-primary: #f8fafc;
+  --text-secondary: #e2e8f0;
+  --text-tertiary: #cbd5e1;
+  --text-light: #94a3b8;
+  --text-muted: #64748b;
+
+  /* Border & Dividers */
+  --border-color: #374151;
+  --border-light: #2d3548;
+  --shadow-color: rgba(0, 0, 0, 0.3);
+  --shadow-light: rgba(0, 0, 0, 0.2);
+
+  /* Component Specific */
+  --table-header-bg: #1f2735;
+  --table-row-hover: #2d3548;
+  --tab-active-border: #60a5fa;
+  --tab-inactive-color: #cbd5e1;
+  --input-border: #374151;
+  --input-focus-border: #60a5fa;
+  --input-bg: #1f2735;
+
+  /* Spacing & Typography - Same as light */
+  --border-radius: 8px;
+  --border-radius-lg: 12px;
+  --border-radius-sm: 4px;
+  --transition-speed: 0.3s;
+  --transition-timing: ease-in-out;
+
+  /* Opacity Levels - Same as light */
+  --opacity-hover: 0.9;
+  --opacity-disabled: 0.6;
+  --opacity-subtle: 0.08;
+  --opacity-faint: 0.03;
+
+  /* Bootstrap Variables for Dark Theme */
+  --bs-body-bg: #0b1220;
+  --bs-body-color: #e2e8f0;
+  --bs-border-color: #374151;
+  --bs-heading-color: #f8fafc;
+  --bs-link-color: #60a5fa;
+  --bs-link-hover-color: #93c5fd;
+}
+
+/* Dark theme body styles */
+html[data-theme="dark"] body {
+  background: var(--bs-body-bg);
+  color: var(--bs-body-color);
+}
+
+html[data-theme="dark"] .section {
+  background: var(--bg-secondary);
+}
+
+html[data-theme="dark"] .card {
+  background: var(--bg-card);
+  border-color: var(--border-color);
+  color: var(--text-secondary);
+}
+
+html[data-theme="dark"] .card-header {
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
+}
+
+html[data-theme="dark"] .alert {
+  border-color: var(--border-color);
+}
+
+html[data-theme="dark"] a {
+  color: var(--bs-link-color);
+}
+
+html[data-theme="dark"] a:hover {
+  color: var(--bs-link-hover-color);
+}
+
+html[data-theme="dark"] p {
+  color: var(--text-secondary);
+}
+
+html[data-theme="dark"] h1,
+html[data-theme="dark"] h2,
+html[data-theme="dark"] h3,
+html[data-theme="dark"] h4,
+html[data-theme="dark"] h5,
+html[data-theme="dark"] h6 {
+  color: var(--bs-heading-color);
+}
+
+html[data-theme="dark"] .text-muted {
+  color: var(--text-muted) !important;
+}

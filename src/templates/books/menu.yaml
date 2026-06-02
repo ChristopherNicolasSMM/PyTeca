@@ -1,0 +1,12 @@
+menu:
+  - name: "Home"
+    endpoint: "web.index"       # Ajuste para o endpoint real da sua rota inicial
+    icon: "bi bi-house-door"
+
+
+  - name: "Livros"
+    endpoint: "books.list_books"
+    icon: "bi bi-book"
+  - name: "Novo Livro"
+    endpoint: "books.new_book"
+    icon: "bi bi-plus-circle"

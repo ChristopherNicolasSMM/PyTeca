@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}Página Não Encontrada - Pyteca{% endblock %}
+
+{% block content %}
+<div class="pagetitle">
+    <h1>404 - Página Não Encontrada</h1>
+    <nav>
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('web.index') }}">Home</a></li>
+            <li class="breadcrumb-item active">404</li>
+        </ol>
+    </nav>
+</div>
+
+<section class="section error-404 min-vh-100 d-flex flex-column align-items-center justify-content-center">
+    <div class="text-center">
+        <h1>404</h1>
+        <h2 class="mb-4">A página que você está procurando não existe.</h2>
+        <p class="mb-4">
+            Talvez você tenha digitado o endereço errado ou a página foi movida.
+        </p>
+        <a href="{{ url_for('web.dashboard') }}" class="btn btn-primary">Voltar para Home</a>
+    </div>
+</section>
+{% endblock %}

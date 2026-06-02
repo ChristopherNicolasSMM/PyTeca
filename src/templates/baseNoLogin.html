@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="utf-8">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+  <title>{% block title %}Pyteca{% endblock %}</title>
+  <meta content="" name="description">
+  <meta content="" name="keywords">
+
+  <!-- Favicons -->
+  <link href="{{ url_for('static', filename='img/nova_logo.png') }}" rel="icon">
+  <link href="{{ url_for('static', filename='img/apple-touch-icon.png') }}" rel="apple-touch-icon">
+
+  <!-- Google Fonts -->
+  <link href="https://fonts.gstatic.com" rel="preconnect">
+  <link
+    href="https://fonts.googleapis.com/css?family=Open+Sans:300,300i,400,400i,600,600i,700,700i|Nunito:300,300i,400,400i,600,600i,700,700i|Poppins:300,300i,400,400i,500,500i,600,600i,700,700i"
+    rel="stylesheet">
+
+  <!-- Vendor CSS Files -->
+  <link href="{{ url_for('static', filename='vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='vendor/boxicons/css/boxicons.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='vendor/quill/quill.snow.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='vendor/quill/quill.bubble.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='vendor/remixicon/remixicon.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='vendor/simple-datatables/style.css') }}" rel="stylesheet">
+
+  <!-- Template Main CSS File -->
+  <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+
+  {% block extra_css %}{% endblock %}
+</head>
+
+<body>
+  <!-- ======= Header ======= -->
+  <header id="header" class="header fixed-top d-flex align-items-center">
+
+  </header><!-- End Header -->
+
+
+  <main id="main" class="main">
+    {% block content %}{% endblock %}
+  </main><!-- End #main -->
+
+  <!-- ======= Footer ======= -->
+  <footer id="footer" class="footer">
+    <div class="copyright">
+      &copy; Copyright <strong><span>Pyteca 1.0</span></strong>. Todos os direitos reservados.
+    </div>
+    <div class="credits">
+      Desenvolvido por <a href="#">Christopher N. S. M. Mauricio</a>
+    </div>
+  </footer><!-- End Footer -->
+
+  <a href="#" class="back-to-top d-flex align-items-center justify-content-center"><i
+      class="bi bi-arrow-up-short"></i></a>
+
+  <!-- Vendor JS Files -->
+  <script src="{{ url_for('static', filename='vendor/apexcharts/apexcharts.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='vendor/chart.js/chart.umd.js') }}"></script>
+  <script src="{{ url_for('static', filename='vendor/echarts/echarts.min.js') }}"></script>
+  <!--<script src="{{ url_for('static', filename='vendor/quill/quill.min.js') }}"></script>-->
+  <script src="{{ url_for('static', filename='vendor/simple-datatables/simple-datatables.js') }}"></script>
+  <script src="{{ url_for('static', filename='vendor/php-email-form/validate.js') }}"></script>
+
+  <script src="{{ url_for('static', filename='vendor/tinymce/tinymce.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='vendor/quill/quill.js') }}"></script>
+
+  <!-- Template Main JS File -->
+  <script src="{{ url_for('static', filename='js/web.js') }}"></script>
+
+
+<style>
+/* Notifications Styles */
+.notifications {
+    width: 400px;
+    max-width: 90vw;
+}
+
+.notifications .dropdown-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.notification-item {
+    padding: 0.75rem 1rem;
+    border-left: 3px solid transparent;
+    transition: all 0.2s ease;
+}
+
+.notification-item.unread {
+    border-left-color: #0d6efd;
+    background-color: #f8f9fa;
+}
+
+.notification-item:hover {
+    background-color: #e9ecef;
+}
+
+.notification-item .text-primary { color: #0d6efd !important; }
+.notification-item .text-success { color: #198754 !important; }
+.notification-item .text-warning { color: #ffc107 !important; }
+.notification-item .text-danger { color: #dc3545 !important; }
+.notification-item .text-secondary { color: #6c757d !important; }
+
+.notification-item i[class^="bi-"] {
+    font-size: 1.2rem;
+}
+
+.notification-item .btn-group {
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.notification-item:hover .btn-group {
+    opacity: 1;
+}
+
+.dropdown-footer {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 1rem;
+}
+
+#notificationsList {
+    scrollbar-width: thin;
+    scrollbar-color: #adb5bd transparent;
+}
+
+#notificationsList::-webkit-scrollbar {
+    width: 6px;
+}
+
+#notificationsList::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+#notificationsList::-webkit-scrollbar-thumb {
+    background-color: #adb5bd;
+    border-radius: 3px;
+}
+
+/* Badge animation */
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+
+.badge.bg-primary {
+    animation: pulse 2s infinite;
+}
+</style>
+
+
+
+
+
+
+
+
+  {% block extra_js %}{% endblock %}
+</body>
+
+</html>

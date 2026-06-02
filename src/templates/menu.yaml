@@ -1,0 +1,35 @@
+menu:
+  - name: "Home"
+    endpoint: "web.index"       # Ajuste para o endpoint real da sua rota inicial
+    icon: "bi bi-house-door"
+
+  - name: "Biblioteca"
+    endpoint: null             
+    icon: "bi bi-box-seam"
+    children:
+      - name: "Visão Geral"
+        endpoint: "books.list_books"
+        icon: "bi bi-grid"
+
+      - name: "Cadastrar Novo"
+        endpoint: "books.new_book"
+        icon: "bi bi-plus-circle"
+
+      - name: "Relatórios"
+        endpoint: "web.relatorios_livros"
+        icon: "bi bi-bar-chart"
+
+
+  - name: "Conta"
+    endpoint: null             # Item pai sem endpoint direto
+    icon: "bi bi-box-seam"
+    children:
+      - name: "Perfil"
+        endpoint: "web.profile"
+        icon: "bi bi-person-circle"
+
+      - name: "Notificações"
+        endpoint: "web.notifications"
+        icon: "bi bi-bell"
+
+

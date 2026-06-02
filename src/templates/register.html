@@ -1,0 +1,340 @@
+<!-- templates/register_request.html -->
+{% extends "baseNoLogin.html" %}
+
+{% block title %}Solicitar Registro - Pyteca{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-body">
+                    <!-- Logo e Título -->
+                    <div class="text-center mb-4">
+                        <img src="{{ url_for('static', filename='img/favicon.png') }}" alt="Logo" width="80" class="mb-3">
+                        <h4 class="card-title">Solicitar Registro no Pyteca</h4>
+                        <p class="text-muted">Preencha seus dados para solicitar acesso ao sistema</p>
+                    </div>
+
+                    <!-- Alertas -->
+                    <div id="alert-container"></div>
+
+                    <!-- Formulário de Solicitação -->
+                    <form id="registerRequestForm" class="row g-3">
+                        <!-- Dados Pessoais -->
+                        <div class="col-12">
+                            <h6 class="border-bottom pb-2">Dados Pessoais</h6>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label for="first_name" class="form-label">Nome <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="first_name" name="first_name" required>
+                            <div class="invalid-feedback">Por favor, informe seu nome.</div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label for="last_name" class="form-label">Sobrenome <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="last_name" name="last_name" required>
+                            <div class="invalid-feedback">Por favor, informe seu sobrenome.</div>
+                        </div>
+
+                        <div class="col-12">
+                            <label for="email" class="form-label">E-mail <span class="text-danger">*</span></label>
+                            <input type="email" class="form-control" id="email" name="email" required>
+                            <div class="invalid-feedback">Por favor, informe um e-mail válido.</div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label for="phone" class="form-label">Telefone</label>
+                            <input type="tel" class="form-control" id="phone" name="phone" placeholder="(11) 99999-9999">
+                        </div>
+
+                        <div class="col-md-6">
+                            <label for="company" class="form-label">Empresa/Cervejaria</label>
+                            <input type="text" class="form-control" id="company" name="company">
+                        </div>
+
+                        <!-- Apresentação Pessoal -->
+                        <div class="col-12">
+                            <h6 class="border-bottom pb-2 mt-4">Apresentação Pessoal</h6>
+                        </div>
+
+                        <div class="col-12">
+                            <label for="experience" class="form-label">Experiência com Cervejaria</label>
+                            <select class="form-select" id="experience" name="experience">
+                                <option value="">Selecione...</option>
+                                <option value="beginner">Iniciante - Estou começando</option>
+                                <option value="hobbyist">Hobby - Produzo em casa</option>
+                                <option value="professional">Profissional - Trabalho na área</option>
+                                <option value="brewer">Cervejeiro - Tenho cervejaria</option>
+                                <option value="other">Outro</option>
+                            </select>
+                        </div>
+
+                        <div class="col-12">
+                            <label for="presentation" class="form-label">Apresentação Pessoal <span class="text-danger">*</span></label>
+                            <textarea class="form-control" id="presentation" name="presentation" rows="4" 
+                                     placeholder="Conte um pouco sobre você, sua experiência com cervejaria e por que gostaria de acessar o sistema..." 
+                                     required></textarea>
+                            <div class="form-text">Esta informação será enviada ao administrador para avaliação.</div>
+                            <div class="invalid-feedback">Por favor, faça uma breve apresentação.</div>
+                        </div>
+
+                        <div class="col-12">
+                            <label for="objectives" class="form-label">Objetivos no Sistema</label>
+                            <textarea class="form-control" id="objectives" name="objectives" rows="3" 
+                                     placeholder="Quais são seus principais objetivos ao usar o sistema?"></textarea>
+                        </div>
+
+                        <!-- Termos e Condições -->
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="terms" name="terms" required>
+                                <label class="form-check-label" for="terms">
+                                    Concordo com os <a href="#" data-bs-toggle="modal" data-bs-target="#termsModal">termos e condições</a> 
+                                    e com o tratamento dos meus dados <span class="text-danger">*</span>
+                                </label>
+                                <div class="invalid-feedback">Você deve concordar com os termos para continuar.</div>
+                            </div>
+                        </div>
+
+                        <!-- Botões -->
+                        <div class="col-12">
+                            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                <button type="button" class="btn btn-secondary" onclick="window.history.back()">
+                                    <i class="bi bi-arrow-left"></i> Voltar
+                                </button>
+                                <button type="submit" class="btn btn-primary" id="submitBtn">
+                                    <i class="bi bi-send"></i> Enviar Solicitação
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+
+                    <!-- Informações Adicionais -->
+                    <div class="mt-4">
+                        <div class="alert alert-info">
+                            <h6><i class="bi bi-info-circle"></i> Como funciona:</h6>
+                            <ul class="mb-0 small">
+                                <li>Seus dados serão enviados para o administrador do sistema</li>
+                                <li>O administrador avaliará sua solicitação</li>
+                                <li>Você receberá um e-mail com a resposta em até 48 horas</li>
+                                <li>O acesso será concedido mediante aprovação</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Termos e Condições -->
+<div class="modal fade" id="termsModal" tabindex="-1" aria-labelledby="termsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="termsModalLabel">Termos e Condições</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <h6>1. Coleta de Dados</h6>
+                <p>Coletamos apenas as informações necessárias para avaliar sua solicitação de acesso ao sistema Pyteca.</p>
+                
+                <h6>2. Uso das Informações</h6>
+                <p>Suas informações serão utilizadas exclusivamente para:</p>
+                <ul>
+                    <li>Avaliar sua solicitação de acesso</li>
+                    <li>Entrar em contato para esclarecimentos</li>
+                    <li>Criar sua conta em caso de aprovação</li>
+                </ul>
+                
+                <h6>3. Armazenamento</h6>
+                <p>Seus dados serão armazenados de forma segura e não serão compartilhados com terceiros.</p>
+                
+                <h6>4. Aprovação</h6>
+                <p>A aprovação do acesso é discricionária e depende da análise do administrador do sistema.</p>
+                
+                <h6>5. Responsabilidades</h6>
+                <p>Ao acessar o sistema, você concorda em utilizar os recursos de forma responsável e ética.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('registerRequestForm');
+    const submitBtn = document.getElementById('submitBtn');
+    
+    // Máscara para telefone
+    const phoneInput = document.getElementById('phone');
+    phoneInput.addEventListener('input', function(e) {
+        let value = e.target.value.replace(/\D/g, '');
+        if (value.length > 11) value = value.substring(0, 11);
+        
+        if (value.length > 10) {
+            value = value.replace(/^(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+        } else if (value.length > 6) {
+            value = value.replace(/^(\d{2})(\d{4})(\d{0,4})/, '($1) $2-$3');
+        } else if (value.length > 2) {
+            value = value.replace(/^(\d{2})(\d{0,5})/, '($1) $2');
+        } else if (value.length > 0) {
+            value = value.replace(/^(\d{0,2})/, '($1');
+        }
+        
+        e.target.value = value;
+    });
+
+    // Validação do formulário
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        if (!form.checkValidity()) {
+            e.stopPropagation();
+            form.classList.add('was-validated');
+            return;
+        }
+
+        // Desabilitar botão e mostrar loading
+        const originalText = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Enviando...';
+        submitBtn.disabled = true;
+
+        try {
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData.entries());
+
+            const response = await fetch('/api/register/request', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                showAlert('Solicitação enviada com sucesso! Entraremos em contato em breve.', 'success');
+                form.reset();
+                form.classList.remove('was-validated');
+                
+                // Redirecionar após 3 segundos
+                setTimeout(() => {
+                    window.location.href = "{{ url_for('web.index') }}";
+                }, 3000);
+            } else {
+                showAlert('Erro: ' + (result.error || 'Erro ao enviar solicitação'), 'danger');
+            }
+        } catch (error) {
+            console.error('Erro:', error);
+            showAlert('Erro de conexão. Tente novamente.', 'danger');
+        } finally {
+            submitBtn.innerHTML = originalText;
+            submitBtn.disabled = false;
+        }
+    });
+
+    // Validação em tempo real
+    const inputs = form.querySelectorAll('input, select, textarea');
+    inputs.forEach(input => {
+        input.addEventListener('blur', function() {
+            if (this.checkValidity()) {
+                this.classList.remove('is-invalid');
+                this.classList.add('is-valid');
+            } else {
+                this.classList.remove('is-valid');
+                this.classList.add('is-invalid');
+            }
+        });
+    });
+});
+
+function showAlert(message, type) {
+    const container = document.getElementById('alert-container');
+    const alertHTML = `
+        <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    container.innerHTML = alertHTML;
+    
+    // Auto-remover após 5 segundos
+    setTimeout(() => {
+        container.innerHTML = '';
+    }, 5000);
+}
+</script>
+
+<style>
+.card {
+    border: none;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    margin-top: 2rem;
+}
+
+.card-body {
+    padding: 2rem;
+}
+
+.form-label {
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+}
+
+.border-bottom {
+    border-color: #dee2e6 !important;
+}
+
+.btn-primary {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+}
+
+.btn-primary:hover {
+    background-color: #0b5ed7;
+    border-color: #0a58ca;
+}
+
+.alert-info {
+    background-color: #d1ecf1;
+    border-color: #bee5eb;
+    color: #0c5460;
+}
+
+.invalid-feedback {
+    display: block;
+}
+
+.was-validated .form-control:invalid,
+.was-validated .form-select:invalid {
+    border-color: #dc3545;
+}
+
+.was-validated .form-control:valid,
+.was-validated .form-select:valid {
+    border-color: #198754;
+}
+
+@media (max-width: 768px) {
+    .card-body {
+        padding: 1.5rem;
+    }
+    
+    .d-md-flex {
+        flex-direction: column;
+    }
+    
+    .d-md-flex .btn {
+        margin-bottom: 0.5rem;
+    }
+}
+</style>
+{% endblock %}
