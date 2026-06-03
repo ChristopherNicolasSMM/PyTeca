@@ -7,10 +7,13 @@ from py_compile import main
 import click
 import yaml
 from dotenv import load_dotenv
-from flask import Flask, request, url_for
+from flask import Flask, request, url_for, Blueprint
 from flask.cli import with_appcontext
 from flask_cors import CORS
 from flask_login import LoginManager
+import pkgutil
+import importlib
+
 
 from logs.setup_logging import configure_logging
 
@@ -74,37 +77,74 @@ def create_app():
     return app
 
 
-def register_core_blueprints(app):
-    """Registra os blueprints essenciais da aplicação."""
+
+def discover_and_register_blueprints(app, package_name):
+    """
+    Percorre todas as subclasses do pacote 'package_name', importa cada módulo
+    e registra quaisquer objetos Blueprint encontrados.
+    """
     try:
-        from api.routes.auth_routes import auth_bp as api_auth_bp
-        from api.routes.notifications_routes import notifications_bp
-        from api.routes.register import register_bp
-        from api.routes.book.book_routes import book_api_bp
-        from api.routes.smart_list_routes import smart_list_api_bp 
-        from api.routes.author.author_routes import author_api_bp 
+        package = importlib.import_module(package_name)
+    except ImportError as e:
+        app.logger.error(f"Pacote '{package_name}' não encontrado: {e}")
+        return
 
-        from controller.auth import auth_bp
-        from controller.web import web_bp
-        from controller.book.book import book_bp
-        from controller.author.author import author_bp
+    for importer, modname, ispkg in pkgutil.walk_packages(package.__path__, prefix=package_name + '.'):
+        # Ignora módulos de cache ou testes
+        if '__pycache__' in modname or modname.endswith('.tests'):
+            continue
+        try:
+            module = importlib.import_module(modname)
+            for attr_name in dir(module):
+                attr = getattr(module, attr_name)
+                if isinstance(attr, Blueprint):
+                    app.register_blueprint(attr)
+                    app.logger.debug(f"Blueprint registrado: {attr.name} de {modname}")
+        except Exception as e:
+            app.logger.error(f"Erro ao importar/registrar {modname}: {e}")
 
-        app.register_blueprint(web_bp)
-        app.register_blueprint(auth_bp,            url_prefix="/auth")
-        app.register_blueprint(register_bp,        url_prefix="/api")
-        app.register_blueprint(notifications_bp,   url_prefix="/api")
-        app.register_blueprint(api_auth_bp)
-        app.register_blueprint(book_bp)
-        app.register_blueprint(book_api_bp)
-        app.register_blueprint(smart_list_api_bp) 
-        
-        app.register_blueprint(author_api_bp)
-        app.register_blueprint(author_bp)
-
-        app.logger.info("Blueprints core registrados com sucesso.")
+def register_core_blueprints(app):
+    """Registra todos os blueprints automaticamente."""
+    try:
+        discover_and_register_blueprints(app, 'controller')
+        discover_and_register_blueprints(app, 'api.routes')
+        app.logger.info("Blueprints core registrados com sucesso via auto-descoberta.")
     except Exception as exc:
         app.logger.exception("Erro ao registrar blueprints core: %s", exc)
         raise
+
+
+#def register_core_blueprints(app):
+#    """Registra os blueprints essenciais da aplicação."""
+#    try:
+#        from api.routes.auth_routes import auth_bp as api_auth_bp
+#        from api.routes.notifications_routes import notifications_bp
+#        from api.routes.register import register_bp
+#        from api.routes.book.book_routes import book_api_bp
+#        from api.routes.smart_list_routes import smart_list_api_bp 
+#        from api.routes.author.author_routes import author_api_bp 
+#
+#        from controller.auth import auth_bp
+#        from controller.web import web_bp
+#        from controller.book.book import book_bp
+#        from controller.author.author import author_bp
+#
+#        app.register_blueprint(web_bp)
+#        app.register_blueprint(auth_bp,            url_prefix="/auth")
+#        app.register_blueprint(register_bp,        url_prefix="/api")
+#        app.register_blueprint(notifications_bp,   url_prefix="/api")
+#        app.register_blueprint(api_auth_bp)
+#        app.register_blueprint(book_bp)
+#        app.register_blueprint(book_api_bp)
+#        app.register_blueprint(smart_list_api_bp) 
+#        
+#        app.register_blueprint(author_api_bp)
+#        app.register_blueprint(author_bp)
+#
+#        app.logger.info("Blueprints core registrados com sucesso.")
+#    except Exception as exc:
+#        app.logger.exception("Erro ao registrar blueprints core: %s", exc)
+#        raise
 
 def register_context_processors(app):
     """Registra context processors, incluindo o menu dinâmico baseado em YAML."""

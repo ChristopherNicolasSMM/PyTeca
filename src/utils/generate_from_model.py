@@ -780,6 +780,13 @@ def render_modal_template(class_name: str, metadata: Dict) -> str:
 </div>
 '''
 
+def ensure_init_py(directory: Path) -> None:
+    """Cria um arquivo __init__.py vazio no diretório se não existir."""
+    init_file = directory / "__init__.py"
+    if not init_file.exists():
+        init_file.write_text("# Auto-generated __init__.py", encoding='utf-8')
+        print(f"Criado: {init_file}")
+
 # ============================================================
 # FUNÇÕES DE GERAÇÃO (CONTROLLER, SERVICE, ROUTES, TEMPLATES)
 # ============================================================
@@ -787,6 +794,7 @@ def generate_controller(model_file: str, class_name: str, plural: str, metadata:
     base_name = Path(model_file).stem
     controller_dir = Path("controller") / base_name     
     controller_dir.mkdir(parents=True, exist_ok=True)
+    ensure_init_py(controller_dir)
     controller_path = controller_dir / f"{class_name.lower()}.py"
     if controller_path.exists():
         print(f"Controller já existe: {controller_path}")
@@ -799,6 +807,7 @@ def generate_service(model_file: str, class_name: str, plural: str, metadata: Di
     base_name = Path(model_file).stem
     service_dir = Path("services") / base_name
     service_dir.mkdir(parents=True, exist_ok=True)
+    ensure_init_py(service_dir)
     service_path = service_dir / f"{class_name.lower()}_service.py"
     if service_path.exists():
         print(f"Service já existe: {service_path}")
@@ -811,6 +820,7 @@ def generate_routes(model_file: str, class_name: str, plural: str, metadata: Dic
     base_name = Path(model_file).stem
     routes_dir = Path("api/routes") / base_name
     routes_dir.mkdir(parents=True, exist_ok=True)
+    ensure_init_py(routes_dir)
     routes_path = routes_dir / f"{class_name.lower()}_routes.py"
     if routes_path.exists():
         print(f"Routes já existe: {routes_path}")
