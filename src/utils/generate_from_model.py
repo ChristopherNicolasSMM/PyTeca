@@ -77,7 +77,7 @@ from services.{class_name.lower()}.{class_name.lower()}_service import {class_na
 from utils.smart_list import ColumnDef, FilterDef, SmartListConfig, SmartListRenderer
 from utils.smart_list.export import export_csv, export_excel, export_pdf
 
-bp = Blueprint("{plural}", __name__, url_prefix="/{plural}")
+{class_name.lower()}_bp = Blueprint("{plural}", __name__, url_prefix="/{plural}")
 
 # ---- Configuração SmartList ----
 def _genre_options():
@@ -100,10 +100,10 @@ SMART_LIST_CONFIG = SmartListConfig(
     export_filename="{plural}",
 )
 
-@bp.route("/")
+@{class_name.lower()}_bp.route("/")
 @login_required
-def list():
-    status = request.args.get("status", "{class_name}Status.ACTIVE")
+def list():    
+    status = request.args.get("status", {class_name}Status.ACTIVE.value)  # "active"
     export = request.args.get("export", "")
 
     user_layout = None
@@ -123,13 +123,12 @@ def list():
         per_page=per_page,
         status=status,
         search=request.args.get("search", "").strip() or None,
-        genre=request.args.get("genre", "").strip() or None,
         sort=request.args.get("sort", SMART_LIST_CONFIG.default_sort),
         direction=request.args.get("dir", SMART_LIST_CONFIG.default_dir),
     )
 
     if export in ("csv", "excel", "pdf"):
-        all_result = service.list(page=1, per_page=10_000, status=status, ...)
+        all_result = service.list(page=1, per_page=10_000, status=status)
         visible_cols = (user_layout or {{}}).get("columns") or None
         if export == "csv":
             return export_csv(SMART_LIST_CONFIG, all_result.items, visible_cols)
@@ -153,7 +152,7 @@ def list():
         current_status=status,
     )
 
-@bp.route("/<int:item_id>")
+@{class_name.lower()}_bp.route("/<int:item_id>")
 @login_required
 def detail(item_id: int):
     service = {class_name}Service()
@@ -233,7 +232,6 @@ class {class_name}Service:
         per_page: int = 20,
         status: str = {class_name}Status.ACTIVE,
         search: str | None = None,
-        genre: str | None = None,
         sort: str = "id",
         direction: str = "asc",
     ) -> {class_name}ListResult:
@@ -243,8 +241,6 @@ class {class_name}Service:
         if search:
             pattern = f"%{{search.strip()}}%"
             query = query.filter({class_name}.name.ilike(pattern))
-        if genre:
-            query = query.filter({class_name}.genre.ilike(f"%{{genre}}%"))
         sort_col = getattr({class_name}, sort, {class_name}.id)
         query = query.order_by(sort_col.desc() if direction == "desc" else sort_col.asc())
         pagination = query.paginate(page=page, per_page=per_page, error_out=False)
@@ -315,6 +311,18 @@ class {class_name}Service:
         db.session.commit()
         return ServiceResult(success=True, data={{"id": id}})
 
+    def count_by_status(self) -> dict[str, int]:
+        """Retorna contagem por status."""
+        rows = (
+            db.session.query({class_name}.status, func.count({class_name}.id))
+            .group_by({class_name}.status)
+            .all()
+        )
+        result = {{s.value: 0 for s in {class_name}Status}}
+        for status, count in rows:
+            result[status] = count
+        return result
+
     def _apply_fields(self, obj: {class_name}, data: dict) -> None:
         for key, value in data.items():
             if hasattr(obj, key) and value is not None:
@@ -332,7 +340,7 @@ from flask_login import current_user, login_required
 from services.{class_name.lower()}.{class_name.lower()}_service import {class_name}Service
 from model.{module_name} import {class_name}Status
 
-bp = Blueprint("{class_name.lower()}_api", __name__, url_prefix="/api/{plural}")
+{class_name.lower()}_api_bp = Blueprint("{class_name.lower()}_api", __name__, url_prefix="/api/{plural}")
 
 def _ok(data, code: int = 200):
     return jsonify({{"success": True, "data": data}}), code
@@ -340,12 +348,11 @@ def _ok(data, code: int = 200):
 def _err(message: str, code: int = 400):
     return jsonify({{"success": False, "error": message}}), code
 
-@bp.route("/", methods=["GET"])
+@{class_name.lower()}_api_bp.route("/", methods=["GET"])
 @login_required
 def list():
-    status = request.args.get("status", {class_name}Status.ACTIVE)
+    status = request.args.get("status", {class_name}Status.ACTIVE.value)  # "active"
     search = request.args.get("search", "").strip() or None
-    genre = request.args.get("genre", "").strip() or None
     sort = request.args.get("sort", "id")
     direction = request.args.get("dir", "asc")
     page = max(1, int(request.args.get("page", 1)))
@@ -354,7 +361,7 @@ def list():
     service = {class_name}Service()
     result = service.list(
         page=page, per_page=per_page, status=status,
-        search=search, genre=genre, sort=sort, direction=direction,
+        search=search, sort=sort, direction=direction,
     )
     return _ok({{
         "items": [item.to_dict() for item in result.items],
@@ -364,7 +371,7 @@ def list():
         "pages": result.pages,
     }})
 
-@bp.route("/<int:id>", methods=["GET"])
+@{class_name.lower()}_api_bp.route("/<int:id>", methods=["GET"])
 @login_required
 def get(id: int):
     service = {class_name}Service()
@@ -373,7 +380,7 @@ def get(id: int):
         return _err("Não encontrado", 404)
     return _ok(item.to_dict())
 
-@bp.route("/draft", methods=["POST"])
+@{class_name.lower()}_api_bp.route("/draft", methods=["POST"])
 @login_required
 def create_draft():
     service = {class_name}Service()
@@ -382,7 +389,7 @@ def create_draft():
         return _err(result.error, result.code)
     return _ok(result.data.to_dict(), 201)
 
-@bp.route("/<int:id>/publish", methods=["POST"])
+@{class_name.lower()}_api_bp.route("/<int:id>/publish", methods=["POST"])
 @login_required
 def publish_draft(id: int):
     data = request.get_json(silent=True) or {{}}
@@ -392,7 +399,7 @@ def publish_draft(id: int):
         return _err(result.error, result.code)
     return _ok(result.data.to_dict())
 
-@bp.route("/<int:id>", methods=["PUT", "PATCH"])
+@{class_name.lower()}_api_bp.route("/<int:id>", methods=["PUT", "PATCH"])
 @login_required
 def update(id: int):
     data = request.get_json(silent=True) or {{}}
@@ -402,7 +409,7 @@ def update(id: int):
         return _err(result.error, result.code)
     return _ok(result.data.to_dict())
 
-@bp.route("/<int:id>/trash", methods=["POST"])
+@{class_name.lower()}_api_bp.route("/<int:id>/trash", methods=["POST"])
 @login_required
 def trash(id: int):
     service = {class_name}Service()
@@ -411,7 +418,7 @@ def trash(id: int):
         return _err(result.error, result.code)
     return _ok(result.data.to_dict())
 
-@bp.route("/<int:id>/restore", methods=["POST"])
+@{class_name.lower()}_api_bp.route("/<int:id>/restore", methods=["POST"])
 @login_required
 def restore(id: int):
     service = {class_name}Service()
@@ -420,7 +427,7 @@ def restore(id: int):
         return _err(result.error, result.code)
     return _ok(result.data.to_dict())
 
-@bp.route("/<int:id>", methods=["DELETE"])
+@{class_name.lower()}_api_bp.route("/<int:id>", methods=["DELETE"])
 @login_required
 def delete_permanent(id: int):
     if not current_user.is_admin:
@@ -431,7 +438,7 @@ def delete_permanent(id: int):
         return _err(result.error, result.code)
     return _ok(result.data)
 
-@bp.route("/<int:id>/discard", methods=["DELETE"])
+@{class_name.lower()}_api_bp.route("/<int:id>/discard", methods=["DELETE"])
 @login_required
 def discard_draft(id: int):
     service = {class_name}Service()
@@ -778,67 +785,67 @@ def render_modal_template(class_name: str, metadata: Dict) -> str:
 # ============================================================
 def generate_controller(model_file: str, class_name: str, plural: str, metadata: Dict):
     base_name = Path(model_file).stem
-    controller_dir = Path("src/controller") / base_name     
+    controller_dir = Path("controller") / base_name     
     controller_dir.mkdir(parents=True, exist_ok=True)
     controller_path = controller_dir / f"{class_name.lower()}.py"
     if controller_path.exists():
         print(f"Controller já existe: {controller_path}")
         return
     content = render_controller_template(class_name, plural, metadata)
-    controller_path.write_text(content)
+    controller_path.write_text(content, encoding='utf-8')
     print(f"Gerado: {controller_path}")
 
 def generate_service(model_file: str, class_name: str, plural: str, metadata: Dict):
     base_name = Path(model_file).stem
-    service_dir = Path("src/services") / base_name
+    service_dir = Path("services") / base_name
     service_dir.mkdir(parents=True, exist_ok=True)
     service_path = service_dir / f"{class_name.lower()}_service.py"
     if service_path.exists():
         print(f"Service já existe: {service_path}")
         return
     content = render_service_template(class_name, metadata)
-    service_path.write_text(content)
+    service_path.write_text(content, encoding='utf-8')
     print(f"Gerado: {service_path}")
 
 def generate_routes(model_file: str, class_name: str, plural: str, metadata: Dict):
     base_name = Path(model_file).stem
-    routes_dir = Path("src/api/routes") / base_name
+    routes_dir = Path("api/routes") / base_name
     routes_dir.mkdir(parents=True, exist_ok=True)
     routes_path = routes_dir / f"{class_name.lower()}_routes.py"
     if routes_path.exists():
         print(f"Routes já existe: {routes_path}")
         return
     content = render_routes_template(class_name, plural, metadata)
-    routes_path.write_text(content)
+    routes_path.write_text(content, encoding='utf-8')
     print(f"Gerado: {routes_path}")
 
 def generate_templates(model_file: str, class_name: str, plural: str, metadata: Dict):
     base_name = Path(model_file).stem
-    templates_dir = Path("src/templates") / plural
+    templates_dir = Path("templates") / plural
     templates_dir.mkdir(parents=True, exist_ok=True)
     modals_dir = templates_dir / "_modals"
     modals_dir.mkdir(exist_ok=True)
 
     manage_path = templates_dir / "manage.html"
     if not manage_path.exists():
-        manage_path.write_text(render_manage_template(class_name, plural, metadata))
+        manage_path.write_text(render_manage_template(class_name, plural, metadata), encoding='utf-8')
         print(f"Gerado: {manage_path}")
 
     detail_path = templates_dir / "detail.html"
     if not detail_path.exists():
-        detail_path.write_text(render_detail_template(class_name, plural, metadata))
+        detail_path.write_text(render_detail_template(class_name, plural, metadata), encoding='utf-8')
         print(f"Gerado: {detail_path}")
 
     modal_path = modals_dir / f"{class_name.lower()}_form_modal.html"
     if not modal_path.exists():
-        modal_path.write_text(render_modal_template(class_name, metadata))
+        modal_path.write_text(render_modal_template(class_name, metadata), encoding='utf-8')
         print(f"Gerado: {modal_path}")
 
 # ============================================================
 # ATUALIZAÇÃO DO MAIN.PY (OPCIONAL)
 # ============================================================
 def update_main_blueprint(class_name: str, plural: str, model_file: str):
-    main_path = Path("src/main.py")
+    main_path = Path("main.py")
     if not main_path.exists():
         print("main.py não encontrado")
         return
@@ -859,7 +866,7 @@ def update_main_blueprint(class_name: str, plural: str, model_file: str):
                 break
     if insert_pos != -1:
         lines.insert(insert_pos, import_line)
-    new_content = "\n".join(lines)
+    new_content = "\n".join(lines)  
     main_path.write_text(new_content)
     print(f"main.py atualizado com import. Registre o blueprint manualmente em register_core_blueprints.")
 

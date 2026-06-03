@@ -22,20 +22,20 @@
     <div class="col-lg-12">
       <div class="card">
         <div class="card-body">
-          <h5 class="card-title">Informações</h5>
+          <h5 class="card-title">InformaÃ§Ãµes</h5>
           <table class="table table-bordered">
             
             <tr>
               <th style="width:30%">Name</th>
-              <td>{{ author.name or '—' }}</td>
+              <td>{{ author.name or 'â€”' }}</td>
             </tr>
             <tr>
               <th style="width:30%">Birth Year</th>
-              <td>{{ author.birth_year or '—' }}</td>
+              <td>{{ author.birth_year or 'â€”' }}</td>
             </tr>
             <tr>
               <th style="width:30%">Bio</th>
-              <td>{{ author.bio or '—' }}</td>
+              <td>{{ author.bio or 'â€”' }}</td>
             </tr>
           </table>
           <div class="mt-4">
@@ -47,7 +47,7 @@
                   <button type="submit" class="btn btn-outline-danger">Mover para lixeira</button>
                 </form>
               {% elif author.status == 'draft' %}
-                <button type="button" class="btn btn-primary" id="btnEditAuthor" data-id="{{ author.id }}">Continuar edição</button>
+                <button type="button" class="btn btn-primary" id="btnEditAuthor" data-id="{{ author.id }}">Continuar ediÃ§Ã£o</button>
                 <form method="post" action="{{ url_for('authors.discard_draft', author_id=author.id) }}" class="d-inline" onsubmit="return confirm('Descartar rascunho?')">
                   <button type="submit" class="btn btn-danger">Descartar</button>
                 </form>
@@ -77,7 +77,7 @@
   const editBtn = document.getElementById('btnEditAuthor');
   if (editBtn) {
     editBtn.addEventListener('click', () => {
-      // O mesmo script do manage.html será reutilizado
+      // O mesmo script do manage.html serÃ¡ reutilizado
       const loadData = (id) => { ... };
       loadData(editBtn.dataset.id);
       modal.show();

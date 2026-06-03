@@ -81,11 +81,13 @@ def register_core_blueprints(app):
         from api.routes.notifications_routes import notifications_bp
         from api.routes.register import register_bp
         from api.routes.book.book_routes import book_api_bp
-        from api.routes.smart_list_routes import smart_list_api_bp   # ← NOVO
+        from api.routes.smart_list_routes import smart_list_api_bp 
+        from api.routes.author.author_routes import author_api_bp 
 
         from controller.auth import auth_bp
         from controller.web import web_bp
         from controller.book.book import book_bp
+        from controller.author.author import author_bp
 
         app.register_blueprint(web_bp)
         app.register_blueprint(auth_bp,            url_prefix="/auth")
@@ -95,6 +97,9 @@ def register_core_blueprints(app):
         app.register_blueprint(book_bp)
         app.register_blueprint(book_api_bp)
         app.register_blueprint(smart_list_api_bp) 
+        
+        app.register_blueprint(author_api_bp)
+        app.register_blueprint(author_bp)
 
         app.logger.info("Blueprints core registrados com sucesso.")
     except Exception as exc:

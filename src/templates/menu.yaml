@@ -11,6 +11,10 @@ menu:
         endpoint: "books.list_books"
         icon: "bi bi-grid"
 
+      - name: "Autores"
+        endpoint: "authors.list"
+        icon: "bi bi-tags"
+
       - name: "Cadastrar Novo"
         endpoint: "books.new_book"
         icon: "bi bi-plus-circle"

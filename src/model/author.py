@@ -1,6 +1,16 @@
 # model/author.py
+from __future__ import annotations
+from enum import Enum as PyEnum
+
 from annotations import label, plural, listview, Column, Filter, form, Group, required, max_length
 from db.database import db
+
+
+class AuthorStatus(str, PyEnum):
+    DRAFT = "draft"
+    ACTIVE = "active"
+    TRASH = "trash"
+
 
 @label("Autores")
 @plural("authors")
@@ -30,3 +40,43 @@ class Author(db.Model):
     name = db.Column(db.String(100), nullable=False)
     birth_year = db.Column(db.Integer)
     bio = db.Column(db.Text)
+    status = db.Column(db.String(20), default=AuthorStatus.DRAFT, nullable=False)
+
+    def publish(self) -> None:
+        """Muda o status para ACTIVE."""
+        self.status = AuthorStatus.ACTIVE
+
+    def send_to_trash(self) -> None:
+        """Muda o status para TRASH."""
+        self.status = AuthorStatus.TRASH
+
+    def restore(self) -> None:
+        """Restaura da lixeira para ACTIVE."""
+        self.status = AuthorStatus.ACTIVE
+
+    @property
+    def is_draft(self) -> bool:
+        return self.status == AuthorStatus.DRAFT
+
+    @property
+    def is_active(self) -> bool:
+        return self.status == AuthorStatus.ACTIVE
+
+    @property
+    def is_trashed(self) -> bool:
+        return self.status == AuthorStatus.TRASH
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "birth_year": self.birth_year,
+            "bio": self.bio,
+            "status": self.status,
+            "is_draft": self.is_draft,
+            "is_active": self.is_active,
+            "is_trashed": self.is_trashed,
+        }
+
+    def __repr__(self):
+        return f"<Author {self.name}>"

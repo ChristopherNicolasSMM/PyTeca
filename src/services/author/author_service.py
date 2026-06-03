@@ -28,7 +28,7 @@ class ServiceResult:
 
 
 class AuthorService:
-    """Camada de negócio para author."""
+    """Camada de negÃ³cio para author."""
 
     def list(
         self,
@@ -37,7 +37,6 @@ class AuthorService:
         per_page: int = 20,
         status: str = AuthorStatus.ACTIVE,
         search: str | None = None,
-        genre: str | None = None,
         sort: str = "id",
         direction: str = "asc",
     ) -> AuthorListResult:
@@ -47,8 +46,6 @@ class AuthorService:
         if search:
             pattern = f"%{search.strip()}%"
             query = query.filter(Author.name.ilike(pattern))
-        if genre:
-            query = query.filter(Author.genre.ilike(f"%{genre}%"))
         sort_col = getattr(Author, sort, Author.id)
         query = query.order_by(sort_col.desc() if direction == "desc" else sort_col.asc())
         pagination = query.paginate(page=page, per_page=per_page, error_out=False)
@@ -72,7 +69,7 @@ class AuthorService:
     def publish_draft(self, id: int, data: dict | None = None) -> ServiceResult:
         obj = self.get_by_id(id)
         if not obj or obj.status != AuthorStatus.DRAFT:
-            return ServiceResult(success=False, error="Rascunho não encontrado", code=404)
+            return ServiceResult(success=False, error="Rascunho nÃ£o encontrado", code=404)
         if data:
             self._apply_fields(obj, data)
         obj.status = AuthorStatus.ACTIVE
@@ -82,7 +79,7 @@ class AuthorService:
     def update(self, id: int, data: dict) -> ServiceResult:
         obj = self.get_by_id(id)
         if not obj:
-            return ServiceResult(success=False, error="Registro não encontrado", code=404)
+            return ServiceResult(success=False, error="Registro nÃ£o encontrado", code=404)
         self._apply_fields(obj, data)
         db.session.commit()
         return ServiceResult(success=True, data=obj)
@@ -90,7 +87,7 @@ class AuthorService:
     def trash(self, id: int) -> ServiceResult:
         obj = self.get_by_id(id)
         if not obj:
-            return ServiceResult(success=False, error="Registro não encontrado", code=404)
+            return ServiceResult(success=False, error="Registro nÃ£o encontrado", code=404)
         obj.status = AuthorStatus.TRASH
         db.session.commit()
         return ServiceResult(success=True, data=obj)
@@ -98,7 +95,7 @@ class AuthorService:
     def restore(self, id: int) -> ServiceResult:
         obj = self.get_by_id(id)
         if not obj or obj.status != AuthorStatus.TRASH:
-            return ServiceResult(success=False, error="Registro não está na lixeira", code=404)
+            return ServiceResult(success=False, error="Registro nÃ£o estÃ¡ na lixeira", code=404)
         obj.status = AuthorStatus.ACTIVE
         db.session.commit()
         return ServiceResult(success=True, data=obj)
@@ -106,7 +103,7 @@ class AuthorService:
     def delete_permanent(self, id: int) -> ServiceResult:
         obj = self.get_by_id(id)
         if not obj or obj.status != AuthorStatus.TRASH:
-            return ServiceResult(success=False, error="Apenas registros na lixeira podem ser excluídos", code=400)
+            return ServiceResult(success=False, error="Apenas registros na lixeira podem ser excluÃ­dos", code=400)
         db.session.delete(obj)
         db.session.commit()
         return ServiceResult(success=True, data={"id": id})
@@ -118,6 +115,18 @@ class AuthorService:
         db.session.delete(obj)
         db.session.commit()
         return ServiceResult(success=True, data={"id": id})
+
+    def count_by_status(self) -> dict[str, int]:
+        """Retorna contagem por status."""
+        rows = (
+            db.session.query(Author.status, func.count(Author.id))
+            .group_by(Author.status)
+            .all()
+        )
+        result = {s.value: 0 for s in AuthorStatus}
+        for status, count in rows:
+            result[status] = count
+        return result
 
     def _apply_fields(self, obj: Author, data: dict) -> None:
         for key, value in data.items():

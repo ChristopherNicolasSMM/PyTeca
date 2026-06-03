@@ -6,7 +6,7 @@ from flask_login import current_user, login_required
 from services.author.author_service import AuthorService
 from model.author import AuthorStatus
 
-bp = Blueprint("author_api", __name__, url_prefix="/api/authors")
+author_api_bp = Blueprint("author_api", __name__, url_prefix="/api/authors")
 
 def _ok(data, code: int = 200):
     return jsonify({"success": True, "data": data}), code
@@ -14,12 +14,11 @@ def _ok(data, code: int = 200):
 def _err(message: str, code: int = 400):
     return jsonify({"success": False, "error": message}), code
 
-@bp.route("/", methods=["GET"])
+@author_api_bp.route("/", methods=["GET"])
 @login_required
 def list():
-    status = request.args.get("status", AuthorStatus.ACTIVE)
+    status = request.args.get("status", AuthorStatus.ACTIVE.value)  # "active"
     search = request.args.get("search", "").strip() or None
-    genre = request.args.get("genre", "").strip() or None
     sort = request.args.get("sort", "id")
     direction = request.args.get("dir", "asc")
     page = max(1, int(request.args.get("page", 1)))
@@ -28,7 +27,7 @@ def list():
     service = AuthorService()
     result = service.list(
         page=page, per_page=per_page, status=status,
-        search=search, genre=genre, sort=sort, direction=direction,
+        search=search, sort=sort, direction=direction,
     )
     return _ok({
         "items": [item.to_dict() for item in result.items],
@@ -38,16 +37,16 @@ def list():
         "pages": result.pages,
     })
 
-@bp.route("/<int:id>", methods=["GET"])
+@author_api_bp.route("/<int:id>", methods=["GET"])
 @login_required
 def get(id: int):
     service = AuthorService()
     item = service.get_by_id(id)
     if not item:
-        return _err("Não encontrado", 404)
+        return _err("NÃ£o encontrado", 404)
     return _ok(item.to_dict())
 
-@bp.route("/draft", methods=["POST"])
+@author_api_bp.route("/draft", methods=["POST"])
 @login_required
 def create_draft():
     service = AuthorService()
@@ -56,7 +55,7 @@ def create_draft():
         return _err(result.error, result.code)
     return _ok(result.data.to_dict(), 201)
 
-@bp.route("/<int:id>/publish", methods=["POST"])
+@author_api_bp.route("/<int:id>/publish", methods=["POST"])
 @login_required
 def publish_draft(id: int):
     data = request.get_json(silent=True) or {}
@@ -66,7 +65,7 @@ def publish_draft(id: int):
         return _err(result.error, result.code)
     return _ok(result.data.to_dict())
 
-@bp.route("/<int:id>", methods=["PUT", "PATCH"])
+@author_api_bp.route("/<int:id>", methods=["PUT", "PATCH"])
 @login_required
 def update(id: int):
     data = request.get_json(silent=True) or {}
@@ -76,7 +75,7 @@ def update(id: int):
         return _err(result.error, result.code)
     return _ok(result.data.to_dict())
 
-@bp.route("/<int:id>/trash", methods=["POST"])
+@author_api_bp.route("/<int:id>/trash", methods=["POST"])
 @login_required
 def trash(id: int):
     service = AuthorService()
@@ -85,7 +84,7 @@ def trash(id: int):
         return _err(result.error, result.code)
     return _ok(result.data.to_dict())
 
-@bp.route("/<int:id>/restore", methods=["POST"])
+@author_api_bp.route("/<int:id>/restore", methods=["POST"])
 @login_required
 def restore(id: int):
     service = AuthorService()
@@ -94,7 +93,7 @@ def restore(id: int):
         return _err(result.error, result.code)
     return _ok(result.data.to_dict())
 
-@bp.route("/<int:id>", methods=["DELETE"])
+@author_api_bp.route("/<int:id>", methods=["DELETE"])
 @login_required
 def delete_permanent(id: int):
     if not current_user.is_admin:
@@ -105,7 +104,7 @@ def delete_permanent(id: int):
         return _err(result.error, result.code)
     return _ok(result.data)
 
-@bp.route("/<int:id>/discard", methods=["DELETE"])
+@author_api_bp.route("/<int:id>/discard", methods=["DELETE"])
 @login_required
 def discard_draft(id: int):
     service = AuthorService()

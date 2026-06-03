@@ -9,9 +9,9 @@ from services.author.author_service import AuthorService
 from utils.smart_list import ColumnDef, FilterDef, SmartListConfig, SmartListRenderer
 from utils.smart_list.export import export_csv, export_excel, export_pdf
 
-bp = Blueprint("authors", __name__, url_prefix="/authors")
+author_bp = Blueprint("authors", __name__, url_prefix="/authors")
 
-# ---- Configuração SmartList ----
+# ---- ConfiguraÃ§Ã£o SmartList ----
 def _genre_options():
     return [("", "Todos")]
 
@@ -34,10 +34,10 @@ SMART_LIST_CONFIG = SmartListConfig(
     export_filename="authors",
 )
 
-@bp.route("/")
+@author_bp.route("/")
 @login_required
-def list():
-    status = request.args.get("status", "AuthorStatus.ACTIVE")
+def list():    
+    status = request.args.get("status", AuthorStatus.ACTIVE.value)  # "active"
     export = request.args.get("export", "")
 
     user_layout = None
@@ -57,13 +57,12 @@ def list():
         per_page=per_page,
         status=status,
         search=request.args.get("search", "").strip() or None,
-        genre=request.args.get("genre", "").strip() or None,
         sort=request.args.get("sort", SMART_LIST_CONFIG.default_sort),
         direction=request.args.get("dir", SMART_LIST_CONFIG.default_dir),
     )
 
     if export in ("csv", "excel", "pdf"):
-        all_result = service.list(page=1, per_page=10_000, status=status, ...)
+        all_result = service.list(page=1, per_page=10_000, status=status)
         visible_cols = (user_layout or {}).get("columns") or None
         if export == "csv":
             return export_csv(SMART_LIST_CONFIG, all_result.items, visible_cols)
@@ -87,7 +86,7 @@ def list():
         current_status=status,
     )
 
-@bp.route("/<int:item_id>")
+@author_bp.route("/<int:item_id>")
 @login_required
 def detail(item_id: int):
     service = AuthorService()
