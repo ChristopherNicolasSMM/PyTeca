@@ -1,0 +1,18 @@
+# Configuração para o gerador automático
+# Cada entrada gera uma estrutura completa (controller, service, routes, templates)
+
+models:
+  - source: "model/book.py"            # caminho relativo a src/
+    # opcional: força nome da classe (se houver várias)
+
+  - source: "generate_model/mockup/product.py"   # mockup exemplo
+    class_name: "Product"
+
+  - source: "model/author.py"
+    # será gerado autor
+
+# Configurações globais (opcionais)
+generator:
+  output_dir: ""                        # raiz onde criar pastas (controller, services, api, templates) --- Já estamos no src, então pode deixar vazio
+  overwrite: false                      # não sobrescrever arquivos existentes
+  update_main: true                     # tentar atualizar main.py automaticamente

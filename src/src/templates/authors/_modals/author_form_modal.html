@@ -1,0 +1,39 @@
+{# Modal de formulário para Author #}
+<div class="modal fade" id="authorModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="authorModalTitle">Novo Autores</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="authorForm">
+          <input type="hidden" id="authorId">
+          <h6>Informações Básicas</h6>
+          <div class="row mb-3">
+            <label for="name" class="col-sm-2 col-form-label">Name</label>
+            <div class="col-sm-10">
+              <input type="text" class="form-control" id="name" name="name">
+            </div>
+          </div>
+          <div class="row mb-3">
+            <label for="birth_year" class="col-sm-2 col-form-label">Birth Year</label>
+            <div class="col-sm-10">
+              <input type="text" class="form-control" id="birth_year" name="birth_year">
+            </div>
+          </div><h6>Biografia</h6>
+          <div class="row mb-3">
+            <label for="bio" class="col-sm-2 col-form-label">Bio</label>
+            <div class="col-sm-10">
+              <input type="text" class="form-control" id="bio" name="bio">
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="btnSaveAuthor">Salvar</button>
+      </div>
+    </div>
+  </div>
+</div>

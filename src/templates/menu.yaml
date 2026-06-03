@@ -21,7 +21,7 @@ menu:
 
 
   - name: "Conta"
-    endpoint: null             # Item pai sem endpoint direto
+    endpoint: null    
     icon: "bi bi-box-seam"
     children:
       - name: "Perfil"
