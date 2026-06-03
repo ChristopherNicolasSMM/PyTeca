@@ -5,7 +5,7 @@ from flask_login import current_user, login_required
 
 from model.book import BookStatus
 from model.user_layout_pref import UserLayoutPref
-from services.book_service import book_service
+from services.book.book_service import book_service
 from utils.smart_list import ColumnDef, FilterDef, SmartListConfig, SmartListRenderer
 from utils.smart_list.export import export_csv, export_excel, export_pdf
 
@@ -120,43 +120,6 @@ def detail(book_id: int):
         abort(404)
     return render_template("books/detail.html", book=book)
 
-
-## ── Novo livro ────────────────────────────────────────────────────────────────
-#
-#@book_bp.route("/new")
-#@login_required
-#def new_book():
-#    pass
-#    result = book_service.create_draft()
-#    draft  = result.data
-#    return render_template(
-#        "books/form.html",
-#        book=draft,
-#        mode="create",
-#        autosave_url=url_for("books_api.autosave_draft", book_id=draft.id),
-#        publish_url=url_for("books_api.publish_draft",   book_id=draft.id),
-#    )
-#
-#
-## ── Edição ────────────────────────────────────────────────────────────────────
-#
-#@book_bp.route("/<int:book_id>/edit")
-#@login_required
-#def edit_book(book_id: int):
-#    pass
-#    book = book_service.get_by_id(book_id)
-#    if not book:
-#        abort(404)
-#    if book.is_trashed:
-#        flash("Este livro está na lixeira. Restaure-o para editar.", "warning")
-#        return redirect(url_for("books.list_books", status="trash"))
-#    return render_template(
-#        "books/form.html",
-#        book=book,
-#        mode="edit",
-#        autosave_url=url_for("books_api.update_book", book_id=book.id),
-#        publish_url=url_for("books_api.update_book",  book_id=book.id),
-#    )
 
 
 # ── Ações POST ────────────────────────────────────────────────────────────────

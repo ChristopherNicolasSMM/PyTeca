@@ -79,12 +79,12 @@ def register_core_blueprints(app):
         from api.routes.auth_routes import auth_bp as api_auth_bp
         from api.routes.notifications_routes import notifications_bp
         from api.routes.register import register_bp
-        from api.routes.book_routes import book_api_bp
+        from api.routes.book.book_routes import book_api_bp
         from api.routes.smart_list_routes import smart_list_api_bp   # ← NOVO
 
         from controller.auth import auth_bp
         from controller.web import web_bp
-        from controller.book import book_bp
+        from controller.book.book import book_bp
 
         app.register_blueprint(web_bp)
         app.register_blueprint(auth_bp,            url_prefix="/auth")
@@ -93,44 +93,12 @@ def register_core_blueprints(app):
         app.register_blueprint(api_auth_bp)
         app.register_blueprint(book_bp)
         app.register_blueprint(book_api_bp)
-        app.register_blueprint(smart_list_api_bp)  # ← NOVO
+        app.register_blueprint(smart_list_api_bp) 
 
         app.logger.info("Blueprints core registrados com sucesso.")
     except Exception as exc:
         app.logger.exception("Erro ao registrar blueprints core: %s", exc)
         raise
-
-
-#def register_core_blueprints(app):
-#    """Registra os blueprints essenciais da aplicação."""
-#    try:
-#        from api.routes.auth_routes import auth_bp as api_auth_bp
-#        from api.routes.notifications_routes import notifications_bp
-#        from api.routes.register import register_bp
-#        from controller.auth import auth_bp
-#        from controller.web import web_bp
-#        
-#        from controller.book import book_bp
-#        from api.routes.book_routes import book_api_bp
-#
-#      
-#
-#        app.register_blueprint(web_bp)
-#        app.register_blueprint(auth_bp, url_prefix="/auth")
-#        app.register_blueprint(register_bp, url_prefix="/api")
-#        app.register_blueprint(notifications_bp, url_prefix="/api")
-#        app.register_blueprint(api_auth_bp)
-#        
-#        
-#        # Dentro de register_core_blueprints
-#        app.register_blueprint(book_bp)
-#        app.register_blueprint(book_api_bp)          
-#
-#        app.logger.info("Blueprints core registrados com sucesso.")
-#    except Exception as exc:
-#        app.logger.exception("Erro ao registrar blueprints core: %s", exc)
-#        raise
-#
 
 def register_context_processors(app):
     """Registra context processors, incluindo o menu dinâmico baseado em YAML."""
@@ -150,6 +118,16 @@ def register_context_processors(app):
         # Determina a seção atual a partir do primeiro segmento da URL
         path = request.path.strip("/")
         section = path.split("/")[0] if path else "home"
+        
+        
+        print("DEBUG MAIN.PY")
+        print(f"Carregando menu para seção: {section}")  # Debug
+        print(f"URL atual: {request.url}")  # Debug
+        print(f"Path atual: {path}")  # Debug
+        print(10 * "\n")  # Debug
+        
+        
+        
 
         # Caminhos possíveis para o arquivo YAML do menu
         section_yaml = os.path.join(app.template_folder, section, "menu.yaml")

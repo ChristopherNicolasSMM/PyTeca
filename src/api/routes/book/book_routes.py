@@ -3,7 +3,7 @@ from __future__ import annotations
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
 
-from services.book_service import book_service
+from services.book.book_service import book_service
 from model.book import BookStatus
 
 book_api_bp = Blueprint("books_api", __name__, url_prefix="/api/books")
