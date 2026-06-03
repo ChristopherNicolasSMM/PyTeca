@@ -1,0 +1,74 @@
+{# ── Modal de formulário (criação/edição) ───────────────────────────────── #}
+<div class="modal fade" id="bookModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="bookModalTitle">Novo Livro</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="bookForm">
+          <input type="hidden" id="bookId" value="">
+          <div class="row mb-3">
+            <label for="title" class="col-sm-2 col-form-label">Título *</label>
+            <div class="col-sm-10">
+              <input type="text" class="form-control" id="title" name="title" required>
+            </div>
+          </div>
+          <div class="row mb-3">
+            <label for="author" class="col-sm-2 col-form-label">Autor *</label>
+            <div class="col-sm-10">
+              <input type="text" class="form-control" id="author" name="author" required>
+            </div>
+          </div>
+          <div class="row mb-3">
+            <label for="isbn" class="col-sm-2 col-form-label">ISBN</label>
+            <div class="col-sm-10">
+              <input type="text" class="form-control" id="isbn" name="isbn">
+            </div>
+          </div>
+          <div class="row mb-3">
+            <label for="publisher" class="col-sm-2 col-form-label">Editora</label>
+            <div class="col-sm-10">
+              <input type="text" class="form-control" id="publisher" name="publisher">
+            </div>
+          </div>
+          <div class="row mb-3">
+            <label for="year" class="col-sm-2 col-form-label">Ano</label>
+            <div class="col-sm-10">
+              <input type="number" class="form-control" id="year" name="year">
+            </div>
+          </div>
+          <div class="row mb-3">
+            <label for="genre" class="col-sm-2 col-form-label">Gênero</label>
+            <div class="col-sm-10">
+              <input type="text" class="form-control" id="genre" name="genre">
+            </div>
+          </div>
+          <div class="row mb-3">
+            <label for="quantity" class="col-sm-2 col-form-label">Quantidade total</label>
+            <div class="col-sm-10">
+              <input type="number" class="form-control" id="quantity" name="quantity" min="0" value="0">
+            </div>
+          </div>
+          <div class="row mb-3">
+            <label for="available" class="col-sm-2 col-form-label">Disponível</label>
+            <div class="col-sm-10">
+              <input type="number" class="form-control" id="available" name="available" min="0" value="0">
+            </div>
+          </div>
+          <div class="row mb-3">
+            <label for="description" class="col-sm-2 col-form-label">Descrição</label>
+            <div class="col-sm-10">
+              <textarea class="form-control" id="description" name="description" rows="3"></textarea>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="btnSaveBook">Salvar</button>
+      </div>
+    </div>
+  </div>
+</div>

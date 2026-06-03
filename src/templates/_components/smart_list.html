@@ -1,0 +1,459 @@
+{% macro render(sl, row_actions=none, extra_filters=none) %}
+{#
+  Macro principal da SmartList.
+
+  Parâmetros:
+    sl            SmartListContext (retornado por SmartListRenderer.build_context)
+    row_actions   macro que recebe (row) e renderiza os botões de ação
+    extra_filters macro que renderiza filtros adicionais específicos da lista
+
+  Uso mínimo no template da lista:
+    {% from "_components/smart_list.html" import render as smart_list %}
+    {{ smart_list(sl, row_actions=_row_actions) }}
+
+  Exemplo de row_actions:
+    {% macro _row_actions(row) %}
+      <a href="{{ url_for('books.detail', book_id=row.id) }}" class="btn btn-sm btn-outline-primary">
+        <i class="bi bi-eye"></i>
+      </a>
+    {% endmacro %}
+#}
+
+{# ── Toolbar ──────────────────────────────────────────────────────────────── #}
+<div class="sl-toolbar d-flex flex-wrap gap-2 align-items-center mb-3">
+
+  {# Filtros #}
+  <form class="d-flex flex-wrap gap-2 align-items-center flex-grow-1"
+        id="sl-filter-form-{{ sl.config.list_id }}"
+        method="get"
+        action="">
+
+    {% for rf in sl.filters %}
+      {% if rf.defn.type == "text" %}
+        <div class="input-group sl-filter-group" style="max-width:{{ rf.defn.width if rf.defn.width != 'auto' else '280px' }};">
+          <span class="input-group-text"><i class="bi bi-search"></i></span>
+          <input type="text"
+                 name="{{ rf.defn.name }}"
+                 class="form-control"
+                 placeholder="{{ rf.defn.placeholder or rf.defn.label }}"
+                 value="{{ rf.value or '' }}"
+                 autocomplete="off">
+          {% if rf.value %}
+          <button type="button"
+                  class="btn btn-outline-secondary sl-clear-filter"
+                  data-field="{{ rf.defn.name }}"
+                  title="Limpar">
+            <i class="bi bi-x"></i>
+          </button>
+          {% endif %}
+        </div>
+
+      {% elif rf.defn.type == "select" %}
+        <select name="{{ rf.defn.name }}"
+                class="form-select sl-filter-select"
+                style="max-width:{{ rf.defn.width if rf.defn.width != 'auto' else '180px' }};"
+                onchange="this.form.submit()">
+          <option value="">{{ rf.defn.label }}</option>
+          {% for val, lbl in rf.options %}
+          <option value="{{ val }}" {% if rf.value == val %}selected{% endif %}>{{ lbl }}</option>
+          {% endfor %}
+        </select>
+
+      {% elif rf.defn.type == "boolean" %}
+        <div class="form-check form-switch ms-2">
+          <input class="form-check-input" type="checkbox"
+                 name="{{ rf.defn.name }}"
+                 value="1"
+                 id="sl-bool-{{ rf.defn.name }}"
+                 {% if rf.value %}checked{% endif %}
+                 onchange="this.form.submit()">
+          <label class="form-check-label" for="sl-bool-{{ rf.defn.name }}">
+            {{ rf.defn.label }}
+          </label>
+        </div>
+      {% endif %}
+    {% endfor %}
+
+    {# Filtros extras específicos da lista #}
+    {% if extra_filters %}
+      {{ extra_filters() }}
+    {% endif %}
+
+    {# Botão buscar (relevante quando há campos de texto) #}
+    {% if sl.filters | selectattr("defn.type", "equalto", "text") | list %}
+    <button type="submit" class="btn btn-outline-primary">
+      <i class="bi bi-funnel-fill me-1"></i>Filtrar
+    </button>
+    {% endif %}
+
+    {# Limpar todos os filtros #}
+    {% set has_active = sl.filters | selectattr("value") | list %}
+    {% if has_active %}
+    <a href="{{ url_for(sl.config.endpoint) }}" class="btn btn-outline-secondary" title="Limpar filtros">
+      <i class="bi bi-x-circle me-1"></i>Limpar
+    </a>
+    {% endif %}
+
+  </form>{# /form filtros #}
+
+  {# Lado direito: export + layout + per_page #}
+  <div class="d-flex gap-2 align-items-center ms-auto">
+
+    {# Contador de registros #}
+    {% if sl.config.show_count %}
+    <span class="badge bg-secondary sl-count-badge" title="Total de registros">
+      <i class="bi bi-list-ul me-1"></i>{{ sl.total }}
+    </span>
+    {% endif %}
+
+    {# Linhas por página #}
+    <div class="input-group input-group-sm" style="width:auto;">
+      <span class="input-group-text text-muted" style="font-size:.8rem;">por pág.</span>
+      <select class="form-select form-select-sm sl-per-page"
+              style="width:70px;"
+              data-list-id="{{ sl.config.list_id }}"
+              onchange="slChangePerPage(this)">
+        {% for n in sl.config.page_sizes %}
+        <option value="{{ n }}" {% if n == sl.current_per_page %}selected{% endif %}>{{ n }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    {# Export #}
+    {% if sl.config.exportable %}
+    <div class="dropdown">
+      <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button"
+              data-bs-toggle="dropdown" title="Exportar">
+        <i class="bi bi-download me-1"></i>Exportar
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end">
+        <li>
+          <a class="dropdown-item" href="{{ sl.export_url_excel }}">
+            <i class="bi bi-file-earmark-excel text-success me-2"></i>Excel (.xlsx)
+          </a>
+        </li>
+        <li>
+          <a class="dropdown-item" href="{{ sl.export_url_csv }}">
+            <i class="bi bi-file-earmark-text text-primary me-2"></i>CSV
+          </a>
+        </li>
+        <li>
+          <a class="dropdown-item" href="{{ sl.export_url_pdf }}">
+            <i class="bi bi-file-earmark-pdf text-danger me-2"></i>PDF horizontal
+          </a>
+        </li>
+      </ul>
+    </div>
+    {% endif %}
+
+    {# Configurar colunas #}
+    {% if sl.config.allow_layout_save %}
+    <button class="btn btn-outline-secondary btn-sm"
+            type="button"
+            title="Configurar colunas"
+            onclick="slOpenColumnConfig('{{ sl.config.list_id }}')">
+      <i class="bi bi-layout-three-columns"></i>
+    </button>
+    {% endif %}
+
+  </div>
+</div>{# /toolbar #}
+
+{# ── Tabela ────────────────────────────────────────────────────────────────── #}
+<div class="table-responsive">
+  <table class="table table-hover align-middle sl-table"
+         id="sl-table-{{ sl.config.list_id }}"
+         data-list-id="{{ sl.config.list_id }}">
+
+    <thead>
+      <tr id="sl-header-{{ sl.config.list_id }}">
+        {% for col in sl.columns %}
+        {% if col.visible %}
+        <th class="sl-col"
+            data-key="{{ col.defn.key }}"
+            {% if col.defn.width %}style="width:{{ col.defn.width }}"{% endif %}>
+
+          {% if col.sort_url %}
+          <a href="{{ col.sort_url }}"
+             class="text-decoration-none d-inline-flex align-items-center gap-1
+                    {% if col.is_sorted %}text-primary fw-semibold{% else %}text-body{% endif %}">
+            {{ col.defn.label }}
+            {% if col.is_sorted %}
+              <i class="bi bi-arrow-{% if col.sort_dir == 'asc' %}up{% else %}down{% endif %} small"></i>
+            {% else %}
+              <i class="bi bi-arrow-down-up text-muted small opacity-50"></i>
+            {% endif %}
+          </a>
+          {% else %}
+          {{ col.defn.label }}
+          {% endif %}
+
+        </th>
+        {% endif %}
+        {% endfor %}
+
+        {# Coluna de ações — sempre por último, sem cabeçalho visível #}
+        {% if row_actions %}
+        <th class="text-end" style="width:1%;white-space:nowrap;"></th>
+        {% endif %}
+      </tr>
+    </thead>
+
+    <tbody>
+    {% if sl.items %}
+      {% for row in sl.items %}
+      <tr class="sl-row" data-id="{{ row.id if row.id is defined else '' }}">
+
+        {% for col in sl.columns %}
+        {% if col.visible %}
+        <td class="sl-cell {% if col.defn.align != 'start' %}text-{{ col.defn.align }}{% endif %}">
+          {# Render customizado via macro nomeado #}
+          {% if col.defn.render %}
+            {# O template pai deve passar o macro no contexto se precisar render custom #}
+            {{ caller_render(col.defn.render, row) if caller_render is defined else '' }}
+          {% else %}
+            {# Render padrão — converte None para traço, datetime para formato BR #}
+            {% set val = row[col.defn.key] if row is mapping else row|attr(col.defn.key) %}
+            {% if val is none or val == '' %}
+              <span class="text-muted">—</span>
+            {% elif val is string and val|length > 60 %}
+              <span title="{{ val }}">{{ val[:58] }}…</span>
+            {% else %}
+              {{ val }}
+            {% endif %}
+          {% endif %}
+        </td>
+        {% endif %}
+        {% endfor %}
+
+        {% if row_actions %}
+        <td class="text-end sl-actions">
+          <div class="btn-group btn-group-sm">
+            {{ row_actions(row) }}
+          </div>
+        </td>
+        {% endif %}
+
+      </tr>
+      {% endfor %}
+    {% else %}
+      <tr>
+        <td colspan="{{ (sl.columns | selectattr('visible') | list | length) + (1 if row_actions else 0) }}"
+            class="text-center py-5 text-muted">
+          <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+          Nenhum registro encontrado.
+          {% set has_active = sl.filters | selectattr("value") | list %}
+          {% if has_active %}
+          <div class="mt-2">
+            <a href="{{ url_for(sl.config.endpoint) }}" class="btn btn-sm btn-outline-secondary">
+              <i class="bi bi-x-circle me-1"></i>Limpar filtros
+            </a>
+          </div>
+          {% endif %}
+        </td>
+      </tr>
+    {% endif %}
+    </tbody>
+  </table>
+</div>{# /table-responsive #}
+
+{# ── Paginação ─────────────────────────────────────────────────────────────── #}
+{% if sl.pages > 1 %}
+<nav aria-label="Paginação {{ sl.config.list_id }}">
+  <ul class="pagination pagination-sm justify-content-center mb-0 flex-wrap">
+
+    <li class="page-item {% if not sl.prev_url %}disabled{% endif %}">
+      <a class="page-link" href="{{ sl.prev_url or '#' }}" aria-label="Anterior">
+        <i class="bi bi-chevron-left"></i>
+      </a>
+    </li>
+
+    {# Janela de páginas: mostra no máx 7 links com reticências #}
+    {% set p = sl.current_page %}
+    {% set total_p = sl.pages %}
+    {% for page_num, page_url in sl.page_urls %}
+      {% if page_num == 1 or page_num == total_p
+            or (page_num >= p - 2 and page_num <= p + 2) %}
+        {# Reticências antes #}
+        {% if loop.changed and page_num > 2 %}
+        <li class="page-item disabled"><span class="page-link">…</span></li>
+        {% endif %}
+        <li class="page-item {% if page_num == p %}active{% endif %}">
+          <a class="page-link" href="{{ page_url }}">{{ page_num }}</a>
+        </li>
+      {% endif %}
+    {% endfor %}
+
+    <li class="page-item {% if not sl.next_url %}disabled{% endif %}">
+      <a class="page-link" href="{{ sl.next_url or '#' }}" aria-label="Próxima">
+        <i class="bi bi-chevron-right"></i>
+      </a>
+    </li>
+
+  </ul>
+</nav>
+{% endif %}
+
+{# ── Modal: configuração de colunas ───────────────────────────────────────── #}
+{% if sl.config.allow_layout_save %}
+<div class="modal fade" id="sl-col-modal-{{ sl.config.list_id }}"
+     tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:400px;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="bi bi-layout-three-columns me-2"></i>Configurar colunas
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted small mb-3">
+          Arraste para reordenar. Desmarque para ocultar.
+        </p>
+        <ul class="list-group sl-col-list" id="sl-col-list-{{ sl.config.list_id }}">
+          {% for col in sl.columns %}
+          <li class="list-group-item d-flex align-items-center gap-2 sl-col-item"
+              data-key="{{ col.defn.key }}"
+              style="cursor:grab;">
+            <i class="bi bi-grip-vertical text-muted"></i>
+            <div class="form-check mb-0 flex-grow-1">
+              <input class="form-check-input sl-col-toggle"
+                     type="checkbox"
+                     id="sl-col-{{ sl.config.list_id }}-{{ col.defn.key }}"
+                     {% if col.visible %}checked{% endif %}>
+              <label class="form-check-label"
+                     for="sl-col-{{ sl.config.list_id }}-{{ col.defn.key }}">
+                {{ col.defn.label }}
+              </label>
+            </div>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+      <div class="modal-footer justify-content-between">
+        {% if sl.user_has_custom_layout %}
+        <button type="button" class="btn btn-outline-danger btn-sm"
+                onclick="slResetLayout('{{ sl.config.list_id }}', '{{ sl.layout_reset_url }}')">
+          <i class="bi bi-arrow-counterclockwise me-1"></i>Restaurar padrão
+        </button>
+        {% else %}
+        <span></span>
+        {% endif %}
+        <div class="d-flex gap-2">
+          <div class="form-check form-switch my-auto">
+            <input class="form-check-input" type="checkbox"
+                   id="sl-visible-all-{{ sl.config.list_id }}">
+            <label class="form-check-label small"
+                   for="sl-visible-all-{{ sl.config.list_id }}">
+              Compartilhar
+            </label>
+          </div>
+          <button type="button" class="btn btn-primary btn-sm"
+                  onclick="slSaveLayout('{{ sl.config.list_id }}', '{{ sl.layout_save_url }}')">
+            <i class="bi bi-save me-1"></i>Salvar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% endmacro %}
+
+
+{# ══════════════════════════════════════════════════════════════════════════════
+   JavaScript da SmartList
+   Incluir UMA VEZ no base.html via {% block scripts %} ou chamar o macro abaixo
+   ══════════════════════════════════════════════════════════════════════════════ #}
+{% macro scripts() %}
+<script>
+(function () {
+  "use strict";
+
+  /* ── Drag-and-drop de colunas (Sortable.js via CDN) ──────────────────── */
+  function initSortable(listId) {
+    var el = document.getElementById("sl-col-list-" + listId);
+    if (!el || typeof Sortable === "undefined") return;
+    Sortable.create(el, { animation: 150, handle: ".bi-grip-vertical" });
+  }
+
+  /* ── Abrir modal de colunas ──────────────────────────────────────────── */
+  window.slOpenColumnConfig = function (listId) {
+    var modal = document.getElementById("sl-col-modal-" + listId);
+    if (!modal) return;
+    initSortable(listId);
+    new bootstrap.Modal(modal).show();
+  };
+
+  /* ── Salvar layout ───────────────────────────────────────────────────── */
+  window.slSaveLayout = function (listId, saveUrl) {
+    var list = document.getElementById("sl-col-list-" + listId);
+    if (!list) return;
+
+    var items = list.querySelectorAll(".sl-col-item");
+    var columns = [], hidden = [];
+    items.forEach(function (item) {
+      var key = item.dataset.key;
+      var cb  = item.querySelector(".sl-col-toggle");
+      columns.push(key);
+      if (cb && !cb.checked) hidden.push(key);
+    });
+
+    var visibleToAll = (document.getElementById("sl-visible-all-" + listId) || {}).checked || false;
+    var perPage = parseInt((document.querySelector(".sl-per-page[data-list-id='" + listId + "']") || {}).value || 20);
+
+    fetch(saveUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        list_id: listId,
+        columns: columns,
+        hidden: hidden,
+        per_page: perPage,
+        visible_to_all: visibleToAll,
+      }),
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (data.success) {
+        var modal = bootstrap.Modal.getInstance(document.getElementById("sl-col-modal-" + listId));
+        if (modal) modal.hide();
+        window.location.reload();
+      } else {
+        alert("Erro ao salvar layout: " + (data.error || "desconhecido"));
+      }
+    })
+    .catch(function () { alert("Erro de rede ao salvar layout."); });
+  };
+
+  /* ── Resetar layout ──────────────────────────────────────────────────── */
+  window.slResetLayout = function (listId, resetUrl) {
+    if (!confirm("Restaurar layout padrão?")) return;
+    fetch(resetUrl, { method: "DELETE" })
+    .then(function () { window.location.reload(); })
+    .catch(function () { alert("Erro ao resetar layout."); });
+  };
+
+  /* ── Limpar filtro individual ────────────────────────────────────────── */
+  document.addEventListener("click", function (e) {
+    var btn = e.target.closest(".sl-clear-filter");
+    if (!btn) return;
+    var field = btn.dataset.field;
+    var form  = btn.closest("form");
+    if (!form) return;
+    var input = form.querySelector("[name='" + field + "']");
+    if (input) { input.value = ""; form.submit(); }
+  });
+
+  /* ── Mudança de per_page ─────────────────────────────────────────────── */
+  window.slChangePerPage = function (select) {
+    var url = new URL(window.location.href);
+    url.searchParams.set("per_page", select.value);
+    url.searchParams.set("page", "1");
+    window.location.href = url.toString();
+  };
+
+})();
+</script>
+{% endmacro %}

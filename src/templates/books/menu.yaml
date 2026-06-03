@@ -8,5 +8,5 @@ menu:
     endpoint: "books.list_books"
     icon: "bi bi-book"
   - name: "Novo Livro"
-    endpoint: "books.new_book"
+    endpoint: "books.list_books"
     icon: "bi bi-plus-circle"

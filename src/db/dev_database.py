@@ -25,7 +25,7 @@ def init_db(app):
 
         # Configurar SQLite com caminho absoluto normalizado
         db_path_abs = db_path.absolute().as_posix()
-        database_uri = f"sqlite:///{db_path_abs}/dbteca.db"
+        database_uri = f"sqlite:///{db_path_abs}/pyteca_db.db"
         print(database_uri)
         app.config["SQLALCHEMY_DATABASE_URI"] = database_uri
         app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
@@ -35,11 +35,15 @@ def init_db(app):
         # Inicializar db com app
         db.init_app(app)
 
-        # Importar modelos DEPOIS de inicializar o db
+        ## Importar modelos DEPOIS de inicializar o db
         with app.app_context():
-            # Importar modelos core
-            import model.notification  # Notification é modelo core 
-            import model.book  # Book é modelo core
+            # Importa automaticamente todos os models da pasta model/
+            import importlib
+            import pkgutil
+            import model as model_pkg
+ 
+            for _, module_name, _ in pkgutil.iter_modules(model_pkg.__path__):
+                importlib.import_module(f"model.{module_name}")     
 
             db.create_all()
             print("Tabelas core criadas com sucesso!")
