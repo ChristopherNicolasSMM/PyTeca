@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block title %}
+    {{ {{ class_name_lower }}.title }} - Detalhe do {{ label }}
+{% endblock %}
+
+{% block content %}
+<div class="pagetitle">
+  <h1>{{ {{ class_name_lower }}.title }}</h1>
+  <nav>
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{{ url_for('web.dashboard') }}">Home</a></li>
+      <li class="breadcrumb-item"><a href="{{ url_for('{{ plural }}.list') }}">{{ label }}s</a></li>
+      <li class="breadcrumb-item active">{{ {{ class_name_lower }}.title }}</li>
+    </ol>
+  </nav>
+</div>
+
+<section class="section">
+  <div class="row">
+    <div class="col-lg-12">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title">Informações</h5>
+          <table class="table table-bordered">
+            {{ fields_rows }}
+          </table>
+
+          <div class="mt-4">
+            <div class="btn-group">
+              <a href="{{ url_for('{{ plural }}.list') }}" class="btn btn-secondary">Voltar</a>
+
+              {% if {{ class_name_lower }}.status == 'active' %}
+                <button type="button" class="btn btn-primary" id="btnEdit{{ class_name }}" data-id="{{ {{ class_name_lower }}.id }}">Editar</button>
+                <form method="post" action="{{ url_for('{{ plural }}.trash', {{ class_name_lower }}_id={{ class_name_lower }}.id) }}" class="d-inline" onsubmit="return confirm('Mover para lixeira?')">
+                  <button type="submit" class="btn btn-outline-danger">Mover para lixeira</button>
+                </form>
+
+              {% elif {{ class_name_lower }}.status == 'draft' %}
+                <button type="button" class="btn btn-primary" id="btnEdit{{ class_name }}" data-id="{{ {{ class_name_lower }}.id }}">Continuar edição</button>
+                <form method="post" action="{{ url_for('{{ plural }}.discard_draft', {{ class_name_lower }}_id={{ class_name_lower }}.id) }}" class="d-inline" onsubmit="return confirm('Descartar rascunho?')">
+                  <button type="submit" class="btn btn-danger">Descartar</button>
+                </form>
+
+              {% elif {{ class_name_lower }}.status == 'trash' %}
+                <form method="post" action="{{ url_for('{{ plural }}.restore', {{ class_name_lower }}_id={{ class_name_lower }}.id) }}" class="d-inline">
+                  <button type="submit" class="btn btn-success">Restaurar</button>
+                </form>
+                {% if current_user.is_admin %}
+                <form method="post" action="{{ url_for('{{ plural }}.delete_permanent', {{ class_name_lower }}_id={{ class_name_lower }}.id) }}" class="d-inline" onsubmit="return confirm('Excluir permanentemente?')">
+                  <button type="submit" class="btn btn-danger">Excluir permanentemente</button>
+                </form>
+                {% endif %}
+
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+{% include "{{ plural }}/_modals/{{ class_name_lower }}_form_modal.html" %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  (function() {
+    // O mesmo script do manage.html é utilizado para edição
+    const modal = new bootstrap.Modal(document.getElementById('{{ class_name_lower }}Modal'));
+    const editBtn = document.getElementById('btnEdit{{ class_name }}');
+    if (!editBtn) return;
+
+    // Função loadData (igual à do manage) – aqui simplificada, mas pode ser compartilhada
+    async function loadData(id) {
+      try {
+        const response = await fetch(`/api/{{ plural }}/${id}`);
+        const result = await response.json();
+        if (result.success) {
+          const data = result.data;
+          for (const [key, value] of Object.entries(data)) {
+            const field = document.getElementById(key);
+            if (field) field.value = value ?? '';
+          }
+          document.getElementById('{{ class_name_lower }}Id').value = id;
+          document.getElementById('{{ class_name_lower }}ModalTitle').innerText = 'Editar {{ label }}';
+        } else {
+          alert('Erro ao carregar dados: ' + (result.error || 'Desconhecido'));
+          modal.hide();
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Erro de conexão.');
+        modal.hide();
+      }
+    }
+
+    function resetForm() {
+      const form = document.getElementById('{{ class_name_lower }}Form');
+      if (form) form.reset();
+      document.getElementById('{{ class_name_lower }}Id').value = '';
+      document.getElementById('{{ class_name_lower }}ModalTitle').innerText = 'Editar {{ label }}';
+    }
+
+    editBtn.addEventListener('click', () => {
+      resetForm();
+      loadData(editBtn.dataset.id);
+      modal.show();
+    });
+  })();
+</script>
+{% endblock %}

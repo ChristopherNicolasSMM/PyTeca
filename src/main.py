@@ -112,40 +112,7 @@ def register_core_blueprints(app):
     except Exception as exc:
         app.logger.exception("Erro ao registrar blueprints core: %s", exc)
         raise
-
-
-#def register_core_blueprints(app):
-#    """Registra os blueprints essenciais da aplicação."""
-#    try:
-#        from api.routes.auth_routes import auth_bp as api_auth_bp
-#        from api.routes.notifications_routes import notifications_bp
-#        from api.routes.register import register_bp
-#        from api.routes.book.book_routes import book_api_bp
-#        from api.routes.smart_list_routes import smart_list_api_bp 
-#        from api.routes.author.author_routes import author_api_bp 
-#
-#        from controller.auth import auth_bp
-#        from controller.web import web_bp
-#        from controller.book.book import book_bp
-#        from controller.author.author import author_bp
-#
-#        app.register_blueprint(web_bp)
-#        app.register_blueprint(auth_bp,            url_prefix="/auth")
-#        app.register_blueprint(register_bp,        url_prefix="/api")
-#        app.register_blueprint(notifications_bp,   url_prefix="/api")
-#        app.register_blueprint(api_auth_bp)
-#        app.register_blueprint(book_bp)
-#        app.register_blueprint(book_api_bp)
-#        app.register_blueprint(smart_list_api_bp) 
-#        
-#        app.register_blueprint(author_api_bp)
-#        app.register_blueprint(author_bp)
-#
-#        app.logger.info("Blueprints core registrados com sucesso.")
-#    except Exception as exc:
-#        app.logger.exception("Erro ao registrar blueprints core: %s", exc)
-#        raise
-
+    
 def register_context_processors(app):
     """Registra context processors, incluindo o menu dinâmico baseado em YAML."""
 
@@ -246,15 +213,17 @@ def register_cli_commands(app):
             click.echo("Falha ao conectar com o banco.", err=True)
             
     @app.cli.command("generate")
-    @click.option("--model", "-m", default=None, help="Caminho do arquivo model (ex: model/author.py)")
+    @click.option("--model",     "-m", default=None,       help="Caminho do model (ex: model/author.py)")
+    @click.option("--theme",     "-t", default="standard", help="Tema de templates (padrão: standard)")
+    @click.option("--overwrite", "-o", is_flag=True,       help="Sobrescreve arquivos existentes")
     @with_appcontext
-    def generate_command(model):
+    def generate_command(model, theme, overwrite):
         """Gera estrutura CRUD a partir de modelos anotados."""
-        from utils.generate_from_model import generate_from_config, generate
+        from utils.generate_from_model import generate, generate_from_config
         if model:
-            generate(model)
+            generate(model, theme=theme, overwrite=overwrite)
         else:
-            generate_from_config()            
+            generate_from_config()          
 
 
 

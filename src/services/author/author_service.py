@@ -28,7 +28,9 @@ class ServiceResult:
 
 
 class AuthorService:
-    """Camada de negócio para author."""
+    """Camada de negócio para Autores."""
+
+    # ── Listagem ──────────────────────────────────────────────────────────────
 
     def list(
         self,
@@ -60,64 +62,7 @@ class AuthorService:
     def get_by_id(self, id: int) -> Author | None:
         return db.session.get(Author, id)
 
-    def create_draft(self) -> ServiceResult:
-        obj = Author(status=AuthorStatus.DRAFT)
-        db.session.add(obj)
-        db.session.commit()
-        return ServiceResult(success=True, data=obj, code=201)
-
-    def publish_draft(self, id: int, data: dict | None = None) -> ServiceResult:
-        obj = self.get_by_id(id)
-        if not obj or obj.status != AuthorStatus.DRAFT:
-            return ServiceResult(success=False, error="Rascunho não encontrado", code=404)
-        if data:
-            self._apply_fields(obj, data)
-        obj.status = AuthorStatus.ACTIVE
-        db.session.commit()
-        return ServiceResult(success=True, data=obj)
-
-    def update(self, id: int, data: dict) -> ServiceResult:
-        obj = self.get_by_id(id)
-        if not obj:
-            return ServiceResult(success=False, error="Registro não encontrado", code=404)
-        self._apply_fields(obj, data)
-        db.session.commit()
-        return ServiceResult(success=True, data=obj)
-
-    def trash(self, id: int) -> ServiceResult:
-        obj = self.get_by_id(id)
-        if not obj:
-            return ServiceResult(success=False, error="Registro não encontrado", code=404)
-        obj.status = AuthorStatus.TRASH
-        db.session.commit()
-        return ServiceResult(success=True, data=obj)
-
-    def restore(self, id: int) -> ServiceResult:
-        obj = self.get_by_id(id)
-        if not obj or obj.status != AuthorStatus.TRASH:
-            return ServiceResult(success=False, error="Registro não está na lixeira", code=404)
-        obj.status = AuthorStatus.ACTIVE
-        db.session.commit()
-        return ServiceResult(success=True, data=obj)
-
-    def delete_permanent(self, id: int) -> ServiceResult:
-        obj = self.get_by_id(id)
-        if not obj or obj.status != AuthorStatus.TRASH:
-            return ServiceResult(success=False, error="Apenas registros na lixeira podem ser excluídos", code=400)
-        db.session.delete(obj)
-        db.session.commit()
-        return ServiceResult(success=True, data={"id": id})
-
-    def discard_draft(self, id: int) -> ServiceResult:
-        obj = self.get_by_id(id)
-        if not obj or obj.status != AuthorStatus.DRAFT:
-            return ServiceResult(success=False, error="Apenas rascunhos podem ser descartados", code=400)
-        db.session.delete(obj)
-        db.session.commit()
-        return ServiceResult(success=True, data={"id": id})
-
     def count_by_status(self) -> dict[str, int]:
-        """Retorna contagem por status."""
         rows = (
             db.session.query(Author.status, func.count(Author.id))
             .group_by(Author.status)
@@ -128,7 +73,109 @@ class AuthorService:
             result[status] = count
         return result
 
-    def _apply_fields(self, obj: Author, data: dict) -> None:
+    # ── Draft ─────────────────────────────────────────────────────────────────
+
+    def create_draft(self) -> ServiceResult:
+        obj = Author(status=AuthorStatus.DRAFT)
+        db.session.add(obj)
+        db.session.commit()
+        return ServiceResult(success=True, data=obj, code=201)
+
+    def autosave_draft(self, id: int, data: dict) -> ServiceResult:
+        obj = self.get_by_id(id)
+        if not obj:
+            return ServiceResult(success=False, error="Não encontrado.", code=404)
+        if obj.status != AuthorStatus.DRAFT:
+            return ServiceResult(success=False, error="Auto-save só é permitido em rascunhos.", code=400)
+        self._apply_fields(obj, data, strict=False)
+        db.session.commit()
+        return ServiceResult(success=True, data=obj)
+
+    def publish_draft(self, id: int, data: dict | None = None) -> ServiceResult:
+        obj = self.get_by_id(id)
+        if not obj or obj.status != AuthorStatus.DRAFT:
+            return ServiceResult(success=False, error="Rascunho não encontrado.", code=404)
+        if data:
+            self._apply_fields(obj, data)
+        obj.status = AuthorStatus.ACTIVE
+        obj.updated_at = datetime.now(timezone.utc)
+        db.session.commit()
+        return ServiceResult(success=True, data=obj)
+
+    # ── CRUD ──────────────────────────────────────────────────────────────────
+
+    def create(self, data: dict) -> ServiceResult:
+        obj = Author(status=AuthorStatus.ACTIVE)
+        self._apply_fields(obj, data)
+        db.session.add(obj)
+        db.session.commit()
+        return ServiceResult(success=True, data=obj, code=201)
+
+    def update(self, id: int, data: dict) -> ServiceResult:
+        obj = self.get_by_id(id)
+        if not obj:
+            return ServiceResult(success=False, error="Registro não encontrado.", code=404)
+        if obj.status == AuthorStatus.TRASH:
+            return ServiceResult(success=False, error="Não é possível editar um registro na lixeira.", code=400)
+        self._apply_fields(obj, data)
+        db.session.commit()
+        return ServiceResult(success=True, data=obj)
+
+    def trash(self, id: int) -> ServiceResult:
+        obj = self.get_by_id(id)
+        if not obj:
+            return ServiceResult(success=False, error="Não encontrado.", code=404)
+        if obj.status == AuthorStatus.TRASH:
+            return ServiceResult(success=False, error="Já está na lixeira.", code=400)
+        obj.status = AuthorStatus.TRASH
+        obj.trashed_at = datetime.now(timezone.utc)
+        obj.updated_at = datetime.now(timezone.utc)
+        db.session.commit()
+        return ServiceResult(success=True, data=obj)
+
+    def restore(self, id: int) -> ServiceResult:
+        obj = self.get_by_id(id)
+        if not obj:
+            return ServiceResult(success=False, error="Não encontrado.", code=404)
+        if obj.status != AuthorStatus.TRASH:
+            return ServiceResult(success=False, error="Não está na lixeira.", code=400)
+        obj.status = AuthorStatus.ACTIVE
+        obj.trashed_at = None
+        obj.updated_at = datetime.now(timezone.utc)
+        db.session.commit()
+        return ServiceResult(success=True, data=obj)
+
+    def delete_permanent(self, id: int) -> ServiceResult:
+        obj = self.get_by_id(id)
+        if not obj:
+            return ServiceResult(success=False, error="Não encontrado.", code=404)
+        if obj.status != AuthorStatus.TRASH:
+            return ServiceResult(
+                success=False,
+                error="Apenas registros na lixeira podem ser excluídos permanentemente.",
+                code=400,
+            )
+        db.session.delete(obj)
+        db.session.commit()
+        return ServiceResult(success=True, data={"id": id})
+
+    def discard_draft(self, id: int) -> ServiceResult:
+        obj = self.get_by_id(id)
+        if not obj:
+            return ServiceResult(success=False, error="Rascunho não encontrado.", code=404)
+        if obj.status != AuthorStatus.DRAFT:
+            return ServiceResult(success=False, error="Apenas rascunhos podem ser descartados.", code=400)
+        db.session.delete(obj)
+        db.session.commit()
+        return ServiceResult(success=True, data={"id": id})
+
+    # ── Helpers ───────────────────────────────────────────────────────────────
+
+    def _apply_fields(self, obj: Author, data: dict, strict: bool = True) -> None:
+        """Aplica campos do dict ao objeto ORM. Sobrescreva para validação customizada."""
         for key, value in data.items():
-            if hasattr(obj, key) and value is not None:
+            if key in ("id", "status", "created_at", "updated_at", "trashed_at"):
+                continue
+            if hasattr(obj, key):
                 setattr(obj, key, value)
+        obj.updated_at = datetime.now(timezone.utc)

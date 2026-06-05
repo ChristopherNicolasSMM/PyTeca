@@ -37,7 +37,7 @@ class AuthorStatus(str, PyEnum):
 class Author(db.Model):
     __tablename__ = "authors"
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
+    name = db.Column(db.String(100), nullable=False, default="")
     birth_year = db.Column(db.Integer)
     bio = db.Column(db.Text)
     status = db.Column(db.String(20), default=AuthorStatus.DRAFT, nullable=False)

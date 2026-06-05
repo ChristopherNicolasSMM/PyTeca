@@ -1,15 +1,15 @@
 {% extends "base.html" %}
 {% from "_components/smart_list.html" import render as smart_list, scripts as sl_scripts %}
 
-{% block title %}Autoress{% endblock %}
+{% block title %}{{ label }}s{% endblock %}
 
 {% block content %}
 <div class="pagetitle">
-  <h1>Autoress</h1>
+  <h1>{{ label }}s</h1>
   <nav>
     <ol class="breadcrumb">
       <li class="breadcrumb-item"><a href="{{ url_for('web.dashboard') }}">Home</a></li>
-      <li class="breadcrumb-item active">Autoress</li>
+      <li class="breadcrumb-item active">{{ label }}s</li>
     </ol>
   </nav>
 </div>
@@ -24,7 +24,7 @@
     {% for value, icon, label_tab, count in tab_map %}
     <li class="nav-item">
       <a class="nav-link {% if current_status == value %}active{% endif %}"
-         href="{{ url_for('authors.list', status=value) }}">
+         href="{{ url_for('{{ plural }}.list', status=value) }}">
         <i class="bi {{ icon }} me-1"></i>{{ label_tab }}
         {% if count > 0 %}
           <span class="badge ms-1
@@ -43,30 +43,30 @@
     <div class="card-body pt-3">
       {% if current_status != 'trash' %}
       <div class="d-flex justify-content-end mb-2">
-        <button type="button" class="btn btn-primary btn-sm" id="btnNovoAuthor">
-          <i class="bi bi-plus-lg me-1"></i>Novo Autores
+        <button type="button" class="btn btn-primary btn-sm" id="btnNovo{{ class_name }}">
+          <i class="bi bi-plus-lg me-1"></i>Novo {{ label }}
         </button>
       </div>
       {% endif %}
 
       {% macro _row_actions(row, status=current_status) %}
         {% if status == 'active' %}
-          <a href="{{ url_for('authors.detail', item_id=row.id) }}" class="btn btn-outline-primary" title="Visualizar"><i class="bi bi-eye"></i></a>
+          <a href="{{ url_for('{{ plural }}.detail', item_id=row.id) }}" class="btn btn-outline-primary" title="Visualizar"><i class="bi bi-eye"></i></a>
           <button type="button" class="btn btn-outline-secondary btn-edit" data-id="{{ row.id }}" title="Editar"><i class="bi bi-pencil"></i></button>
-          <form method="post" action="{{ url_for('authors.trash', author_id=row.id) }}" class="d-inline" onsubmit="return confirm('Mover para a lixeira?')">
+          <form method="post" action="{{ url_for('{{ plural }}.trash', {{ class_name_lower }}_id=row.id) }}" class="d-inline" onsubmit="return confirm('Mover para a lixeira?')">
             <button class="btn btn-outline-danger" title="Lixeira"><i class="bi bi-trash3"></i></button>
           </form>
         {% elif status == 'draft' %}
           <button type="button" class="btn btn-outline-primary btn-edit" data-id="{{ row.id }}" title="Continuar editando"><i class="bi bi-pencil"></i></button>
-          <form method="post" action="{{ url_for('authors.discard_draft', author_id=row.id) }}" class="d-inline" onsubmit="return confirm('Descartar rascunho?')">
+          <form method="post" action="{{ url_for('{{ plural }}.discard_draft', {{ class_name_lower }}_id=row.id) }}" class="d-inline" onsubmit="return confirm('Descartar rascunho?')">
             <button class="btn btn-outline-danger" title="Descartar"><i class="bi bi-x-circle"></i></button>
           </form>
         {% elif status == 'trash' %}
-          <form method="post" action="{{ url_for('authors.restore', author_id=row.id) }}" class="d-inline">
+          <form method="post" action="{{ url_for('{{ plural }}.restore', {{ class_name_lower }}_id=row.id) }}" class="d-inline">
             <button class="btn btn-outline-success" title="Restaurar"><i class="bi bi-arrow-counterclockwise"></i></button>
           </form>
           {% if current_user.is_admin %}
-          <form method="post" action="{{ url_for('authors.delete_permanent', author_id=row.id) }}" class="d-inline" onsubmit="return confirm('Excluir PERMANENTEMENTE?')">
+          <form method="post" action="{{ url_for('{{ plural }}.delete_permanent', {{ class_name_lower }}_id=row.id) }}" class="d-inline" onsubmit="return confirm('Excluir PERMANENTEMENTE?')">
             <button class="btn btn-danger" title="Excluir permanente"><i class="bi bi-trash3-fill"></i></button>
           </form>
           {% endif %}
@@ -78,7 +78,7 @@
   </div>
 </section>
 
-{% include "authors/_modals/author_form_modal.html" %}
+{% include "{{ plural }}/_modals/{{ class_name_lower }}_form_modal.html" %}
 {% endblock %}
 
 {% block extra_js %}
@@ -86,15 +86,15 @@
 {{ sl_scripts() }}
 <script>
   (function() {
-    const modal = new bootstrap.Modal(document.getElementById('authorModal'));
-    const form = document.getElementById('authorForm');
-    const titleElem = document.getElementById('authorModalTitle');
-    const idElem = document.getElementById('authorId');
+    const modal = new bootstrap.Modal(document.getElementById('{{ class_name_lower }}Modal'));
+    const form = document.getElementById('{{ class_name_lower }}Form');
+    const titleElem = document.getElementById('{{ class_name_lower }}ModalTitle');
+    const idElem = document.getElementById('{{ class_name_lower }}Id');
 
     function resetForm() {
       form.reset();
       idElem.value = '';
-      titleElem.innerText = 'Novo Autores';
+      titleElem.innerText = 'Novo {{ label }}';
       const qty = document.getElementById('quantity');
       if (qty) qty.value = 0;
       const avail = document.getElementById('available');
@@ -103,7 +103,7 @@
 
     async function loadData(id) {
       try {
-        const response = await fetch(`/api/authors/${id}`);
+        const response = await fetch(`/api/{{ plural }}/${id}`);
         const result = await response.json();
         if (result.success) {
           const data = result.data;
@@ -112,7 +112,7 @@
             if (field) field.value = value ?? '';
           }
           idElem.value = id;
-          titleElem.innerText = 'Editar Autores';
+          titleElem.innerText = 'Editar {{ label }}';
         } else {
           alert('Erro ao carregar dados: ' + (result.error || 'Desconhecido'));
           modal.hide();
@@ -139,23 +139,23 @@
       //  return;
       //}
       //Final Validação campos obrigatórios
-      const saveBtn = document.getElementById('btnSaveAuthor');
+      const saveBtn = document.getElementById('btnSave{{ class_name }}');
       saveBtn.disabled = true;
       saveBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Salvando...';
       try {
         let response;
         if (id) {
-          response = await fetch(`/api/authors/${id}`, {
+          response = await fetch(`/api/{{ plural }}/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
           });
         } else {
-          const draftRes = await fetch(`/api/authors/draft`, { method: 'POST' });
+          const draftRes = await fetch(`/api/{{ plural }}/draft`, { method: 'POST' });
           const draftData = await draftRes.json();
           if (!draftData.success) throw new Error(draftData.error);
           const draftId = draftData.data.id;
-          response = await fetch(`/api/authors/${draftId}/publish`, {
+          response = await fetch(`/api/{{ plural }}/${draftId}/publish`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
@@ -177,11 +177,11 @@
       }
     }
 
-    document.getElementById('btnNovoAuthor')?.addEventListener('click', () => {
+    document.getElementById('btnNovo{{ class_name }}')?.addEventListener('click', () => {
       resetForm();
       modal.show();
     });
-    document.getElementById('btnSaveAuthor')?.addEventListener('click', save);
+    document.getElementById('btnSave{{ class_name }}')?.addEventListener('click', save);
     document.body.addEventListener('click', (e) => {
       const btn = e.target.closest('.btn-edit');
       if (btn && btn.dataset.id) {

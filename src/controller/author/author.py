@@ -11,20 +11,18 @@ from utils.smart_list.export import export_csv, export_excel, export_pdf
 
 author_bp = Blueprint("authors", __name__, url_prefix="/authors")
 
-# ---- Configuração SmartList ----
-def _genre_options():
-    return [("", "Todos")]
+# ── Configuração SmartList ────────────────────────────────────────────────────
 
 SMART_LIST_CONFIG = SmartListConfig(
     list_id="authors",
     endpoint="authors.list",
     columns=[
-                ColumnDef("id", "ID", sortable=True, width="60px", align="start"),
-        ColumnDef("name", "Nome", sortable=True, width="None", align="start"),
+        ColumnDef("id", "ID", sortable=True, width="60px", align="start"),
+        ColumnDef("name", "Nome", sortable=True, width=None, align="start"),
         ColumnDef("birth_year", "Ano Nascimento", sortable=False, width="100px", align="center")
     ],
     filters=[
-                FilterDef("name", "name", type="text", placeholder="Buscar por nome...")
+        FilterDef("name", "name", type="text", placeholder="Buscar por nome...")
     ],
     default_sort="name",
     default_dir="asc",
@@ -34,10 +32,13 @@ SMART_LIST_CONFIG = SmartListConfig(
     export_filename="authors",
 )
 
+
+# ── Listagem ──────────────────────────────────────────────────────────────────
+
 @author_bp.route("/")
 @login_required
-def list():    
-    status = request.args.get("status", AuthorStatus.ACTIVE.value)  # "active"
+def list():
+    status = request.args.get("status", AuthorStatus.ACTIVE.value)
     export = request.args.get("export", "")
 
     user_layout = None
@@ -86,6 +87,9 @@ def list():
         current_status=status,
     )
 
+
+# ── Detalhe ───────────────────────────────────────────────────────────────────
+
 @author_bp.route("/<int:item_id>")
 @login_required
 def detail(item_id: int):
@@ -94,3 +98,47 @@ def detail(item_id: int):
     if not item:
         abort(404)
     return render_template("authors/detail.html", author=item)
+
+
+# ── Ações POST ────────────────────────────────────────────────────────────────
+
+@author_bp.route("/<int:author_id>/trash", methods=["POST"])
+@login_required
+def trash(author_id: int):
+    service = AuthorService()
+    r = service.trash(author_id)
+    flash("Movido para a lixeira." if r.success else r.error,
+          "success" if r.success else "danger")
+    return redirect(request.referrer or url_for("authors.list"))
+
+
+@author_bp.route("/<int:author_id>/restore", methods=["POST"])
+@login_required
+def restore(author_id: int):
+    service = AuthorService()
+    r = service.restore(author_id)
+    flash("Registro restaurado." if r.success else r.error,
+          "success" if r.success else "danger")
+    return redirect(request.referrer or url_for("authors.list", status="trash"))
+
+
+@author_bp.route("/<int:author_id>/delete", methods=["POST"])
+@login_required
+def delete_permanent(author_id: int):
+    if not current_user.is_admin:
+        abort(403)
+    service = AuthorService()
+    r = service.delete_permanent(author_id)
+    flash("Excluído permanentemente." if r.success else r.error,
+          "success" if r.success else "danger")
+    return redirect(url_for("authors.list", status="trash"))
+
+
+@author_bp.route("/<int:author_id>/discard", methods=["POST"])
+@login_required
+def discard_draft(author_id: int):
+    service = AuthorService()
+    r = service.discard_draft(author_id)
+    flash("Rascunho descartado." if r.success else r.error,
+          "info" if r.success else "danger")
+    return redirect(url_for("authors.list"))

@@ -1,9 +1,8 @@
 {% extends "base.html" %}
 
 {% block title %}
-
-    {{ class_name.lower() }.title} - Detalhe do Autores{% endblock %}
-    }
+    {{ author.title }} - Detalhe do Autores
+{% endblock %}
 
 {% block content %}
 <div class="pagetitle">
@@ -24,33 +23,36 @@
         <div class="card-body">
           <h5 class="card-title">Informações</h5>
           <table class="table table-bordered">
-            
-            <tr>
-              <th style="width:30%">Name</th>
-              <td>{{ author.name or '—' }}</td>
-            </tr>
-            <tr>
-              <th style="width:30%">Birth Year</th>
-              <td>{{ author.birth_year or '—' }}</td>
-            </tr>
-            <tr>
-              <th style="width:30%">Bio</th>
-              <td>{{ author.bio or '—' }}</td>
-            </tr>
+                          <tr>
+                <th style="width:30%">Name</th>
+                <td>{{ author.name or '—' }}</td>
+              </tr>
+              <tr>
+                <th style="width:30%">Birth Year</th>
+                <td>{{ author.birth_year or '—' }}</td>
+              </tr>
+              <tr>
+                <th style="width:30%">Bio</th>
+                <td>{{ author.bio or '—' }}</td>
+              </tr>
           </table>
+
           <div class="mt-4">
             <div class="btn-group">
               <a href="{{ url_for('authors.list') }}" class="btn btn-secondary">Voltar</a>
+
               {% if author.status == 'active' %}
                 <button type="button" class="btn btn-primary" id="btnEditAuthor" data-id="{{ author.id }}">Editar</button>
                 <form method="post" action="{{ url_for('authors.trash', author_id=author.id) }}" class="d-inline" onsubmit="return confirm('Mover para lixeira?')">
                   <button type="submit" class="btn btn-outline-danger">Mover para lixeira</button>
                 </form>
+
               {% elif author.status == 'draft' %}
                 <button type="button" class="btn btn-primary" id="btnEditAuthor" data-id="{{ author.id }}">Continuar edição</button>
                 <form method="post" action="{{ url_for('authors.discard_draft', author_id=author.id) }}" class="d-inline" onsubmit="return confirm('Descartar rascunho?')">
                   <button type="submit" class="btn btn-danger">Descartar</button>
                 </form>
+
               {% elif author.status == 'trash' %}
                 <form method="post" action="{{ url_for('authors.restore', author_id=author.id) }}" class="d-inline">
                   <button type="submit" class="btn btn-success">Restaurar</button>
@@ -60,6 +62,7 @@
                   <button type="submit" class="btn btn-danger">Excluir permanentemente</button>
                 </form>
                 {% endif %}
+
               {% endif %}
             </div>
           </div>
@@ -68,20 +71,54 @@
     </div>
   </div>
 </section>
+
 {% include "authors/_modals/author_form_modal.html" %}
 {% endblock %}
 
 {% block extra_js %}
 <script>
-  const modal = new bootstrap.Modal(document.getElementById('authorModal'));
-  const editBtn = document.getElementById('btnEditAuthor');
-  if (editBtn) {
+  (function() {
+    // O mesmo script do manage.html é utilizado para edição
+    const modal = new bootstrap.Modal(document.getElementById('authorModal'));
+    const editBtn = document.getElementById('btnEditAuthor');
+    if (!editBtn) return;
+
+    // Função loadData (igual à do manage) – aqui simplificada, mas pode ser compartilhada
+    async function loadData(id) {
+      try {
+        const response = await fetch(`/api/authors/${id}`);
+        const result = await response.json();
+        if (result.success) {
+          const data = result.data;
+          for (const [key, value] of Object.entries(data)) {
+            const field = document.getElementById(key);
+            if (field) field.value = value ?? '';
+          }
+          document.getElementById('authorId').value = id;
+          document.getElementById('authorModalTitle').innerText = 'Editar Autores';
+        } else {
+          alert('Erro ao carregar dados: ' + (result.error || 'Desconhecido'));
+          modal.hide();
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Erro de conexão.');
+        modal.hide();
+      }
+    }
+
+    function resetForm() {
+      const form = document.getElementById('authorForm');
+      if (form) form.reset();
+      document.getElementById('authorId').value = '';
+      document.getElementById('authorModalTitle').innerText = 'Editar Autores';
+    }
+
     editBtn.addEventListener('click', () => {
-      // O mesmo script do manage.html será reutilizado
-      const loadData = (id) => { ... };
+      resetForm();
       loadData(editBtn.dataset.id);
       modal.show();
     });
-  }
+  })();
 </script>
 {% endblock %}

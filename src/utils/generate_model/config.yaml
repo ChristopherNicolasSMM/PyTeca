@@ -1,18 +1,23 @@
-# Configuração para o gerador automático
-# Cada entrada gera uma estrutura completa (controller, service, routes, templates)
+## Configuração do gerador automático de CRUD
+## Execute: flask generate  ou  flask generate --model model/author.py
 
 models:
-  - source: "model/book.py"            # caminho relativo a src/
-    # opcional: força nome da classe (se houver várias)
-
-  - source: "generate_model/mockup/product.py"   # mockup exemplo
-    class_name: "Product"
-
   - source: "model/author.py"
-    # será gerado autor
+    # class_name: "Author"   # opcional — filtra uma classe específica do arquivo
+    # plural: "authors"      # opcional — sobrescreve @plural do model
 
-# Configurações globais (opcionais)
+  # - source: "model/book.py"
+  # - source: "model/product.py"
+
 generator:
-  output_dir: ""                        # raiz onde criar pastas (controller, services, api, templates) --- Já estamos no src, então pode deixar vazio
-  overwrite: false                      # não sobrescrever arquivos existentes
-  update_main: true                     # tentar atualizar main.py automaticamente
+  # Pasta de templates a usar. Deve existir dentro de:
+  #   utils/generate_model/templates/<template_theme>/
+  # Padrão: "standard"
+  template_theme: "standard"
+
+  # Se true, sobrescreve arquivos já existentes (com backup automático no futuro).
+  # Se false, pula arquivos que já existem.
+  overwrite: false
+
+  # Atualização automática do main.py (não implementado ainda).
+  update_main: false
