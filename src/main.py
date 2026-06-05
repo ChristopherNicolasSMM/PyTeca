@@ -216,12 +216,13 @@ def register_cli_commands(app):
     @click.option("--model",     "-m", default=None,       help="Caminho do model (ex: model/author.py)")
     @click.option("--theme",     "-t", default="standard", help="Tema de templates (padrão: standard)")
     @click.option("--overwrite", "-o", is_flag=True,       help="Sobrescreve arquivos existentes")
+    @click.option("--add-to-root-menu", is_flag=True,       help="Adiciona entrada no menu raiz")
     @with_appcontext
-    def generate_command(model, theme, overwrite):
+    def generate_command(model, theme, overwrite, add_to_root_menu):
         """Gera estrutura CRUD a partir de modelos anotados."""
         from utils.generate_from_model import generate, generate_from_config
         if model:
-            generate(model, theme=theme, overwrite=overwrite)
+            generate(model, theme=theme, overwrite=overwrite, add_to_root_menu=add_to_root_menu)
         else:
             generate_from_config()          
 

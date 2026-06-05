@@ -161,7 +161,6 @@ def _build_context(
         "form_fields":      _build_form_fields(form_fields_list),
     }
 
-
 # ══════════════════════════════════════════════════════════════════════════════
 # HELPERS DE I/O
 # ══════════════════════════════════════════════════════════════════════════════
@@ -183,6 +182,73 @@ def _write_file(path: Path, content: str, overwrite: bool = False) -> bool:
     print(f"  ✓ {path}")
     return True
 
+# ==================================================================
+# GERAÇÃO DO MENU YAML
+# ==================================================================
+
+def _generate_menu_yaml(templates_dir: Path, class_name: str, plural: str, label: str, overwrite: bool = False) -> None:
+    """Cria o arquivo menu.yaml na pasta templates/plural se não existir."""
+    menu_yaml_path = templates_dir / "menu.yaml"
+    if menu_yaml_path.exists() and not overwrite:
+        print(f"  ⚠ menu.yaml já existe em {menu_yaml_path}, pulando.")
+        return
+
+    content = f"""# Menu para a seção {label}
+menu:
+  - name: "{label}s"
+    endpoint: "{plural}.list"
+    icon: "bi-grid"
+"""
+    menu_yaml_path.write_text(content, encoding="utf-8")
+    print(f"  ✓ {menu_yaml_path}")
+
+
+def _add_to_root_menu(class_name: str, plural: str, label: str, overwrite: bool = False) -> None:
+    """
+    Adiciona uma entrada para a entidade no menu principal (templates/menu.yaml).
+    Se o arquivo não existir, cria com apenas esta entrada.
+    """
+    root_menu = Path("templates") / "menu.yaml"
+    new_item = {
+        "name": f"{label}s",
+        "endpoint": f"{plural}.list",
+        "icon": "bi-grid"
+    }
+
+    # Carrega o menu existente (se houver)
+    menu_data = {}
+    if root_menu.exists():
+        try:
+            import yaml
+            with open(root_menu, "r", encoding="utf-8") as f:
+                menu_data = yaml.safe_load(f) or {}
+        except Exception as e:
+            print(f"  ⚠ Erro ao ler {root_menu}: {e}")
+
+    # Garante a estrutura
+    if not isinstance(menu_data, dict):
+        menu_data = {}
+    if "menu" not in menu_data or not isinstance(menu_data["menu"], list):
+        menu_data["menu"] = []
+
+    # Verifica se a entrada já existe (pelo endpoint)
+    exists = any(item.get("endpoint") == new_item["endpoint"] for item in menu_data["menu"])
+    if exists and not overwrite:
+        print(f"  ⚠ Entrada para {plural} já existe no menu raiz, pulando.")
+        return
+
+    # Remove entrada antiga se overwrite=True
+    if overwrite:
+        menu_data["menu"] = [item for item in menu_data["menu"] if item.get("endpoint") != new_item["endpoint"]]
+
+    # Adiciona a nova entrada
+    menu_data["menu"].append(new_item)
+
+    # Escreve o arquivo
+    import yaml
+    with open(root_menu, "w", encoding="utf-8") as f:
+        yaml.dump(menu_data, f, allow_unicode=True, sort_keys=False)
+    print(f"  ✓ Entrada adicionada ao menu raiz: {root_menu}")
 
 # ══════════════════════════════════════════════════════════════════════════════
 # FUNÇÕES DE GERAÇÃO
@@ -249,6 +315,7 @@ def generate_templates(
     metadata: Dict,
     loader,
     overwrite: bool = False,
+    add_to_root_menu: bool = False,
 ) -> None:
     templates_dir = Path("templates") / plural
     modals_dir    = templates_dir / "_modals"
@@ -265,6 +332,12 @@ def generate_templates(
 
     _write_file(modals_dir / f"{class_name.lower()}_form_modal.html",
                 loader.render("form_modal.html.j2", ctx), overwrite)
+    
+    _generate_menu_yaml(templates_dir, class_name, plural, ctx["label"], overwrite)
+    
+    # Se solicitado, adiciona ao menu raiz
+    if add_to_root_menu:
+        _add_to_root_menu(class_name, plural, ctx["label"], overwrite)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -277,6 +350,7 @@ def _run_generation(
     plural_override: Optional[str],
     loader,
     overwrite: bool,
+    add_to_root_menu: bool = False,
 ) -> None:
     """Executa geração para um arquivo de model."""
     classes = load_classes_from_file(str(file_path), class_name_filter)
@@ -295,7 +369,7 @@ def _run_generation(
         generate_controller(str(file_path), cls_name, final_plural, metadata, loader, overwrite)
         generate_service    (str(file_path), cls_name, final_plural, metadata, loader, overwrite)
         generate_routes     (str(file_path), cls_name, final_plural, metadata, loader, overwrite)
-        generate_templates  (str(file_path), cls_name, final_plural, metadata, loader, overwrite)
+        generate_templates  (str(file_path), cls_name, final_plural, metadata, loader, overwrite, add_to_root_menu)
 
 
 def generate_from_config() -> None:
@@ -314,16 +388,21 @@ def generate_from_config() -> None:
         if not file_path.exists():
             print(f"  ✗ Arquivo não encontrado: {file_path}")
             continue
+        
+        # Extrair a flag add_to_root_menu (padrão False)
+        add_to_root_menu = entry.get("add_to_root_menu", False)
+        
         _run_generation(
             file_path,
             class_name_filter=entry.get("class_name"),
             plural_override=entry.get("plural"),
             loader=loader,
             overwrite=overwrite,
+            add_to_root_menu=add_to_root_menu,
         )
 
 
-def generate(model_path: str, theme: str = "standard", overwrite: bool = False) -> None:
+def generate(model_path: str, theme: str = "standard", overwrite: bool = False, add_to_root_menu: bool = False) -> None:
     """
     Gera todos os artefatos para um único arquivo de model.
     Exemplo: generate("model/author.py")
@@ -335,4 +414,4 @@ def generate(model_path: str, theme: str = "standard", overwrite: bool = False) 
 
     loader = get_loader(theme)
     print(f"Tema de templates: '{theme}'  |  overwrite={overwrite}")
-    _run_generation(file_path, None, None, loader, overwrite)
+    _run_generation(file_path, None, None, loader, overwrite, add_to_root_menu=add_to_root_menu)
