@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+
+{% block title %}
+    {{ loan.title }} - Detalhe do Empréstimos
+{% endblock %}
+
+{% block content %}
+<div class="pagetitle">
+  <h1>{{ loan.title }}</h1>
+  <nav>
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{{ url_for('web.dashboard') }}">Home</a></li>
+      <li class="breadcrumb-item"><a href="{{ url_for('loans.list') }}">Empréstimoss</a></li>
+      <li class="breadcrumb-item active">{{ loan.title }}</li>
+    </ol>
+  </nav>
+</div>
+
+<section class="section">
+  <div class="row">
+    <div class="col-lg-12">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title">Informações</h5>
+          <table class="table table-bordered">
+                          <td>
+                <th style="width:30%">User Id</th>
+                <td>{{ loan.user_id or '—' }}</td>
+              </tr>
+              <td>
+                <th style="width:30%">Book Id</th>
+                <td>{{ loan.book_id or '—' }}</td>
+              </tr>
+              <td>
+                <th style="width:30%">Loan Date</th>
+                <td>{{ loan.loan_date or '—' }}</td>
+              </tr>
+              <td>
+                <th style="width:30%">Due Date</th>
+                <td>{{ loan.due_date or '—' }}</td>
+              </tr>
+              <td>
+                <th style="width:30%">Status</th>
+                <td>{{ loan.status or '—' }}</td>
+              </tr>
+              <td>
+                <th style="width:30%">Notes</th>
+                <td>{{ loan.notes or '—' }}</td>
+              </tr>
+          </table>
+
+          <div class="mt-4">
+            <div class="btn-group">
+              <a href="{{ url_for('loans.list') }}" class="btn btn-secondary">Voltar</a>
+
+              {% if loan.status == 'active' %}
+                <button type="button" class="btn btn-primary" id="btnEditLoan" data-id="{{ loan.id }}">Editar</button>
+                <form method="post" action="{{ url_for('loans.trash', loan_id=loan.id) }}" class="d-inline" onsubmit="return confirm('Mover para lixeira?')">
+                  <button type="submit" class="btn btn-outline-danger">Mover para lixeira</button>
+                </form>
+
+              {% elif loan.status == 'draft' %}
+                <button type="button" class="btn btn-primary" id="btnEditLoan" data-id="{{ loan.id }}">Continuar edição</button>
+                <form method="post" action="{{ url_for('loans.discard_draft', loan_id=loan.id) }}" class="d-inline" onsubmit="return confirm('Descartar rascunho?')">
+                  <button type="submit" class="btn btn-danger">Descartar</button>
+                </form>
+
+              {% elif loan.status == 'trash' %}
+                <form method="post" action="{{ url_for('loans.restore', loan_id=loan.id) }}" class="d-inline">
+                  <button type="submit" class="btn btn-success">Restaurar</button>
+                </form>
+                {% if current_user.is_admin %}
+                <form method="post" action="{{ url_for('loans.delete_permanent', loan_id=loan.id) }}" class="d-inline" onsubmit="return confirm('Excluir permanentemente?')">
+                  <button type="submit" class="btn btn-danger">Excluir permanentemente</button>
+                </form>
+                {% endif %}
+
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+{% include "loans/_modals/loan_form_modal.html" %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  (function() {
+    // O mesmo script do manage.html é utilizado para edição
+    const modal = new bootstrap.Modal(document.getElementById('loanModal'));
+    const editBtn = document.getElementById('btnEditLoan');
+    if (!editBtn) return;
+
+    // Função loadData (igual à do manage) – aqui simplificada, mas pode ser compartilhada
+    async function loadData(id) {
+      try {
+        const response = await fetch(`/api/loans/${id}`);
+        const result = await response.json();
+        if (result.success) {
+          const data = result.data;
+          for (const [key, value] of Object.entries(data)) {
+            const field = document.getElementById(key);
+            if (field) field.value = value ?? '';
+          }
+          document.getElementById('loanId').value = id;
+          document.getElementById('loanModalTitle').innerText = 'Editar Empréstimos';
+        } else {
+          alert('Erro ao carregar dados: ' + (result.error || 'Desconhecido'));
+          modal.hide();
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Erro de conexão.');
+        modal.hide();
+      }
+    }
+
+    function resetForm() {
+      const form = document.getElementById('loanForm');
+      if (form) form.reset();
+      document.getElementById('loanId').value = '';
+      document.getElementById('loanModalTitle').innerText = 'Editar Empréstimos';
+    }
+
+    editBtn.addEventListener('click', () => {
+      resetForm();
+      loadData(editBtn.dataset.id);
+      modal.show();
+    });
+  })();
+</script>
+{% endblock %}

@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+{% from "_components/smart_list.html" import render as smart_list, scripts as sl_scripts %}
+
+{% block title %}Empréstimoss{% endblock %}
+
+{% block content %}
+<div class="pagetitle">
+  <h1>Empréstimoss</h1>
+  <nav>
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{{ url_for('web.dashboard') }}">Home</a></li>
+      <li class="breadcrumb-item active">Empréstimoss</li>
+    </ol>
+  </nav>
+</div>
+
+<section class="section">
+  <ul class="nav nav-tabs mb-3">
+    {% set tab_map = [
+      ('active', 'bi-book', 'Publicados', counts.active | default(0)),
+      ('draft',  'bi-pencil-square', 'Rascunhos', counts.draft | default(0)),
+      ('trash',  'bi-trash3', 'Lixeira', counts.trash | default(0)),
+    ] %}
+    {% for value, icon, label_tab, count in tab_map %}
+    <li class="nav-item">
+      <a class="nav-link {% if current_status == value %}active{% endif %}"
+         href="{{ url_for('loans.list', status=value) }}">
+        <i class="bi {{ icon }} me-1"></i>{{ label_tab }}
+        {% if count > 0 %}
+          <span class="badge ms-1
+            {% if value == 'trash' %}bg-danger
+            {% elif value == 'draft' %}bg-warning text-dark
+            {% else %}bg-primary{% endif %}">
+            {{ count }}
+          </span>
+        {% endif %}
+      </a>
+    </li>
+    {% endfor %}
+  </ul>
+
+  <div class="card">
+    <div class="card-body pt-3">
+      {% if current_status != 'trash' %}
+      <div class="d-flex justify-content-end mb-2">
+        <button type="button" class="btn btn-primary btn-sm" id="btnNovoLoan">
+          <i class="bi bi-plus-lg me-1"></i>Novo Empréstimos
+        </button>
+      </div>
+      {% endif %}
+
+      {% macro _row_actions(row, status=current_status) %}
+        {% if status == 'active' %}
+          <a href="{{ url_for('loans.detail', item_id=row.id) }}" class="btn btn-outline-primary" title="Visualizar"><i class="bi bi-eye"></i></a>
+          <button type="button" class="btn btn-outline-secondary btn-edit" data-id="{{ row.id }}" title="Editar"><i class="bi bi-pencil"></i></button>
+          <form method="post" action="{{ url_for('loans.trash', loan_id=row.id) }}" class="d-inline" onsubmit="return confirm('Mover para a lixeira?')">
+            <button class="btn btn-outline-danger" title="Lixeira"><i class="bi bi-trash3"></i></button>
+          </form>
+        {% elif status == 'draft' %}
+          <button type="button" class="btn btn-outline-primary btn-edit" data-id="{{ row.id }}" title="Continuar editando"><i class="bi bi-pencil"></i></button>
+          <form method="post" action="{{ url_for('loans.discard_draft', loan_id=row.id) }}" class="d-inline" onsubmit="return confirm('Descartar rascunho?')">
+            <button class="btn btn-outline-danger" title="Descartar"><i class="bi bi-x-circle"></i></button>
+          </form>
+        {% elif status == 'trash' %}
+          <form method="post" action="{{ url_for('loans.restore', loan_id=row.id) }}" class="d-inline">
+            <button class="btn btn-outline-success" title="Restaurar"><i class="bi bi-arrow-counterclockwise"></i></button>
+          </form>
+          {% if current_user.is_admin %}
+          <form method="post" action="{{ url_for('loans.delete_permanent', loan_id=row.id) }}" class="d-inline" onsubmit="return confirm('Excluir PERMANENTEMENTE?')">
+            <button class="btn btn-danger" title="Excluir permanente"><i class="bi bi-trash3-fill"></i></button>
+          </form>
+          {% endif %}
+        {% endif %}
+      {% endmacro %}
+
+      {{ smart_list(sl, row_actions=_row_actions) }}
+    </div>
+  </div>
+</section>
+
+{% include "loans/_modals/loan_form_modal.html" %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+{{ sl_scripts() }}
+<script>
+  (function() {
+    const modal = new bootstrap.Modal(document.getElementById('loanModal'));
+    const form = document.getElementById('loanForm');
+    const titleElem = document.getElementById('loanModalTitle');
+    const idElem = document.getElementById('loanId');
+
+    function resetForm() {
+      form.reset();
+      idElem.value = '';
+      titleElem.innerText = 'Novo Empréstimos';
+      const qty = document.getElementById('quantity');
+      if (qty) qty.value = 0;
+      const avail = document.getElementById('available');
+      if (avail) avail.value = 0;
+    }
+
+    async function loadData(id) {
+      try {
+        const response = await fetch(`/api/loans/${id}`);
+        const result = await response.json();
+        if (result.success) {
+          const data = result.data;
+          for (const [key, value] of Object.entries(data)) {
+            const field = document.getElementById(key);
+            if (field) field.value = value ?? '';
+          }
+          idElem.value = id;
+          titleElem.innerText = 'Editar Empréstimos';
+        } else {
+          alert('Erro ao carregar dados: ' + (result.error || 'Desconhecido'));
+          modal.hide();
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Erro de conexão.');
+        modal.hide();
+      }
+    }
+
+    async function save() {
+      const id = idElem.value;
+      const data = {};
+      const fields = form.querySelectorAll('[name]');
+      fields.forEach(field => {
+        let value = field.value;
+        if (field.type === 'number') value = parseInt(value) || null;
+        data[field.name] = value;
+      });
+      //Inicio Validação campos obrigatórios
+      //if (!data.title || !data.author) {
+      //  alert('Campos obrigatórios não preenchidos.');
+      //  return;
+      //}
+      //Final Validação campos obrigatórios
+      const saveBtn = document.getElementById('btnSaveLoan');
+      saveBtn.disabled = true;
+      saveBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Salvando...';
+      try {
+        let response;
+        if (id) {
+          response = await fetch(`/api/loans/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+          });
+        } else {
+          const draftRes = await fetch(`/api/loans/draft`, { method: 'POST' });
+          const draftData = await draftRes.json();
+          if (!draftData.success) throw new Error(draftData.error);
+          const draftId = draftData.data.id;
+          response = await fetch(`/api/loans/${draftId}/publish`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+          });
+        }
+        const result = await response.json();
+        if (result.success) {
+          modal.hide();
+          window.location.reload();
+        } else {
+          alert('Erro: ' + (result.error || 'Falha ao salvar'));
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Erro de conexão.');
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = 'Salvar';
+      }
+    }
+
+    document.getElementById('btnNovoLoan')?.addEventListener('click', () => {
+      resetForm();
+      modal.show();
+    });
+    document.getElementById('btnSaveLoan')?.addEventListener('click', save);
+    document.body.addEventListener('click', (e) => {
+      const btn = e.target.closest('.btn-edit');
+      if (btn && btn.dataset.id) {
+        e.preventDefault();
+        resetForm();
+        loadData(btn.dataset.id);
+        modal.show();
+      }
+    });
+  })();
+</script>
+{% endblock %}

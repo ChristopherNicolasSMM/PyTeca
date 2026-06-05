@@ -1,5 +1,8 @@
 # src/db/database.py
 from pathlib import Path
+import pkgutil
+import importlib
+import model as model_pkg
 
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text
@@ -37,13 +40,10 @@ def init_db(app):
 
         ## Importar modelos DEPOIS de inicializar o db
         with app.app_context():
-            # Importa automaticamente todos os models da pasta model/
-            import importlib
-            import pkgutil
-            import model as model_pkg
  
-            for _, module_name, _ in pkgutil.iter_modules(model_pkg.__path__):
-                importlib.import_module(f"model.{module_name}")     
+            for importer, modname, ispkg in pkgutil.walk_packages(model_pkg.__path__, prefix="model."):
+                if not ispkg:  # evita importar pacotes, apenas módulos
+                    importlib.import_module(modname)   
 
             db.create_all()
             print("Tabelas core criadas com sucesso!")

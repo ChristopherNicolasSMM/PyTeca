@@ -1,14 +1,14 @@
-{# Modal de formulário para {{ class_name }} #}
-<div class="modal fade" id="{{ class_name_lower }}Modal" tabindex="-1" aria-hidden="true">
+{# Modal de formulário para Book #}
+<div class="modal fade" id="bookModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="{{ class_name_lower }}ModalTitle">Novo {{ label }}</h5>
+        <h5 class="modal-title" id="bookModalTitle">Novo Livros</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
-        <form id="{{ class_name_lower }}Form">
-          <input type="hidden" id="{{ class_name_lower }}Id">
+        <form id="bookForm">
+          <input type="hidden" id="bookId">
           {% for field in form_fields_list %}
             {# Verifica se o campo é uma chave estrangeira #}
             {% set is_fk = false %}
@@ -43,7 +43,7 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-        <button type="button" class="btn btn-primary" id="btnSave{{ class_name }}">Salvar</button>
+        <button type="button" class="btn btn-primary" id="btnSaveBook">Salvar</button>
       </div>
     </div>
   </div>
@@ -112,10 +112,10 @@
     }
 
     // Observa a abertura do modal para inicializar os selects
-    const modalElement = document.getElementById('{{ class_name_lower }}Modal');
+    const modalElement = document.getElementById('bookModal');
     if (modalElement) {
       modalElement.addEventListener('shown.bs.modal', function() {
-        initRelationshipSelects('{{ class_name_lower }}Modal');
+        initRelationshipSelects('bookModal');
       });
     }
   })();

@@ -5,7 +5,7 @@ Utilitário para configuração automática do ambiente de desenvolvimento.
 import os
 
 from db.database import db
-from model.user import User
+from model.core.user import User
 
 
 def ensure_dev_admin():

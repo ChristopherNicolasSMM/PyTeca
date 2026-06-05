@@ -1,0 +1,5 @@
+# Menu para a seção Autores
+menu:
+  - name: "Autoress"
+    endpoint: "authors.list"
+    icon: "bi-grid"

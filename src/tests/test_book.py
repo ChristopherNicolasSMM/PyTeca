@@ -15,7 +15,7 @@ os.environ['FLASK_ENV'] = 'DEV'
 def app():
     """Configura a aplicação Flask e garante que os modelos sejam carregados."""
     from main import create_app
-    from model.book import Book, BookTrash
+    from Python.Biblioteca.src.model.bookstore.book import Book, BookTrash
     
     flask_app = create_app()
     
@@ -57,7 +57,7 @@ def json_serial(obj):
 
 def test_create_book_with_dump(db_session):
     """Testa a inserção (Create) de um novo livro e imprime dump."""
-    from model.book import Book
+    from Python.Biblioteca.src.model.bookstore.book import Book
     
     new_book = Book(
         title="O Senhor dos Anéis",
@@ -77,7 +77,7 @@ def test_create_book_with_dump(db_session):
 
 def test_read_book_and_to_dict(db_session):
     """Testa a leitura e serialização to_dict()."""
-    from model.book import Book
+    from Python.Biblioteca.src.model.bookstore.book import Book
     
     book = Book(title="1984", author="George Orwell", isbn="9780451524935", publication_year=1949)
     db_session.add(book)
@@ -94,7 +94,7 @@ def test_read_book_and_to_dict(db_session):
 
 def test_update_book(db_session):
     """Testa atualização de campos."""
-    from model.book import Book
+    from Python.Biblioteca.src.model.bookstore.book import Book
     
     book = Book(title="Duna", author="Frank Herbert", isbn="9780441172719", publication_year=1965)
     db_session.add(book)
@@ -111,7 +111,7 @@ def test_update_book(db_session):
 
 def test_delete_and_move_to_trash(db_session):
     """Testa exclusão e movimentação para a tabela de lixeira."""
-    from model.book import Book, BookTrash
+    from Python.Biblioteca.src.model.bookstore.book import Book, BookTrash
     
     book = Book(title="Fundação", author="Isaac Asimov", isbn="9780553293357", publication_year=1951)
     db_session.add(book)
@@ -129,7 +129,7 @@ def test_delete_and_move_to_trash(db_session):
 
 def test_unique_isbn_constraint(db_session):
     """Testa se a restrição unique=True no ISBN funciona."""
-    from model.book import Book
+    from Python.Biblioteca.src.model.bookstore.book import Book
     
     # Usando ISBNs diferentes para evitar colisões entre testes
     book1 = Book(title="L1", author="A1", isbn="1111111111111", publication_year=2024)

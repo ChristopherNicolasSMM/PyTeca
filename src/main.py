@@ -59,7 +59,7 @@ def create_app():
     @login_manager.user_loader
     def load_user(user_id):
         from db.database import db
-        from model.user import User
+        from  model.core.user import User
 
         return db.session.get(User, int(user_id))
 
@@ -70,6 +70,8 @@ def create_app():
 
     # Registrar context processors (menu dinâmico via YAML)
     register_context_processors(app)
+    
+    
 
     # Registrar comandos CLI (apenas os essenciais)
     register_cli_commands(app)
@@ -177,6 +179,17 @@ def register_context_processors(app):
                 return "#"
 
         return {"menu_items": menu_items, "safe_url_for": safe_url_for}
+    
+    
+    @app.context_processor
+    def inject_notification_count():
+        from flask_login import current_user
+        if current_user.is_authenticated:
+            from services.core.notifications_service import list_notifications
+            count = len(list_notifications(current_user.id, status="unread"))
+        else:
+            count = 0
+        return {"unread_notifications_count": count}
 
 
 def register_cli_commands(app):
@@ -189,7 +202,7 @@ def register_cli_commands(app):
     @with_appcontext
     def init_admin(username, email, password):
         from db.database import db
-        from model.user import User
+        from  model.core.user import User
 
         admin = User.query.filter_by(username=username).first()
         if admin:
@@ -247,7 +260,7 @@ if __name__ == "__main__":
         db.init_app(temp_app)
 
         with temp_app.app_context():
-            from utils.generate_from_model import generate, generate_from_config
+            from  utils.generate_from_model import generate, generate_from_config
 
             if "--model" in sys.argv:
                 model_index = sys.argv.index("--model") + 1

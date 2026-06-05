@@ -4,18 +4,20 @@ Gerador automático de CRUD a partir de modelos SQLAlchemy anotados.
 
 Uso via Flask CLI:
     flask generate --model model/author.py
-    flask generate                          # usa utils/generate_model/config.yaml
+    flask generate --model model/bookstore/loan.py   # subpasta
+    flask generate --model model/bookstore           # pasta inteira (futuro)
+    flask generate                                   # usa config.yaml
 
 Os templates ficam em:
     utils/generate_model/templates/<tema>/
-O tema padrão é 'standard'. Para usar outro tema configure no YAML:
-    generator:
-      template_theme: meu_tema
+O tema padrão é 'standard'.
 """
 
 from __future__ import annotations
 
 import importlib.util
+import os
+import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -50,14 +52,38 @@ def load_classes_from_file(
     Carrega todas as classes de um arquivo Python que são subclasses de db.Model
     e cujo nome não contenha 'Trash'.
     Retorna lista de (cls, nome_da_classe).
+    Usa importação real (com nome completo) para resolver dependências.
     """
-    spec   = importlib.util.spec_from_file_location("_temp_gen_module", file_path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    import sys
+    import importlib
+
+    full_path = Path(file_path).resolve()
+    project_root = full_path.parent.parent  # assume que 'src' é a raiz do projeto
+
+    # Adiciona a raiz do projeto ao sys.path para permitir imports absolutos
+    if str(project_root) not in sys.path:
+        sys.path.insert(0, str(project_root))
+
+    # Calcula o nome do módulo a partir do caminho relativo à raiz
+    rel_path = full_path.relative_to(project_root)
+    module_name = str(rel_path.with_suffix('')).replace(os.sep, '.')
+
+    # Remove do cache se já existir (força recarga)
+    if module_name in sys.modules:
+        del sys.modules[module_name]
+
+    try:
+        module = importlib.import_module(module_name)
+    except Exception as e:
+        print(f"Erro ao importar {module_name}: {e}")
+        return []
 
     classes = []
     for name, obj in module.__dict__.items():
         if not isinstance(obj, type):
+            continue
+        # Ignora classes importadas de outros módulos
+        if obj.__module__ != module.__name__:
             continue
         if "Trash" in name:
             continue
@@ -112,7 +138,7 @@ def _build_fields_rows(class_name_lower: str, fields: list[str]) -> str:
     for field in fields:
         label = field.replace("_", " ").title()
         rows.append(
-            f"              <tr>\n"
+            f"              <td>\n"
             f"                <th style=\"width:30%\">{label}</th>\n"
             f"                <td>{{{{ {class_name_lower}.{field} or '—' }}}}</td>\n"
             f"              </tr>"
@@ -140,6 +166,7 @@ def _build_context(
     class_name: str,
     plural: str,
     metadata: Dict,
+    model_class=None,
 ) -> Dict[str, Any]:
     """Monta o dicionário de contexto passado a todos os templates."""
     class_name_lower = class_name.lower()
@@ -147,6 +174,10 @@ def _build_context(
     label            = metadata.get("label", class_name)
     default_sort     = metadata.get("ui_listview", {}).get("default_sort", "id")
     form_fields_list = metadata.get("ui_form", {}).get("fields", [])
+    # detectar relacionamentos
+    relationship_fields = []
+    if model_class:
+        relationship_fields = _get_relationship_fields(model_class)
 
     return {
         "class_name":       class_name,
@@ -159,6 +190,7 @@ def _build_context(
         "filters":          _build_filters_block(metadata),
         "fields_rows":      _build_fields_rows(class_name_lower, form_fields_list),
         "form_fields":      _build_form_fields(form_fields_list),
+        "relationship_fields": relationship_fields, 
     }
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -251,7 +283,29 @@ def _add_to_root_menu(class_name: str, plural: str, label: str, overwrite: bool 
     print(f"  ✓ Entrada adicionada ao menu raiz: {root_menu}")
 
 # ══════════════════════════════════════════════════════════════════════════════
-# FUNÇÕES DE GERAÇÃO
+# DETECÇÃO DE RELACIONAMENTOS (FK)
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _get_relationship_fields(model_class) -> list[dict]:
+    """
+    Retorna metadados das colunas que são chaves estrangeiras.
+    Cada entrada contém: name, foreign_table, nullable.
+    """
+    rels = []
+    if not hasattr(model_class, '__table__'):
+        return rels
+    for col in model_class.__table__.columns:
+        if col.foreign_keys:
+            fk = list(col.foreign_keys)[0]
+            rels.append({
+                'name': col.name,
+                'foreign_table': fk.column.table.name,
+                'nullable': col.nullable,
+            })
+    return rels
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FUNÇÕES DE GERAÇÃO (com suporte a subdiretórios)
 # ══════════════════════════════════════════════════════════════════════════════
 
 def generate_controller(
@@ -261,13 +315,15 @@ def generate_controller(
     metadata: Dict,
     loader,
     overwrite: bool = False,
+    model_class=None,
+    output_subdir: Path = Path("."),
 ) -> None:
-    base_name      = Path(model_file).stem
-    output_dir     = Path("controller") / base_name
+    base_name = Path(model_file).stem
+    output_dir = Path("controller") / output_subdir # / base_name
     output_dir.mkdir(parents=True, exist_ok=True)
     _ensure_init_py(output_dir)
 
-    ctx     = _build_context(class_name, plural, metadata)
+    ctx = _build_context(class_name, plural, metadata, model_class=model_class)
     content = loader.render("controller.py.j2", ctx)
     _write_file(output_dir / f"{class_name.lower()}.py", content, overwrite)
 
@@ -279,13 +335,15 @@ def generate_service(
     metadata: Dict,
     loader,
     overwrite: bool = False,
+    model_class=None,
+    output_subdir: Path = Path("."),
 ) -> None:
-    base_name  = Path(model_file).stem
-    output_dir = Path("services") / base_name
+    base_name = Path(model_file).stem
+    output_dir = Path("services") / output_subdir #/ base_name
     output_dir.mkdir(parents=True, exist_ok=True)
     _ensure_init_py(output_dir)
 
-    ctx     = _build_context(class_name, plural, metadata)
+    ctx = _build_context(class_name, plural, metadata, model_class=model_class)
     content = loader.render("service.py.j2", ctx)
     _write_file(output_dir / f"{class_name.lower()}_service.py", content, overwrite)
 
@@ -297,13 +355,15 @@ def generate_routes(
     metadata: Dict,
     loader,
     overwrite: bool = False,
+    model_class=None,
+    output_subdir: Path = Path("."),
 ) -> None:
-    base_name  = Path(model_file).stem
-    output_dir = Path("api/routes") / base_name
+    base_name = Path(model_file).stem
+    output_dir = Path("api/routes") / output_subdir #/ base_name
     output_dir.mkdir(parents=True, exist_ok=True)
     _ensure_init_py(output_dir)
 
-    ctx     = _build_context(class_name, plural, metadata)
+    ctx = _build_context(class_name, plural, metadata, model_class=model_class)
     content = loader.render("routes.py.j2", ctx)
     _write_file(output_dir / f"{class_name.lower()}_routes.py", content, overwrite)
 
@@ -316,13 +376,16 @@ def generate_templates(
     loader,
     overwrite: bool = False,
     add_to_root_menu: bool = False,
+    model_class=None,
+    output_subdir: Path = Path("."),
 ) -> None:
-    templates_dir = Path("templates") / plural
-    modals_dir    = templates_dir / "_modals"
+    # Templates seguem a mesma estrutura aninhada (ex: templates/bookstore/books/)
+    templates_dir = Path("templates") / output_subdir / plural
+    modals_dir = templates_dir / "_modals"
     templates_dir.mkdir(parents=True, exist_ok=True)
     modals_dir.mkdir(exist_ok=True)
 
-    ctx = _build_context(class_name, plural, metadata)
+    ctx = _build_context(class_name, plural, metadata, model_class=model_class)
 
     _write_file(templates_dir / "manage.html",
                 loader.render("manage.html.j2", ctx), overwrite)
@@ -332,10 +395,9 @@ def generate_templates(
 
     _write_file(modals_dir / f"{class_name.lower()}_form_modal.html",
                 loader.render("form_modal.html.j2", ctx), overwrite)
-    
+
     _generate_menu_yaml(templates_dir, class_name, plural, ctx["label"], overwrite)
-    
-    # Se solicitado, adiciona ao menu raiz
+
     if add_to_root_menu:
         _add_to_root_menu(class_name, plural, ctx["label"], overwrite)
 
@@ -358,40 +420,50 @@ def _run_generation(
         print(f"  ✗ Nenhuma classe db.Model encontrada em {file_path}")
         return
 
+    # Calcula o subdiretório de saída relativo à pasta 'model'
+    model_root = Path("model")
+    if file_path.parent == model_root:
+        output_subdir = Path(".")
+    else:
+        output_subdir = file_path.parent.relative_to(model_root)
+
     for cls, cls_name in classes:
         print(f"\n→ Gerando para {cls_name} ({file_path.name})")
-        metadata                 = get_model_metadata(cls)
-        metadata["module_name"]  = file_path.stem
+        metadata = get_model_metadata(cls)
+        metadata["module_name"] = file_path.stem
         if plural_override:
             metadata["plural"] = plural_override
         final_plural = metadata.get("plural", cls_name.lower() + "s")
 
-        generate_controller(str(file_path), cls_name, final_plural, metadata, loader, overwrite)
-        generate_service    (str(file_path), cls_name, final_plural, metadata, loader, overwrite)
-        generate_routes     (str(file_path), cls_name, final_plural, metadata, loader, overwrite)
-        generate_templates  (str(file_path), cls_name, final_plural, metadata, loader, overwrite, add_to_root_menu)
+        generate_controller(str(file_path), cls_name, final_plural, metadata, loader,
+                            overwrite, model_class=cls, output_subdir=output_subdir)
+        generate_service(str(file_path), cls_name, final_plural, metadata, loader,
+                         overwrite, model_class=cls, output_subdir=output_subdir)
+        generate_routes(str(file_path), cls_name, final_plural, metadata, loader,
+                        overwrite, model_class=cls, output_subdir=output_subdir)
+        generate_templates(str(file_path), cls_name, final_plural, metadata, loader,
+                           overwrite, add_to_root_menu, model_class=cls, output_subdir=output_subdir)
 
 
 def generate_from_config() -> None:
     """Gera CRUDs para todos os modelos listados em config.yaml."""
-    config        = load_config()
+    config = load_config()
     generator_cfg = config.get("generator", {})
-    overwrite     = generator_cfg.get("overwrite", False)
-    theme         = generator_cfg.get("template_theme", "standard")
-    loader        = get_loader(theme)
+    overwrite = generator_cfg.get("overwrite", False)
+    theme = generator_cfg.get("template_theme", "standard")
+    loader = get_loader(theme)
 
     print(f"Tema de templates: '{theme}'  |  overwrite={overwrite}")
 
     for entry in config.get("models", []):
-        source    = entry.get("source", "")
+        source = entry.get("source", "")
         file_path = Path(source)
         if not file_path.exists():
             print(f"  ✗ Arquivo não encontrado: {file_path}")
             continue
-        
-        # Extrair a flag add_to_root_menu (padrão False)
+
         add_to_root_menu = entry.get("add_to_root_menu", False)
-        
+
         _run_generation(
             file_path,
             class_name_filter=entry.get("class_name"),
@@ -405,7 +477,7 @@ def generate_from_config() -> None:
 def generate(model_path: str, theme: str = "standard", overwrite: bool = False, add_to_root_menu: bool = False) -> None:
     """
     Gera todos os artefatos para um único arquivo de model.
-    Exemplo: generate("model/author.py")
+    Exemplo: generate("model/author.py") ou generate("model/bookstore/loan.py")
     """
     file_path = Path(model_path)
     if not file_path.exists():

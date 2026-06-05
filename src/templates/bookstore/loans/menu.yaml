@@ -1,0 +1,5 @@
+# Menu para a seção Empréstimos
+menu:
+  - name: "Empréstimoss"
+    endpoint: "loans.list"
+    icon: "bi-grid"

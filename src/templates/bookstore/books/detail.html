@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+
+{% block title %}
+    {{ book.title }} - Detalhe do Livros
+{% endblock %}
+
+{% block content %}
+<div class="pagetitle">
+  <h1>{{ book.title }}</h1>
+  <nav>
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{{ url_for('web.dashboard') }}">Home</a></li>
+      <li class="breadcrumb-item"><a href="{{ url_for('books.list') }}">Livross</a></li>
+      <li class="breadcrumb-item active">{{ book.title }}</li>
+    </ol>
+  </nav>
+</div>
+
+<section class="section">
+  <div class="row">
+    <div class="col-lg-12">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title">Informações</h5>
+          <table class="table table-bordered">
+                          <td>
+                <th style="width:30%">Title</th>
+                <td>{{ book.title or '—' }}</td>
+              </tr>
+              <td>
+                <th style="width:30%">Author</th>
+                <td>{{ book.author or '—' }}</td>
+              </tr>
+              <td>
+                <th style="width:30%">Isbn</th>
+                <td>{{ book.isbn or '—' }}</td>
+              </tr>
+              <td>
+                <th style="width:30%">Publisher</th>
+                <td>{{ book.publisher or '—' }}</td>
+              </tr>
+              <td>
+                <th style="width:30%">Year</th>
+                <td>{{ book.year or '—' }}</td>
+              </tr>
+              <td>
+                <th style="width:30%">Edition</th>
+                <td>{{ book.edition or '—' }}</td>
+              </tr>
+              <td>
+                <th style="width:30%">Genre</th>
+                <td>{{ book.genre or '—' }}</td>
+              </tr>
+              <td>
+                <th style="width:30%">Description</th>
+                <td>{{ book.description or '—' }}</td>
+              </tr>
+              <td>
+                <th style="width:30%">Cover Url</th>
+                <td>{{ book.cover_url or '—' }}</td>
+              </tr>
+              <td>
+                <th style="width:30%">Language</th>
+                <td>{{ book.language or '—' }}</td>
+              </tr>
+              <td>
+                <th style="width:30%">Quantity</th>
+                <td>{{ book.quantity or '—' }}</td>
+              </tr>
+              <td>
+                <th style="width:30%">Available</th>
+                <td>{{ book.available or '—' }}</td>
+              </tr>
+          </table>
+
+          <div class="mt-4">
+            <div class="btn-group">
+              <a href="{{ url_for('books.list') }}" class="btn btn-secondary">Voltar</a>
+
+              {% if book.status == 'active' %}
+                <button type="button" class="btn btn-primary" id="btnEditBook" data-id="{{ book.id }}">Editar</button>
+                <form method="post" action="{{ url_for('books.trash', book_id=book.id) }}" class="d-inline" onsubmit="return confirm('Mover para lixeira?')">
+                  <button type="submit" class="btn btn-outline-danger">Mover para lixeira</button>
+                </form>
+
+              {% elif book.status == 'draft' %}
+                <button type="button" class="btn btn-primary" id="btnEditBook" data-id="{{ book.id }}">Continuar edição</button>
+                <form method="post" action="{{ url_for('books.discard_draft', book_id=book.id) }}" class="d-inline" onsubmit="return confirm('Descartar rascunho?')">
+                  <button type="submit" class="btn btn-danger">Descartar</button>
+                </form>
+
+              {% elif book.status == 'trash' %}
+                <form method="post" action="{{ url_for('books.restore', book_id=book.id) }}" class="d-inline">
+                  <button type="submit" class="btn btn-success">Restaurar</button>
+                </form>
+                {% if current_user.is_admin %}
+                <form method="post" action="{{ url_for('books.delete_permanent', book_id=book.id) }}" class="d-inline" onsubmit="return confirm('Excluir permanentemente?')">
+                  <button type="submit" class="btn btn-danger">Excluir permanentemente</button>
+                </form>
+                {% endif %}
+
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+{% include "books/_modals/book_form_modal.html" %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  (function() {
+    // O mesmo script do manage.html é utilizado para edição
+    const modal = new bootstrap.Modal(document.getElementById('bookModal'));
+    const editBtn = document.getElementById('btnEditBook');
+    if (!editBtn) return;
+
+    // Função loadData (igual à do manage) – aqui simplificada, mas pode ser compartilhada
+    async function loadData(id) {
+      try {
+        const response = await fetch(`/api/books/${id}`);
+        const result = await response.json();
+        if (result.success) {
+          const data = result.data;
+          for (const [key, value] of Object.entries(data)) {
+            const field = document.getElementById(key);
+            if (field) field.value = value ?? '';
+          }
+          document.getElementById('bookId').value = id;
+          document.getElementById('bookModalTitle').innerText = 'Editar Livros';
+        } else {
+          alert('Erro ao carregar dados: ' + (result.error || 'Desconhecido'));
+          modal.hide();
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Erro de conexão.');
+        modal.hide();
+      }
+    }
+
+    function resetForm() {
+      const form = document.getElementById('bookForm');
+      if (form) form.reset();
+      document.getElementById('bookId').value = '';
+      document.getElementById('bookModalTitle').innerText = 'Editar Livros';
+    }
+
+    editBtn.addEventListener('click', () => {
+      resetForm();
+      loadData(editBtn.dataset.id);
+      modal.show();
+    });
+  })();
+</script>
+{% endblock %}

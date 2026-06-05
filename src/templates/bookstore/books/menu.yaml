@@ -1,0 +1,5 @@
+# Menu para a seção Livros
+menu:
+  - name: "Livross"
+    endpoint: "books.list"
+    icon: "bi-grid"
