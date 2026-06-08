@@ -1,0 +1,185 @@
+{% extends "core/base.html" %}
+
+{% block title %}Bem-vindo - Biblioteca{% endblock %}
+
+{% block content %}
+<div class="pagetitle">
+  <h1>Bem-vindo</h1>
+  <nav>
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{{ url_for('web.dashboard') }}">Home</a></li>
+      <li class="breadcrumb-item active">Bem-vindo 556</li>
+    </ol>
+  </nav>
+</div>
+
+<section class="section welcome">
+  <div class="row justify-content-center">
+    <div class="col-lg-12">
+      <div class="card welcome-card shadow-lg border-0">
+        <div class="card-body p-5 text-center">
+          <!-- Logo do Sistema -->
+          <div class="mb-5">
+            <img src="{{ url_for('static', filename='img/nova_logo.png') }}" 
+                 alt="Biblioteca Logo" 
+                 class="welcome-logo img-fluid">
+          </div>
+          
+          <!-- Título -->
+          <h1 class="welcome-title display-4 fw-bold text-primary mb-3">
+            Pyteca
+          </h1>
+          
+          <!-- Subtítulo -->
+          <p class="welcome-subtitle lead text-muted mb-5">
+            Sistema de Gerenciamento de Biblioteca 
+          </p>
+          
+          <!-- Linha divisória -->
+          <div class="divider mb-5">
+            <hr class="mx-auto" style="width: 100px; border-top: 3px solid #4e73df; opacity: 1;">
+          </div>
+          
+          <!-- Parágrafo de boas-vindas -->
+          <div class="welcome-text mx-auto" style="max-width: 600px;">
+            <h1>Página não implementada</h1>
+            <p class="fs-5 text-secondary mb-4">
+            </p>
+            
+            <p class="fs-5 text-secondary">
+            </p>
+
+
+
+          </div>
+          
+          <!-- Botão de ação -->
+          <div class="mt-5">
+            <a href="{{ url_for('web.dashboard') }}" 
+               class="btn btn-primary btn-lg px-5 py-3 rounded-pill">
+              <i class="bi bi-speedometer2 me-2"></i>
+              Ir para Dashboard
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+.welcome-card {
+  border-radius: 20px;
+  overflow: hidden;
+  background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+}
+
+.welcome-logo {
+  max-height: 150px;
+  width: auto;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.1));
+}
+
+.welcome-title {
+  background: linear-gradient(45deg, #4e73df, #224abe);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.5px;
+}
+
+.welcome-subtitle {
+  font-weight: 300;
+  letter-spacing: 0.5px;
+}
+
+.welcome-text {
+  line-height: 1.8;
+  text-align: justify;
+}
+
+.btn-primary {
+  background: linear-gradient(45deg, #4e73df, #224abe);
+  border: none;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(78, 115, 223, 0.3);
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(78, 115, 223, 0.4);
+}
+
+/* Animações suaves */
+.welcome-logo {
+  animation: fadeInDown 1s ease;
+}
+
+.welcome-title {
+  animation: fadeInUp 1s ease 0.2s both;
+}
+
+.welcome-subtitle {
+  animation: fadeInUp 1s ease 0.4s both;
+}
+
+.welcome-text {
+  animation: fadeInUp 1s ease 0.6s both;
+}
+
+.btn {
+  animation: fadeInUp 1s ease 0.8s both;
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 768px) {
+  .welcome-card {
+    margin: 1rem;
+    padding: 2rem 1rem !important;
+  }
+  
+  .welcome-logo {
+    max-height: 100px;
+  }
+  
+  .welcome-title {
+    font-size: 2.5rem;
+  }
+  
+  .welcome-subtitle {
+    font-size: 1.1rem;
+  }
+  
+  .welcome-text {
+    font-size: 1rem;
+    text-align: left;
+  }
+  
+  .btn-lg {
+    padding: 0.75rem 1.5rem !important;
+    font-size: 1rem;
+  }
+}
+</style>
+{% endblock %}

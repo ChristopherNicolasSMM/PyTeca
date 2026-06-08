@@ -216,73 +216,83 @@ def _write_file(path: Path, content: str, overwrite: bool = False) -> bool:
     print(f"  ✓ {path}")
     return True
 
+
+###################################################################################################################
+#      INICIO - GERAÇÃO DE MENU POR CRUD A PARTIR DE MODELO ANOTADO (CONTROLLER, SERVICE, ROUTES, TEMPLATES)
+#                                              DEIXAR DINAMICO
+###################################################################################################################
+#
 # ==================================================================
 # GERAÇÃO DO MENU YAML
 # ==================================================================
-
-def _generate_menu_yaml(templates_dir: Path, class_name: str, plural: str, label: str, overwrite: bool = False) -> None:
-    """Cria o arquivo menu.yaml na pasta templates/plural se não existir."""
-    menu_yaml_path = templates_dir / "menu.yaml"
-    if menu_yaml_path.exists() and not overwrite:
-        print(f"  ⚠ menu.yaml já existe em {menu_yaml_path}, pulando.")
-        return
-
-    content = f"""# Menu para a seção {label}
-menu:
-  - name: "{label}s"
-    endpoint: "{plural}.list"
-    icon: "bi-grid"
-"""
-    menu_yaml_path.write_text(content, encoding="utf-8")
-    print(f"  ✓ {menu_yaml_path}")
-
-
-def _add_to_root_menu(class_name: str, plural: str, label: str, overwrite: bool = False) -> None:
-    """
-    Adiciona uma entrada para a entidade no menu principal (templates/menu.yaml).
-    Se o arquivo não existir, cria com apenas esta entrada.
-    """
-    root_menu = Path("templates") / "menu.yaml"
-    new_item = {
-        "name": f"{label}s",
-        "endpoint": f"{plural}.list",
-        "icon": "bi-grid"
-    }
-
-    # Carrega o menu existente (se houver)
-    menu_data = {}
-    if root_menu.exists():
-        try:
-            import yaml
-            with open(root_menu, "r", encoding="utf-8") as f:
-                menu_data = yaml.safe_load(f) or {}
-        except Exception as e:
-            print(f"  ⚠ Erro ao ler {root_menu}: {e}")
-
-    # Garante a estrutura
-    if not isinstance(menu_data, dict):
-        menu_data = {}
-    if "menu" not in menu_data or not isinstance(menu_data["menu"], list):
-        menu_data["menu"] = []
-
-    # Verifica se a entrada já existe (pelo endpoint)
-    exists = any(item.get("endpoint") == new_item["endpoint"] for item in menu_data["menu"])
-    if exists and not overwrite:
-        print(f"  ⚠ Entrada para {plural} já existe no menu raiz, pulando.")
-        return
-
-    # Remove entrada antiga se overwrite=True
-    if overwrite:
-        menu_data["menu"] = [item for item in menu_data["menu"] if item.get("endpoint") != new_item["endpoint"]]
-
-    # Adiciona a nova entrada
-    menu_data["menu"].append(new_item)
-
-    # Escreve o arquivo
-    import yaml
-    with open(root_menu, "w", encoding="utf-8") as f:
-        yaml.dump(menu_data, f, allow_unicode=True, sort_keys=False)
-    print(f"  ✓ Entrada adicionada ao menu raiz: {root_menu}")
+#
+###def _generate_menu_yaml(templates_dir: Path, class_name: str, plural: str, label: str, overwrite: bool = False) -> None:
+###    """Cria o arquivo menu.yaml na pasta templates/plural se não existir."""
+###    menu_yaml_path = templates_dir / "menu.yaml"
+###    if menu_yaml_path.exists() and not overwrite:
+###        print(f"  ⚠ menu.yaml já existe em {menu_yaml_path}, pulando.")
+###        return
+###
+###    content = f"""# Menu para a seção {label}
+###menu:
+###  - name: "{label}s"
+###    endpoint: "{plural}.list"
+###    icon: "bi-grid"
+###"""
+###    menu_yaml_path.write_text(content, encoding="utf-8")
+###    print(f"  ✓ {menu_yaml_path}")
+###
+###
+###def _add_to_root_menu(class_name: str, plural: str, label: str, overwrite: bool = False) -> None:
+###    """
+###    Adiciona uma entrada para a entidade no menu principal (templates/menu.yaml).
+###    Se o arquivo não existir, cria com apenas esta entrada.
+###    """
+###    root_menu = Path("templates") / "menu.yaml"
+###    new_item = {
+###        "name": f"{label}s",
+###        "endpoint": f"{plural}.list",
+###        "icon": "bi-grid"
+###    }
+###
+###    # Carrega o menu existente (se houver)
+###    menu_data = {}
+###    if root_menu.exists():
+###        try:
+###            import yaml
+###            with open(root_menu, "r", encoding="utf-8") as f:
+###                menu_data = yaml.safe_load(f) or {}
+###        except Exception as e:
+###            print(f"  ⚠ Erro ao ler {root_menu}: {e}")
+###
+###    # Garante a estrutura
+###    if not isinstance(menu_data, dict):
+###        menu_data = {}
+###    if "menu" not in menu_data or not isinstance(menu_data["menu"], list):
+###        menu_data["menu"] = []
+###
+###    # Verifica se a entrada já existe (pelo endpoint)
+###    exists = any(item.get("endpoint") == new_item["endpoint"] for item in menu_data["menu"])
+###    if exists and not overwrite:
+###        print(f"  ⚠ Entrada para {plural} já existe no menu raiz, pulando.")
+###        return
+###
+###    # Remove entrada antiga se overwrite=True
+###    if overwrite:
+###        menu_data["menu"] = [item for item in menu_data["menu"] if item.get("endpoint") != new_item["endpoint"]]
+###
+###    # Adiciona a nova entrada
+###    menu_data["menu"].append(new_item)
+###
+###    # Escreve o arquivo
+###    import yaml
+###    with open(root_menu, "w", encoding="utf-8") as f:
+###        yaml.dump(menu_data, f, allow_unicode=True, sort_keys=False)
+###    print(f"  ✓ Entrada adicionada ao menu raiz: {root_menu}")
+###################################################################################################################
+#      FINAL - GERAÇÃO DE MENU POR CRUD A PARTIR DE MODELO ANOTADO (CONTROLLER, SERVICE, ROUTES, TEMPLATES)
+#                                              DEIXAR DINAMICO
+###################################################################################################################
 
 # ══════════════════════════════════════════════════════════════════════════════
 # DETECÇÃO DE RELACIONAMENTOS (FK)

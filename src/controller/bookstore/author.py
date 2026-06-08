@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
-
 from model.bookstore.author import Author, AuthorStatus
 from model.core.user_layout_pref import UserLayoutPref
 from services.bookstore.author_service import AuthorService
+from utils.generate_model.menu_builder import menu_item
 from utils.smart_list import ColumnDef, FilterDef, SmartListConfig, SmartListRenderer
 from utils.smart_list.export import export_csv, export_excel, export_pdf
 
@@ -34,9 +34,10 @@ SMART_LIST_CONFIG = SmartListConfig(
 
 
 # ── Listagem ──────────────────────────────────────────────────────────────────
-
+#Biblioteca
 @author_bp.route("/")
 @login_required
+@menu_item("556", icon="bi-speedometer2", parent="Biblioteca", endpoint="authors.list", clickable_parent=True)
 def list():
     status = request.args.get("status", AuthorStatus.ACTIVE.value)
     export = request.args.get("export", "")

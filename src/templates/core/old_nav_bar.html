@@ -1,0 +1,60 @@
+
+      <!-- Menu dinâmico -->
+      {% block sidebar_menu %}
+      {% if menu_items %}
+      {% for item in menu_items %}
+      {% if item.children %}
+      <!-- Item com submenu -->
+      <li class="nav-item">
+        <a class="nav-link collapsed" data-bs-target="#nav-{{ loop.index }}" data-bs-toggle="collapse"
+          href="{{ safe_url_for(item.endpoint) if item.endpoint else '#' }}">
+          {% if item.icon %}<i class="{{ item.icon }}"></i>{% endif %}
+          <span>{{ item.name }}</span>
+          <i class="bi bi-chevron-down ms-auto"></i>
+        </a>
+        <ul id="nav-{{ loop.index }}" class="nav-content collapse" data-bs-parent="#sidebar-nav">
+          {% for child in item.children %}
+          {% if child.children %}
+          <!-- Subitem com submenu (nível 3) -->
+          <li>
+            <a class="nav-link collapsed" data-bs-target="#nav-{{ loop.parent.index }}-{{ loop.index }}"
+              data-bs-toggle="collapse" href="{{ safe_url_for(child.endpoint) if child.endpoint else '#' }}">
+              {% if child.icon %}<i class="{{ child.icon }}"></i>{% endif %}
+              <span>{{ child.name }}</span>
+              <i class="bi bi-chevron-down ms-auto"></i>
+            </a>
+            <ul id="nav-{{ loop.parent.index }}-{{ loop.index }}" class="nav-content collapse">
+              {% for subchild in child.children %}
+              <li>
+                <a href="{{ safe_url_for(subchild.endpoint) if subchild.endpoint else '#' }}">
+                  {% if subchild.icon %}<i class="{{ subchild.icon }}"></i>{% endif %}
+                  <span>{{ subchild.name }}</span>
+                </a>
+              </li>
+              {% endfor %}
+            </ul>
+          </li>
+          {% else %}
+          <!-- Subitem simples -->
+          <li>
+            <a href="{{ safe_url_for(child.endpoint) if child.endpoint else '#' }}">
+              {% if child.icon %}<i class="{{ child.icon }}"></i>{% endif %}
+              <span>{{ child.name }}</span>
+            </a>
+          </li>
+          {% endif %}
+          {% endfor %}
+        </ul>
+      </li>
+      {% else %}
+      <!-- Item simples -->
+      <li class="nav-item">
+        <a class="nav-link" href="{{ safe_url_for(item.endpoint) if item.endpoint else '#' }}">
+          {% if item.icon %}<i class="{{ item.icon }}"></i>{% endif %}
+          <span>{{ item.name }}</span>
+        </a>
+      </li>
+      {% endif %}
+      {% endfor %}
+      {% endif %}
+      {% endblock %}

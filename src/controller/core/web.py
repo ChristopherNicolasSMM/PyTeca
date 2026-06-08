@@ -33,13 +33,11 @@ def render_app_template(template_name: str, **context):
         )
         abort(404)
 
-
 @web_bp.route("/556")
 @login_required
-@menu_item("556", icon="bi-speedometer2")#, parent="Relatórios")
+@menu_item("556", icon="bi-speedometer2", parent="Configurações", endpoint="web.index_556", clickable_parent=True)
 def index_556():
-    return render_app_template("core/556.html")
-
+    return render_app_template("core/556.html")#apenas exemplo
 
 @web_bp.route("/")
 def index():

@@ -118,3 +118,15 @@ def get_model_metadata(cls) -> Dict[str, Any]:
         "ui_form": getattr(cls, '_ui_form', None),
         "validations": getattr(cls, '_validations', {}),
     }
+# ---- Ajustes para o menu ----
+def menu_icon(value: str):
+    def decorator(cls):
+        cls._menu_icon = value
+        return cls
+    return decorator
+
+def menu_parent(value: str):
+    def decorator(cls):
+        cls._menu_parent = value
+        return cls
+    return decorator    

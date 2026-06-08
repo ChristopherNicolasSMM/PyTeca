@@ -1,32 +1,25 @@
 # Itens que não pertencem a nenhum modelo (ex: páginas administrativas, relatórios, etc.)
 #------------------------------------------------------------------------------------------
+items:
+  # Pai "Biblioteca" com modo híbrido ativado
+  - name: "Biblioteca"
+    endpoint: "biblioteca.dashboard"   # endpoint real (pai clicável)
+    icon: "bi-book"
+    clickable_parent: true             # ← ativa modo híbrido (pai clicável + toggle separado)
+                                       #   Se omitido ou false, pai fica não clicável (apenas toggle)
 
-#items:
-#  - name: "Biblioteca"
-#    endpoint: "#"                # ou None – item apenas como agrupador
-#    icon: "bi-book"
-#    # não tem endpoint real, serve como pai
-#  - name: "Livros"
-#    endpoint: "books.list"
-#    icon: "bi-book"
-#    parent: "Biblioteca"         # referência pelo name do pai
-#  - name: "Autores"
-#    endpoint: "authors.list"
-#    icon: "bi-person"
-#    parent: "Biblioteca"
-#  - name: "Empréstimos"
-#    endpoint: "loans.list"
-#    icon: "bi-arrow-left-right"
-#    parent: "Biblioteca"
-#
-#  - name: "Administração"
-#    endpoint: "#"
-#    icon: "bi-shield"
-#  - name: "Usuários"
-#    endpoint: "admin.users"
-#    icon: "bi-people"
-#    parent: "Administração"
-#  - name: "Configurações"
-#    endpoint: "web.config"
-#    icon: "bi-gear"
-#    parent: "Administração"
+  # Pai "Administração" sem clickable_parent (modo padrão: não clicável)
+  - name: "Administração"
+    endpoint: "#"                       # link morto
+    icon: "bi-shield"
+
+  - name: "Usuários"
+    endpoint: "admin.users"
+    icon: "bi-people"
+    parent: "Administração"
+
+  - name: "Configurações"
+    endpoint: "web.config"
+    icon: "bi-gear"
+    parent: "Administração"
+    clickable_parent: true             # ← ativa modo híbrido (pai clicável + toggle separado)

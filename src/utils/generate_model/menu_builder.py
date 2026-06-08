@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import yaml
 from pathlib import Path
-from flask import url_for
+from flask import url_for, current_app, request
 from db.database import db
 from annotations import get_model_metadata
 
@@ -21,12 +21,35 @@ def get_registered_items() -> list[dict]:
 def menu_item(name: str, icon: str = "bi-grid", endpoint: str = None, parent: str = None, **kwargs):
     """
     Decorator para registrar uma view como item de menu.
-    parent: endpoint ou name do item pai (para criar submenu)
+
+    Args:
+        name: Nome exibido no menu.
+        icon: Classe do ícone (Bootstrap Icons). Ex: 'bi-speedometer2'.
+        endpoint: Nome do endpoint Flask (obrigatório para views em blueprints).
+                 Para funções sem blueprint, pode ser omitido (usa o nome da função).
+                 Ex: 'web.dashboard', 'auth.login'.
+        parent: Endpoint ou 'name' do item pai (para criar submenu).
+        **kwargs: Campos adicionais (ex: order, roles_allowed).
+
+    Importante:
+        - Se a view estiver dentro de um Blueprint, **é obrigatório** informar o `endpoint`
+          completo no formato `blueprint.nome_da_funcao`.
+        - O sistema não infere automaticamente o prefixo do blueprint.
+        - Exemplo correto:
+            @web_bp.route("/dashboard")
+            @menu_item("Dashboard", icon="bi-speedometer2", endpoint="web.dashboard")
+            def dashboard(): ...
     """
     def decorator(view_func):
         nonlocal endpoint
         if endpoint is None:
+            # Para funções sem blueprint, usa o nome da função como endpoint
             endpoint = view_func.__name__
+            # Aviso em desenvolvimento para lembrar o usuário
+            import sys
+            if hasattr(sys, 'gettrace') and sys.gettrace() is not None:
+                print(f"[menu_item] Aviso: endpoint não informado para '{name}'. "
+                      f"Usando '{endpoint}'. Se estiver em um blueprint, especifique o endpoint completo.")
         register_menu_item({
             "name": name,
             "endpoint": endpoint,
@@ -36,6 +59,24 @@ def menu_item(name: str, icon: str = "bi-grid", endpoint: str = None, parent: st
         })
         return view_func
     return decorator
+#def menu_item(name: str, icon: str = "bi-grid", endpoint: str = None, parent: str = None, **kwargs):
+#    """
+#    Decorator para registrar uma view como item de menu.
+#    parent: endpoint ou name do item pai (para criar submenu)
+#    """
+#    def decorator(view_func):
+#        nonlocal endpoint
+#        if endpoint is None:
+#            endpoint = view_func.__name__
+#        register_menu_item({
+#            "name": name,
+#            "endpoint": endpoint,
+#            "icon": icon,
+#            "parent": parent,
+#            **kwargs
+#        })
+#        return view_func
+#    return decorator
 
 # ------------------------------------------------------------
 # Itens gerados a partir dos modelos anotados
@@ -70,14 +111,17 @@ def get_items_from_models() -> list[dict]:
 # Itens extras do arquivo YAML (templates/menu.yaml)
 # ------------------------------------------------------------
 def get_items_from_yaml() -> list[dict]:
-    yaml_path = Path(__file__).parent.parent / "templates" / "menu.yaml"
+    # Sobe do diretório atual (utils/generate_model) até a raiz do projeto (src) e então entra em templates
+    yaml_path = Path(__file__).parent.parent.parent / "templates" / "menu_complementar.yaml"
     if not yaml_path.exists():
+        print(f"[menu_builder] Arquivo de menu complementar não encontrado: {yaml_path}. Ignorando.")
         return []
     with open(yaml_path, 'r', encoding='utf-8') as f:
         data = yaml.safe_load(f) or {}
     # Aceita tanto 'items' (lista plana) quanto 'extra_items' (back compat)
     items = data.get('items', data.get('extra_items', []))
     # Itens podem ter campo 'parent'
+    print(f"[menu_builder] Carregados {len(items)} itens do YAML complementar.")
     return items
 
 # ------------------------------------------------------------

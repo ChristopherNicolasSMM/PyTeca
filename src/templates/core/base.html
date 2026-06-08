@@ -176,31 +176,54 @@
     <ul class="sidebar-nav" id="sidebar-nav">
 
 
+
+
+
+
+
+
       <!-- Menu dinâmico -->
+             <!-- Menu dinâmico -->
       {% block sidebar_menu %}
       {% if menu_items %}
       {% for item in menu_items %}
+      {% set outer_index = loop.index %}
       {% if item.children %}
       <!-- Item com submenu -->
       <li class="nav-item">
-        <a class="nav-link collapsed" data-bs-target="#nav-{{ loop.index }}" data-bs-toggle="collapse"
+        {% if item.clickable_parent %}
+        <!-- Modo híbrido: link clicável + toggle separado -->
+        <div class="d-flex align-items-center w-100">
+          <a class="nav-link flex-grow-1" href="{{ safe_url_for(item.endpoint) if item.endpoint else '#' }}">
+            {% if item.icon %}<i class="{{ item.icon }}"></i>{% endif %}
+            <span>{{ item.name }}</span>
+          </a>
+          <i class="bi bi-chevron-down toggle-icon ms-auto" data-bs-toggle="collapse"
+            data-bs-target="#nav-{{ outer_index }}" role="button" aria-expanded="false"></i>
+        </div>
+        {% else %}
+        <!-- Modo padrão: link único com toggle embutido (pai não clicável) -->
+        <a class="nav-link collapsed" data-bs-target="#nav-{{ outer_index }}" data-bs-toggle="collapse"
           href="{{ safe_url_for(item.endpoint) if item.endpoint else '#' }}">
           {% if item.icon %}<i class="{{ item.icon }}"></i>{% endif %}
           <span>{{ item.name }}</span>
           <i class="bi bi-chevron-down ms-auto"></i>
         </a>
-        <ul id="nav-{{ loop.index }}" class="nav-content collapse" data-bs-parent="#sidebar-nav">
+        {% endif %}
+
+        <!-- Submenu (nível 2) -->
+        <ul id="nav-{{ outer_index }}" class="nav-content collapse" data-bs-parent="#sidebar-nav">
           {% for child in item.children %}
           {% if child.children %}
           <!-- Subitem com submenu (nível 3) -->
           <li>
-            <a class="nav-link collapsed" data-bs-target="#nav-{{ loop.parent.index }}-{{ loop.index }}"
+            <a class="nav-link collapsed" data-bs-target="#nav-{{ outer_index }}-{{ loop.index }}"
               data-bs-toggle="collapse" href="{{ safe_url_for(child.endpoint) if child.endpoint else '#' }}">
               {% if child.icon %}<i class="{{ child.icon }}"></i>{% endif %}
               <span>{{ child.name }}</span>
               <i class="bi bi-chevron-down ms-auto"></i>
             </a>
-            <ul id="nav-{{ loop.parent.index }}-{{ loop.index }}" class="nav-content collapse">
+            <ul id="nav-{{ outer_index }}-{{ loop.index }}" class="nav-content collapse">
               {% for subchild in child.children %}
               <li>
                 <a href="{{ safe_url_for(subchild.endpoint) if subchild.endpoint else '#' }}">
@@ -224,7 +247,7 @@
         </ul>
       </li>
       {% else %}
-      <!-- Item simples -->
+      <!-- Item simples (sem filhos) -->
       <li class="nav-item">
         <a class="nav-link" href="{{ safe_url_for(item.endpoint) if item.endpoint else '#' }}">
           {% if item.icon %}<i class="{{ item.icon }}"></i>{% endif %}
@@ -236,7 +259,16 @@
       {% endif %}
       {% endblock %}
 
-      
+
+
+
+
+
+
+
+
+
+
     </ul>
   </aside><!-- End Sidebar-->
 
