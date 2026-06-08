@@ -1,0 +1,32 @@
+# Itens que não pertencem a nenhum modelo (ex: páginas administrativas, relatórios, etc.)
+#------------------------------------------------------------------------------------------
+
+#items:
+#  - name: "Biblioteca"
+#    endpoint: "#"                # ou None – item apenas como agrupador
+#    icon: "bi-book"
+#    # não tem endpoint real, serve como pai
+#  - name: "Livros"
+#    endpoint: "books.list"
+#    icon: "bi-book"
+#    parent: "Biblioteca"         # referência pelo name do pai
+#  - name: "Autores"
+#    endpoint: "authors.list"
+#    icon: "bi-person"
+#    parent: "Biblioteca"
+#  - name: "Empréstimos"
+#    endpoint: "loans.list"
+#    icon: "bi-arrow-left-right"
+#    parent: "Biblioteca"
+#
+#  - name: "Administração"
+#    endpoint: "#"
+#    icon: "bi-shield"
+#  - name: "Usuários"
+#    endpoint: "admin.users"
+#    icon: "bi-people"
+#    parent: "Administração"
+#  - name: "Configurações"
+#    endpoint: "web.config"
+#    icon: "bi-gear"
+#    parent: "Administração"

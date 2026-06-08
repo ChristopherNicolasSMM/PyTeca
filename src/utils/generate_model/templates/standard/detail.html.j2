@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "core/base.html" %}
 
 {% block title %}
     {{ {{ class_name_lower }}.title }} - Detalhe do {{ label }}
@@ -61,7 +61,7 @@
   </div>
 </section>
 
-{% include "{{ plural }}/_modals/{{ class_name_lower }}_form_modal.html" %}
+{% include "{{ output_subdir }}/{{ plural }}/_modals/{{ class_name_lower }}_form_modal.html" %}
 {% endblock %}
 
 {% block extra_js %}

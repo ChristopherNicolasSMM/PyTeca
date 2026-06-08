@@ -1,15 +1,15 @@
-{% extends "base.html" %}
+{% extends "core/base.html" %}
 {% from "_components/smart_list.html" import render as smart_list, scripts as sl_scripts %}
 
-{% block title %}{{ label }}s{% endblock %}
+{% block title %}{{ plural }}{% endblock %}
 
 {% block content %}
 <div class="pagetitle">
-  <h1>{{ label }}s</h1>
+  <h1>{{ plural }}</h1>
   <nav>
     <ol class="breadcrumb">
       <li class="breadcrumb-item"><a href="{{ url_for('web.dashboard') }}">Home</a></li>
-      <li class="breadcrumb-item active">{{ label }}s</li>
+      <li class="breadcrumb-item active">{{ plural }}s</li>
     </ol>
   </nav>
 </div>
@@ -78,7 +78,7 @@
   </div>
 </section>
 
-{% include "{{ plural }}/_modals/{{ class_name_lower }}_form_modal.html" %}
+{% include "{{ output_subdir }}/{{ plural }}/_modals/{{ class_name_lower }}_form_modal.html" %}
 {% endblock %}
 
 {% block extra_js %}

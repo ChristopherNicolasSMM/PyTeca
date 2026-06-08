@@ -6,7 +6,7 @@ from flask_login import current_user, login_required
 from services.bookstore.author_service import AuthorService
 from model.bookstore.author import AuthorStatus
 
-author_api_bp = Blueprint("author_api", __name__, url_prefix="/api/authors")
+author_api_bp = Blueprint("author_api", __name__, url_prefix="/api/bookstore/authors")
 
 
 def _ok(data, code: int = 200):

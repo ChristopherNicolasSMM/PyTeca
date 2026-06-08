@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "core/base.html" %}
 
 {% block title %}
     {{ author.title }} - Detalhe do Autores
@@ -72,7 +72,7 @@
   </div>
 </section>
 
-{% include "authors/_modals/author_form_modal.html" %}
+{% include "bookstore/authors/_modals/author_form_modal.html" %}
 {% endblock %}
 
 {% block extra_js %}

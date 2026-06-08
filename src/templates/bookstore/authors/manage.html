@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "core/base.html" %}
 {% from "_components/smart_list.html" import render as smart_list, scripts as sl_scripts %}
 
 {% block title %}Autoress{% endblock %}
@@ -78,7 +78,7 @@
   </div>
 </section>
 
-{% include "authors/_modals/author_form_modal.html" %}
+{% include "bookstore/authors/_modals/author_form_modal.html" %}
 {% endblock %}
 
 {% block extra_js %}

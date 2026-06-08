@@ -81,7 +81,7 @@ def list():
     )
 
     return render_template(
-        "authors/manage.html",
+        "bookstore/authors/manage.html",
         sl=sl,
         counts=service.count_by_status(),
         current_status=status,
@@ -97,7 +97,7 @@ def detail(item_id: int):
     item = service.get_by_id(item_id)
     if not item:
         abort(404)
-    return render_template("authors/detail.html", author=item)
+    return render_template("bookstore/authors/detail.html", author=item)
 
 
 # ── Ações POST ────────────────────────────────────────────────────────────────

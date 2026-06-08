@@ -6,7 +6,7 @@ from flask_login import current_user, login_required
 from services.bookstore.book_service import BookService
 from model.bookstore.book import BookStatus
 
-book_api_bp = Blueprint("book_api", __name__, url_prefix="/api/books")
+book_api_bp = Blueprint("book_api", __name__, url_prefix="/api/bookstore/books")
 
 
 def _ok(data, code: int = 200):

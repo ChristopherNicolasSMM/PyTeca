@@ -7,6 +7,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
+from utils.generate_model.menu_builder import menu_item
 from flask import Blueprint, abort, flash, redirect, render_template, url_for
 from flask_login import current_user, login_required
 
@@ -31,6 +32,13 @@ def render_app_template(template_name: str, **context):
             "Template %s não encontrado: %s. Retornando 404.", template_name, e
         )
         abort(404)
+
+
+@web_bp.route("/556")
+@login_required
+@menu_item("556", icon="bi-speedometer2")#, parent="Relatórios")
+def index_556():
+    return render_app_template("core/556.html")
 
 
 @web_bp.route("/")

@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "core/base.html" %}
 
 {% block title %}
     {{ loan.title }} - Detalhe do Empréstimos
@@ -84,7 +84,7 @@
   </div>
 </section>
 
-{% include "loans/_modals/loan_form_modal.html" %}
+{% include "bookstore/loans/_modals/loan_form_modal.html" %}
 {% endblock %}
 
 {% block extra_js %}

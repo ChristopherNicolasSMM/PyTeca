@@ -6,7 +6,7 @@ from flask_login import current_user, login_required
 from services.bookstore.loan_service import LoanService
 from model.bookstore.loan import LoanStatus
 
-loan_api_bp = Blueprint("loan_api", __name__, url_prefix="/api/loans")
+loan_api_bp = Blueprint("loan_api", __name__, url_prefix="/api/bookstore/loans")
 
 
 def _ok(data, code: int = 200):

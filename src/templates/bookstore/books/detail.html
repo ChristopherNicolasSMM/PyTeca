@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "core/base.html" %}
 
 {% block title %}
     {{ book.title }} - Detalhe do Livros
@@ -108,7 +108,7 @@
   </div>
 </section>
 
-{% include "books/_modals/book_form_modal.html" %}
+{% include "bookstore/books/_modals/book_form_modal.html" %}
 {% endblock %}
 
 {% block extra_js %}

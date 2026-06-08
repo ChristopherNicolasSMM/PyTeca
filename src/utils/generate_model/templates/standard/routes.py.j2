@@ -6,7 +6,7 @@ from flask_login import current_user, login_required
 from services.{{ output_subdir }}.{{ class_name_lower }}_service import {{ class_name }}Service
 from model.{{ output_subdir }}.{{ module_name }} import {{ class_name }}Status
 
-{{ class_name_lower }}_api_bp = Blueprint("{{ class_name_lower }}_api", __name__, url_prefix="/api/{{ plural }}")
+{{ class_name_lower }}_api_bp = Blueprint("{{ class_name_lower }}_api", __name__, url_prefix="/api/{{ output_subdir }}/{{ plural }}")
 
 
 def _ok(data, code: int = 200):
