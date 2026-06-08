@@ -173,10 +173,93 @@ def build_tree(items: list[dict]) -> list[dict]:
 # ------------------------------------------------------------
 # Função principal que consolida todas as fontes
 # ------------------------------------------------------------
-def get_full_menu() -> list[dict]:
+
+def apply_menu_customization(items: list[dict], config: dict) -> list[dict]:
+    """
+    Aplica customizações definidas no banco sobre a lista de itens do menu.
+    
+    Configurações suportadas:
+    - Se config tiver a chave "full_menu", substitui completamente a lista.
+    - Caso contrário, aplica overrides:
+        - "hide": lista de endpoints a serem removidos.
+        - "rename": dicionário {endpoint: novo_nome}.
+        - "move": dicionário {endpoint: novo_parent} (move para outro pai).
+        - "reorder": lista de endpoints na ordem desejada (para itens raiz).
+        - "icon_change": dicionário {endpoint: novo_icon}.
+    """
+    # 1. Substituição total (se for o caso)
+    if "full_menu" in config and isinstance(config["full_menu"], list):
+        return config["full_menu"]
+
+    # 2. Overrides parciais
+    hide_set = set(config.get("hide", []))
+    rename_map = config.get("rename", {})
+    move_map = config.get("move", {})
+    icon_map = config.get("icon_change", {})
+    reorder_root = config.get("reorder", [])
+
+    # Filtrar itens ocultos
+    filtered = [item for item in items if item.get("endpoint") not in hide_set]
+
+    # Renomear e trocar ícones
+    for item in filtered:
+        ep = item.get("endpoint")
+        if ep in rename_map:
+            item["name"] = rename_map[ep]
+        if ep in icon_map:
+            item["icon"] = icon_map[ep]
+
+    # Mover itens (alterar parent)
+    for item in filtered:
+        ep = item.get("endpoint")
+        if ep in move_map:
+            item["parent"] = move_map[ep]
+
+    # Reordenar itens raiz (apenas os que estão no nível superior, sem parent definido)
+    if reorder_root:
+        root_items = [item for item in filtered if not item.get("parent")]
+        other_items = [item for item in filtered if item.get("parent")]
+        # Ordenar root_items conforme a ordem em reorder_root (preservando os não listados no final)
+        ordered = []
+        for ep in reorder_root:
+            for item in root_items:
+                if item.get("endpoint") == ep and item not in ordered:
+                    ordered.append(item)
+        # Adicionar os que sobraram (não listados) mantendo ordem original
+        for item in root_items:
+            if item not in ordered:
+                ordered.append(item)
+        filtered = ordered + other_items
+
+    return filtered
+
+#def get_full_menu() -> list[dict]:
+def get_full_menu(user_id=None):
+    # 1. Verificar se existe customização salva (prioridade máxima)
+    from model.core.config.menu_customization import MenuCustomization
+    custom = None
+    if user_id:
+        custom = MenuCustomization.query.filter_by(user_id=user_id).first()
+    if not custom:
+        custom = MenuCustomization.query.filter_by(user_id=None).first()
+    
+    if custom and custom.config:
+        # Se a customização tiver uma lista completa, usa direto
+        if "full_menu" in custom.config:
+            return build_tree(custom.config["full_menu"])
+        else:
+            # Caso contrário, monta a lista normal e aplica os overrides
+            all_items = []
+            all_items.extend(get_registered_items())
+            all_items.extend(get_items_from_yaml())
+            all_items.extend(get_items_from_models())
+            all_items = apply_menu_customization(all_items, custom.config)
+            return build_tree(all_items)
+
+    # 2. Sem customização: fluxo original
     all_items = []
-    all_items.extend(get_registered_items())      # 1º manual (decorator)
-    all_items.extend(get_items_from_yaml())       # 2º YAML
-    all_items.extend(get_items_from_models())     # 3º automático
+    all_items.extend(get_registered_items())
+    all_items.extend(get_items_from_yaml())
+    all_items.extend(get_items_from_models())
     return build_tree(all_items)
 

@@ -1,0 +1,12 @@
+{
+  "reorder": ["biblioteca", "authors.list", "loans.list"],
+  "rename": {
+    "authors.list": "Autores",
+    "loans.list": "Empréstimos"
+  },
+  "move": {
+    "authors.list": "Biblioteca",
+    "loans.list": "Biblioteca"
+  },
+  "hide": ["admin.users"]
+}

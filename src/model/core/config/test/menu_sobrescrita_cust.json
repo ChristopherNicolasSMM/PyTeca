@@ -1,0 +1,18 @@
+{
+  "full_menu": [
+    {
+      "name": "Dashboard",
+      "endpoint": "web.dashboard",
+      "icon": "bi-speedometer2"
+    },
+    {
+      "name": "Biblioteca",
+      "endpoint": "#",
+      "icon": "bi-book",
+      "children": [
+        {"name": "Livros", "endpoint": "books.list", "icon": "bi-grid"},
+        {"name": "Autores", "endpoint": "authors.list", "icon": "bi-grid"}
+      ]
+    }
+  ]
+}
