@@ -3,9 +3,9 @@ from __future__ import annotations
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
-from model.{{ module_name }} import {{ class_name }}, {{ class_name }}Status
-from model.user_layout_pref import UserLayoutPref
-from services.{{ class_name_lower }}.{{ class_name_lower }}_service import {{ class_name }}Service
+from model.{{ output_subdir }}.{{ module_name }} import {{ class_name }}, {{ class_name }}Status
+from model.core.user_layout_pref import UserLayoutPref
+from services.{{ output_subdir }}.{{ class_name_lower }}.{{ class_name_lower }}_service import {{ class_name }}Service
 from utils.smart_list import ColumnDef, FilterDef, SmartListConfig, SmartListRenderer
 from utils.smart_list.export import export_csv, export_excel, export_pdf
 

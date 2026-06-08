@@ -3,9 +3,9 @@ from __future__ import annotations
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
-from model.book import Book, BookStatus
-from model.user_layout_pref import UserLayoutPref
-from services.book.book_service import BookService
+from model.bookstore.book import Book, BookStatus
+from model.core.user_layout_pref import UserLayoutPref
+from services.bookstore.book_service import BookService
 from utils.smart_list import ColumnDef, FilterDef, SmartListConfig, SmartListRenderer
 from utils.smart_list.export import export_csv, export_excel, export_pdf
 

@@ -7,7 +7,7 @@ from typing import Any
 from sqlalchemy import func
 
 from db.database import db
-from model.loan import Loan, LoanStatus
+from model.bookstore.loan import Loan, LoanStatus
 
 
 @dataclass

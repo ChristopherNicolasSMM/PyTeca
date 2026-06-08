@@ -3,8 +3,8 @@ from __future__ import annotations
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
 
-from services.loan.loan_service import LoanService
-from model.loan import LoanStatus
+from services.bookstore.loan_service import LoanService
+from model.bookstore.loan import LoanStatus
 
 loan_api_bp = Blueprint("loan_api", __name__, url_prefix="/api/loans")
 

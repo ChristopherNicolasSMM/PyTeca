@@ -134,13 +134,13 @@ def register_context_processors(app):
         path = request.path.strip("/")
         section = path.split("/")[0] if path else "home"
         
-        
-        print("DEBUG MAIN.PY")
-        print(f"Carregando menu para seção: {section}")  # Debug
-        print(f"URL atual: {request.url}")  # Debug
-        print(f"Path atual: {path}")  # Debug
-        print(10 * "\n")  # Debug
-        
+        #print(1 * "\n")  # Debug
+        #print("DEBUG MAIN.PY")
+        #print(f"Carregando menu para seção: {section}")  # Debug
+        #print(f"URL atual: {request.url}")  # Debug
+        #print(f"Path atual: {path}")  # Debug
+        #print("DEBUG MAIN.PY")
+        #print(1 * "\n")  # Debug        
         
         
 

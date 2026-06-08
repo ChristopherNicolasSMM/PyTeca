@@ -167,6 +167,7 @@ def _build_context(
     plural: str,
     metadata: Dict,
     model_class=None,
+    output_subdir: Path = Path("."),
 ) -> Dict[str, Any]:
     """Monta o dicionário de contexto passado a todos os templates."""
     class_name_lower = class_name.lower()
@@ -191,6 +192,7 @@ def _build_context(
         "fields_rows":      _build_fields_rows(class_name_lower, form_fields_list),
         "form_fields":      _build_form_fields(form_fields_list),
         "relationship_fields": relationship_fields, 
+        "output_subdir":     output_subdir
     }
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -323,7 +325,7 @@ def generate_controller(
     output_dir.mkdir(parents=True, exist_ok=True)
     _ensure_init_py(output_dir)
 
-    ctx = _build_context(class_name, plural, metadata, model_class=model_class)
+    ctx = _build_context(class_name, plural, metadata, model_class=model_class,output_subdir=output_subdir)
     content = loader.render("controller.py.j2", ctx)
     _write_file(output_dir / f"{class_name.lower()}.py", content, overwrite)
 
@@ -343,7 +345,7 @@ def generate_service(
     output_dir.mkdir(parents=True, exist_ok=True)
     _ensure_init_py(output_dir)
 
-    ctx = _build_context(class_name, plural, metadata, model_class=model_class)
+    ctx = _build_context(class_name, plural, metadata, model_class=model_class,output_subdir=output_subdir)
     content = loader.render("service.py.j2", ctx)
     _write_file(output_dir / f"{class_name.lower()}_service.py", content, overwrite)
 
@@ -363,7 +365,7 @@ def generate_routes(
     output_dir.mkdir(parents=True, exist_ok=True)
     _ensure_init_py(output_dir)
 
-    ctx = _build_context(class_name, plural, metadata, model_class=model_class)
+    ctx = _build_context(class_name, plural, metadata, model_class=model_class, output_subdir=output_subdir)
     content = loader.render("routes.py.j2", ctx)
     _write_file(output_dir / f"{class_name.lower()}_routes.py", content, overwrite)
 
@@ -385,7 +387,7 @@ def generate_templates(
     templates_dir.mkdir(parents=True, exist_ok=True)
     modals_dir.mkdir(exist_ok=True)
 
-    ctx = _build_context(class_name, plural, metadata, model_class=model_class)
+    ctx = _build_context(class_name, plural, metadata, model_class=model_class, output_subdir=output_subdir)
 
     _write_file(templates_dir / "manage.html",
                 loader.render("manage.html.j2", ctx), overwrite)

@@ -7,7 +7,7 @@ from typing import Any
 from sqlalchemy import func
 
 from db.database import db
-from model.book import Book, BookStatus
+from model.bookstore.book import Book, BookStatus
 
 
 @dataclass

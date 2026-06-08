@@ -3,8 +3,8 @@ from __future__ import annotations
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
 
-from services.author.author_service import AuthorService
-from model.author import AuthorStatus
+from services.bookstore.author_service import AuthorService
+from model.bookstore.author import AuthorStatus
 
 author_api_bp = Blueprint("author_api", __name__, url_prefix="/api/authors")
 

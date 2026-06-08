@@ -3,8 +3,8 @@ from __future__ import annotations
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
 
-from services.{{ class_name_lower }}.{{ class_name_lower }}_service import {{ class_name }}Service
-from model.{{ module_name }} import {{ class_name }}Status
+from services.{{ output_subdir }}.{{ class_name_lower }}_service import {{ class_name }}Service
+from model.{{ output_subdir }}.{{ module_name }} import {{ class_name }}Status
 
 {{ class_name_lower }}_api_bp = Blueprint("{{ class_name_lower }}_api", __name__, url_prefix="/api/{{ plural }}")
 

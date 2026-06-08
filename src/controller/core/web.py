@@ -80,11 +80,6 @@ def register():
     return render_app_template("core/register.html")
 
 
-@web_bp.route("/register/request")
-def register_request():
-    return render_app_template("core/register_request.html")
-
-
 @web_bp.route("/dashboard")
 @login_required
 def dashboard():
@@ -95,6 +90,7 @@ def dashboard():
 @login_required
 def config():
     return render_app_template("core/config.html")
+
 
 
 @web_bp.route("/profile")
