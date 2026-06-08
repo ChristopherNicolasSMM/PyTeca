@@ -175,7 +175,8 @@ def build_tree(items: list[dict]) -> list[dict]:
 # ------------------------------------------------------------
 def get_full_menu() -> list[dict]:
     all_items = []
-    all_items.extend(get_items_from_models())
-    all_items.extend(get_items_from_yaml())
-    all_items.extend(get_registered_items())
+    all_items.extend(get_registered_items())      # 1º manual (decorator)
+    all_items.extend(get_items_from_yaml())       # 2º YAML
+    all_items.extend(get_items_from_models())     # 3º automático
     return build_tree(all_items)
+
