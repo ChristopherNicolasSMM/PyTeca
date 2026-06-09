@@ -131,70 +131,10 @@ def register_context_processors(app):
     print("\n")
     print(50 * "=")  # Debug    
     print("Registrando context processors do menu dinâmico")
-#    #@app.context_processor
-#    def inject_menu_from_yaml():
-#        """
-#        Carrega o menu do arquivo YAML correspondente à seção atual.
-#        A estrutura esperada nos arquivos YAML é:
-#
-#        menu:
-#          - name: "Nome do Item"
-#            endpoint: "nome.do.endpoint"
-#            icon: "bi bi-house"  # opcional
-#            children: [...]       # opcional, para submenus
-#        """
-#        # Determina a seção atual a partir do primeiro segmento da URL
-#        path = request.path.strip("/")
-#        section = path.split("/")[0] if path else "home"
-#        
-#        #print(1 * "\n")  # Debug
-#        #print("DEBUG MAIN.PY")
-#        #print(f"Carregando menu para seção: {section}")  # Debug
-#        #print(f"URL atual: {request.url}")  # Debug
-#        #print(f"Path atual: {path}")  # Debug
-#        #print("DEBUG MAIN.PY")
-#        #print(1 * "\n")  # Debug        
-#        
-#        # Caminhos possíveis para o arquivo YAML do menu
-#        section_yaml = os.path.join(app.template_folder, section, "core/menu.yaml")
-#        root_yaml = os.path.join(app.template_folder, "core/menu.yaml")
-#
-#        yaml_file = None
-#        if os.path.exists(section_yaml):
-#            yaml_file = section_yaml
-#        elif os.path.exists(root_yaml):
-#            yaml_file = root_yaml
-#
-#        menu_items = []
-#        if yaml_file:
-#            try:
-#                with open(yaml_file, "r", encoding="utf-8") as f:
-#                    data = yaml.safe_load(f)
-#                    if isinstance(data, dict):
-#                        menu_items = data.get("menu", [])
-#                    elif isinstance(data, list):
-#                        menu_items = data
-#            except Exception as e:
-#                app.logger.error("Erro ao carregar menu do YAML %s: %s", yaml_file, e)
-#
-#        # Helper para construir URLs de forma segura nos templates
-#        def safe_url_for(endpoint, **values):
-#            if not endpoint:
-#                return "#"
-#            try:
-#                return url_for(endpoint, **values)
-#            except Exception:
-#                app.logger.debug(
-#                    "Endpoint '%s' não encontrado, retornando '#'", endpoint
-#                )
-#                return "#"
-#
-#        return {"menu_items": menu_items, "safe_url_for": safe_url_for}
     
     from utils.generate_model.menu_builder import get_full_menu
     @app.context_processor
     def inject_dynamic_menu():
-        print("Passou em inject_dynamic_menu")  # Debug
         menu_items = get_full_menu()
         
         def safe_url_for(endpoint, **values):
@@ -204,8 +144,7 @@ def register_context_processors(app):
                 return url_for(endpoint, **values)
             except Exception:
                 app.logger.debug("Endpoint '%s' não encontrado", endpoint)
-                return "#"
-        print("Menu dinâmico injetado:", menu_items)  # Debug    
+                return "#" 
         return {"menu_items": menu_items, "safe_url_for": safe_url_for}    
     
     

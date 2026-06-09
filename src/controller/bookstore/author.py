@@ -37,7 +37,7 @@ SMART_LIST_CONFIG = SmartListConfig(
 #Biblioteca
 @author_bp.route("/")
 @login_required
-@menu_item("556", icon="bi-speedometer2", parent="Biblioteca", endpoint="authors.list", clickable_parent=True)
+@menu_item("Autores", icon="bi-speedometer2", parent="Biblioteca", endpoint="authors.list", clickable_parent=True)
 def list():
     status = request.args.get("status", AuthorStatus.ACTIVE.value)
     export = request.args.get("export", "")

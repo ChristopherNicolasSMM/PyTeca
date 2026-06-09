@@ -258,6 +258,7 @@ def get_full_menu(user_id=None):
 
     # 2. Sem customização: fluxo original
     all_items = []
+    
     all_items.extend(get_registered_items())
     all_items.extend(get_items_from_yaml())
     all_items.extend(get_items_from_models())

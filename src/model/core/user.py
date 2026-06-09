@@ -43,6 +43,8 @@ class User(UserMixin, db.Model):
     notificacao_ofertas = Column(Boolean, default=False)
     # Preferências de tema
     modo_escuro = Column(Boolean, default=False)
+    # dentro da classe User
+    roles = db.relationship("Role", secondary="user_roles", back_populates="users")    
 
     # No seu models.py
     @property
@@ -70,6 +72,14 @@ class User(UserMixin, db.Model):
 
     def verify_password(self, password: str) -> bool:
         return self.check_password(password)
+    
+    def has_permission(self, permission_name):
+        for role in self.roles:
+            for perm in role.permissions:
+                if perm.name == permission_name:
+                    return True
+        return False
+    
 
     def to_dict(self):
         return {

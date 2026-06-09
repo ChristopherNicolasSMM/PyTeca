@@ -1,25 +1,52 @@
 # Itens que não pertencem a nenhum modelo (ex: páginas administrativas, relatórios, etc.)
 #------------------------------------------------------------------------------------------
 items:
+
+###################################################################################################
+# Itens do menu "Biblioteca" (pai "Biblioteca")
+###################################################################################################
   # Pai "Biblioteca" com modo híbrido ativado
   - name: "Biblioteca"
-    endpoint: "biblioteca.dashboard"   # endpoint real (pai clicável)
+    endpoint: "#"   # endpoint real (pai clicável)
     icon: "bi-book"
-    clickable_parent: true             # ← ativa modo híbrido (pai clicável + toggle separado)
-                                       #   Se omitido ou false, pai fica não clicável (apenas toggle)
+    #clickable_parent: true
+    
 
-  # Pai "Administração" sem clickable_parent (modo padrão: não clicável)
+
+###################################################################################################
+# Itens do menu "Administração" (subitens do pai "Administração")   
+###################################################################################################  
   - name: "Administração"
     endpoint: "#"                       # link morto
     icon: "bi-shield"
+    #clickable_parent: true             # ← ativa modo híbrido (pai clicável + toggle separado)    
+                                        #   Se omitido ou false, pai fica não clicável (apenas toggle)
+    
+  - name: "Configurações"
+    endpoint: "admin_config.index"
+    icon: "bi-gear"
+    parent: "Administração"
+
+  - name: "Tarefas"
+    endpoint: "admin_tasks.index"
+    icon: "bi-clock-history"
+    parent: "Administração"
+
+  - name: "Model Builder"
+    endpoint: "admin_model_builder.index"
+    icon: "bi-code-square"
+    parent: "Administração"
+
+  - name: "Playground"
+    endpoint: "builder_query.index"
+    icon: "bi-terminal"
+    parent: "Administração"
 
   - name: "Usuários"
     endpoint: "admin.users"
     icon: "bi-people"
     parent: "Administração"
 
-  - name: "Configurações"
-    endpoint: "web.config"
-    icon: "bi-gear"
-    parent: "Administração"
-    clickable_parent: true             # ← ativa modo híbrido (pai clicável + toggle separado)
+###################################################################################################
+# Itens do menu "Relatórios" (subitens do pai "Relatórios")
+###################################################################################################

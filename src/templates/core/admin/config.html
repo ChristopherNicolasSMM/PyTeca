@@ -1,0 +1,121 @@
+{% extends "core/base.html" %}
+
+{% block title %}Configurações do Sistema{% endblock %}
+
+{% block content %}
+<div class="pagetitle">
+  <h1>Configurações</h1>
+  <nav>
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{{ url_for('web.dashboard') }}">Home</a></li>
+      <li class="breadcrumb-item active">Configurações</li>
+    </ol>
+  </nav>
+</div>
+
+<section class="section">
+  <div class="card">
+    <div class="card-body">
+      <h5 class="card-title">Parâmetros do Sistema</h5>
+      <div id="config-groups" class="row">
+        <!-- Abas serão carregadas via JavaScript -->
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  async function loadConfig() {
+    const response = await fetch('/api/admin/config/');
+    const data = await response.json();
+    if (!data.success) return;
+
+    const container = document.getElementById('config-groups');
+    container.innerHTML = '';
+
+    // Criar abas
+    const tabs = document.createElement('ul');
+    tabs.className = 'nav nav-tabs mb-3';
+    const content = document.createElement('div');
+    content.className = 'tab-content';
+
+    let first = true;
+    for (const [groupName, configs] of Object.entries(data.groups)) {
+      const tabId = `tab-${groupName}`;
+      // Tab link
+      const li = document.createElement('li');
+      li.className = 'nav-item';
+      li.innerHTML = `<button class="nav-link ${first ? 'active' : ''}" data-bs-toggle="tab" data-bs-target="#${tabId}">${groupName.charAt(0).toUpperCase() + groupName.slice(1)}</button>`;
+      tabs.appendChild(li);
+
+      // Tab pane
+      const pane = document.createElement('div');
+      pane.className = `tab-pane fade ${first ? 'show active' : ''}`;
+      pane.id = tabId;
+      pane.innerHTML = `
+        <form class="config-form" data-group="${groupName}">
+          ${configs.map(cfg => `
+            <div class="row mb-3">
+              <label class="col-sm-3 col-form-label">${cfg.key.replace(/_/g, ' ').toUpperCase()}</label>
+              <div class="col-sm-9">
+                ${cfg.type === 'bool' ? `
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" name="${cfg.key}" value="true" ${cfg.value ? 'checked' : ''}>
+                  </div>
+                ` : cfg.type === 'json' ? `
+                  <textarea class="form-control" name="${cfg.key}" rows="3">${JSON.stringify(cfg.value, null, 2)}</textarea>
+                ` : `
+                  <input type="${cfg.type === 'int' ? 'number' : 'text'}" class="form-control" name="${cfg.key}" value="${cfg.value}">
+                `}
+                <small class="form-text text-muted">${cfg.description || ''}</small>
+              </div>
+            </div>
+          `).join('')}
+          <div class="text-center">
+            <button type="submit" class="btn btn-primary">Salvar</button>
+          </div>
+        </form>
+      `;
+      content.appendChild(pane);
+
+      first = false;
+    }
+
+    container.appendChild(tabs);
+    container.appendChild(content);
+
+    // Event listeners para forms
+    document.querySelectorAll('.config-form').forEach(form => {
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(form);
+        const data = {};
+        for (let [key, value] of formData.entries()) {
+          // Detecta tipo pelo input
+          const input = form.querySelector(`[name="${key}"]`);
+          if (input && input.type === 'checkbox') {
+            data[key] = value === 'true';
+          } else if (input && input.type === 'number') {
+            data[key] = parseFloat(value);
+          } else {
+            data[key] = value;
+          }
+        }
+        const response = await fetch('/api/admin/config/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        const result = await response.json();
+        if (result.success) {
+          alert('Configurações salvas!');
+        } else {
+          alert('Erro: ' + result.error);
+        }
+      });
+    });
+  }
+
+  loadConfig();
+</script>
+{% endblock %}

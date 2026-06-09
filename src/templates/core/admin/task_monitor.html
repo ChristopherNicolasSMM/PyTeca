@@ -1,0 +1,28 @@
+{% extends "core/base.html" %}
+
+{% block title %}Monitor de Tarefas{% endblock %}
+
+{% block content %}
+<div class="pagetitle">
+  <h1>Monitor de Tarefas</h1>
+  <nav>
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{{ url_for('web.dashboard') }}">Home</a></li>
+      <li class="breadcrumb-item active">Tarefas</li>
+    </ol>
+  </nav>
+</div>
+
+<section class="section">
+  <div class="row">
+    <div class="col-lg-12">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title">Funcionalidade em desenvolvimento</h5>
+          <p>Em breve você poderá agendar tarefas, aprovar execuções e monitorar filas de mensagens.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

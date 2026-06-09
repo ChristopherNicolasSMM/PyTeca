@@ -1,0 +1,135 @@
+{% extends "core/base.html" %}
+
+{% block title %}Construtor de Modelos{% endblock %}
+
+{% block content %}
+<div class="pagetitle">
+  <h1>Construtor de Modelos</h1>
+  <nav>
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{{ url_for('web.dashboard') }}">Home</a></li>
+      <li class="breadcrumb-item active">Model Builder</li>
+    </ol>
+  </nav>
+</div>
+
+<section class="section">
+  <div class="row">
+    <div class="col-lg-12">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title">Novo Modelo</h5>
+          <form id="modelForm">
+            <div class="row mb-3">
+              <label class="col-sm-2 col-form-label">Nome do Modelo</label>
+              <div class="col-sm-10">
+                <input type="text" class="form-control" name="name" required placeholder="Ex: Produto">
+              </div>
+            </div>
+            <div class="row mb-3">
+              <label class="col-sm-2 col-form-label">Módulo</label>
+              <div class="col-sm-10">
+                <input type="text" class="form-control" name="module" value="core">
+              </div>
+            </div>
+            <div class="row mb-3">
+              <label class="col-sm-2 col-form-label">Nome da Tabela</label>
+              <div class="col-sm-10">
+                <input type="text" class="form-control" name="table_name" required placeholder="ex: produtos">
+              </div>
+            </div>
+
+            <h6>Campos</h6>
+            <div id="fields-container">
+              <div class="field-row row mb-2">
+                <div class="col-sm-3"><input type="text" class="form-control" placeholder="Nome do campo" name="field_name[]"></div>
+                <div class="col-sm-3">
+                  <select class="form-select" name="field_type[]">
+                    <option value="string">String</option>
+                    <option value="integer">Integer</option>
+                    <option value="boolean">Boolean</option>
+                    <option value="datetime">DateTime</option>
+                    <option value="text">Text</option>
+                  </select>
+                </div>
+                <div class="col-sm-2"><input type="text" class="form-control" placeholder="Default" name="field_default[]"></div>
+                <div class="col-sm-2 form-check">
+                  <input type="checkbox" class="form-check-input" name="field_nullable[]" value="false"> <label class="form-check-label">Obrigatório</label>
+                </div>
+                <div class="col-sm-2"><button type="button" class="btn btn-danger btn-sm remove-field">Remover</button></div>
+              </div>
+            </div>
+            <button type="button" class="btn btn-secondary btn-sm mb-3" id="addFieldBtn">+ Adicionar Campo</button>
+
+            <div class="text-center">
+              <button type="submit" class="btn btn-primary">Criar Modelo e Gerar CRUD</button>
+            </div>
+          </form>
+          <div id="previewArea" style="display:none; margin-top:20px;">
+            <h5>Pré-visualização do Código</h5>
+            <pre id="codePreview" class="bg-light p-3"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  document.getElementById('addFieldBtn').addEventListener('click', function() {
+    const container = document.getElementById('fields-container');
+    const newRow = container.children[0].cloneNode(true);
+    newRow.querySelectorAll('input, select').forEach(el => el.value = '');
+    container.appendChild(newRow);
+  });
+  document.addEventListener('click', function(e) {
+    if (e.target.classList.contains('remove-field')) {
+      e.target.closest('.field-row').remove();
+    }
+  });
+
+  document.getElementById('modelForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const formData = new FormData(this);
+    const data = {
+      name: formData.get('name'),
+      module: formData.get('module'),
+      table_name: formData.get('table_name'),
+      fields: [],
+      annotations: {}
+    };
+    const fieldNames = formData.getAll('field_name[]');
+    const fieldTypes = formData.getAll('field_type[]');
+    const fieldDefaults = formData.getAll('field_default[]');
+    const fieldNullable = formData.getAll('field_nullable[]');
+    for (let i = 0; i < fieldNames.length; i++) {
+      if (fieldNames[i]) {
+        data.fields.push({
+          name: fieldNames[i],
+          type: fieldTypes[i],
+          default: fieldDefaults[i] || null,
+          nullable: fieldNullable[i] !== 'false'
+        });
+      }
+    }
+
+    const response = await fetch('/api/core/builder/model/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    const result = await response.json();
+    if (result.success) {
+      const genResponse = await fetch(`/api/core/builder/model/${result.id}/generate`, { method: 'POST' });
+      const genResult = await genResponse.json();
+      if (genResult.success) {
+        alert('Modelo e CRUD gerados com sucesso! O servidor pode precisar reiniciar para refletir as novas rotas.');
+      } else {
+        alert('Erro na geração do CRUD: ' + genResult.error);
+      }
+    } else {
+      alert('Erro ao criar modelo: ' + (result.error || 'desconhecido'));
+    }
+  });
+</script>
+{% endblock %}

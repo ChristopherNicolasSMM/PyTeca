@@ -1,0 +1,28 @@
+{% extends "core/base.html" %}
+
+{% block title %}Dashboard Administrativo{% endblock %}
+
+{% block content %}
+<div class="pagetitle">
+  <h1>Dashboard Administrativo</h1>
+  <nav>
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{{ url_for('web.dashboard') }}">Home</a></li>
+      <li class="breadcrumb-item active">Admin Dashboard</li>
+    </ol>
+  </nav>
+</div>
+
+<section class="section">
+  <div class="row">
+    <div class="col-lg-12">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title">Bem-vindo ao painel administrativo</h5>
+          <p>Gerencie configurações, tarefas agendadas e monitore o sistema.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

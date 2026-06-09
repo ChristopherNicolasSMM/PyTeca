@@ -1,0 +1,133 @@
+# model/{{ module_name }}/{{ class_name_lower }}.py
+from __future__ import annotations
+from datetime import datetime, timezone
+from enum import Enum as PyEnum
+from sqlalchemy import DateTime, Enum, Integer, String, Text, Boolean, ForeignKey
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from db.database import db
+from annotations import label, plural, listview, Column, Filter, form, Group, required, max_length, min_length, min_value
+
+{% if annotations.label %}
+@label("{{ annotations.label }}")
+{% endif %}
+{% if annotations.plural %}
+@plural("{{ annotations.plural }}")
+{% endif %}
+{% if annotations.listview %}
+@listview(
+    columns=[
+        {% for col in annotations.listview.columns %}
+        Column("{{ col.name }}", label="{{ col.label }}", width="{{ col.width }}", sortable={{ col.sortable|lower }}, align="{{ col.align }}"),
+        {% endfor %}
+    ],
+    default_sort="{{ annotations.listview.default_sort }}",
+    filters=[
+        {% for f in annotations.listview.filters %}
+        Filter("{{ f.name }}", type="{{ f.type }}", placeholder="{{ f.placeholder }}"),
+        {% endfor %}
+    ]
+)
+{% endif %}
+{% if annotations.form %}
+@form(
+    fields={{ annotations.form.fields | tojson }},
+    groups=[
+        {% for g in annotations.form.groups %}
+        Group("{{ g.name }}", "{{ g.label }}", {{ g.fields | tojson }}, collapsible={{ g.collapsible|lower }}),
+        {% endfor %}
+    ]
+)
+{% endif %}
+{% for req in annotations.required %}
+@required("{{ req.field }}", "{{ req.message }}")
+{% endfor %}
+{% for ml in annotations.max_length %}
+@max_length("{{ ml.field }}", {{ ml.max }})
+{% endfor %}
+class {{ class_name }}(db.Model):
+    __tablename__ = "{{ table_name }}"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    {% for field in fields %}
+    {{ field.name }}: Mapped[{{ field.type }}]{% if field.nullable == false %} = mapped_column({{ field.type_mapped }}, nullable=False{% if field.default %}, default={{ field.default }}{% endif %}){% else %} = mapped_column({{ field.type_mapped }}, nullable=True){% endif %}
+    {% endfor %}
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            {% for field in fields %}
+            "{{ field.name }}": self.{{ field.name }},
+            {% endfor %}
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+    def __repr__(self):
+        return f"<{{ class_name }} id={self.id}>"
+    
+    
+    
+    
+    
+    
+    
+###################
+
+# model/{{ module_name }}/{{ class_name_lower }}.py
+from __future__ import annotations
+from datetime import datetime, timezone
+from enum import Enum as PyEnum
+from sqlalchemy import DateTime, Enum, Integer, String, Text, Boolean, Float, ForeignKey
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from db.database import db
+from annotations import label, plural, listview, Column, Filter, form, Group, required, max_length
+
+{% if annotations.label %}
+@label("{{ annotations.label }}")
+{% endif %}
+{% if annotations.plural %}
+@plural("{{ annotations.plural }}")
+{% endif %}
+{% if annotations.listview %}
+@listview(
+    columns={{ annotations.listview.columns | tojson }},
+    default_sort="{{ annotations.listview.default_sort }}",
+    filters={{ annotations.listview.filters | tojson }}
+)
+{% endif %}
+{% if annotations.form %}
+@form(
+    fields={{ annotations.form.fields | tojson }},
+    groups={{ annotations.form.groups | tojson }}
+)
+{% endif %}
+{% for field in fields %}
+{% if field.required %}
+@required("{{ field.name }}")
+{% endif %}
+{% if field.max_length %}
+@max_length("{{ field.name }}", {{ field.max_length }})
+{% endif %}
+{% endfor %}
+class {{ class_name }}(db.Model):
+    __tablename__ = "{{ table_name }}"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+{% for field in fields %}
+    {{ field.name }}: Mapped[{{ field.type_mapped }}] = mapped_column({{ field.type_mapped }}{% if not field.nullable %}, nullable=False{% endif %}{% if field.default %}, default={{ field.default }}{% endif %})
+{% endfor %}
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+{% for field in fields %}
+            "{{ field.name }}": self.{{ field.name }},
+{% endfor %}
+        }
+
+    def __repr__(self):
+        return f"<{{ class_name }} id={self.id}>"    
