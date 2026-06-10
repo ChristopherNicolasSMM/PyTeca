@@ -12,12 +12,11 @@
       📄 __init__.py
       📂 bookstore/
         📄 author_routes.py
-        📄 book_routes.py
-        📄 loan_routes.py
         📄 __init__.py
       📂 core/
         📄 auth_routes.py
         📄 notifications_routes.py
+        📄 old_options_routes.py
         📄 options_routes.py
         📄 register.py
         📄 smart_list_routes.py
@@ -33,8 +32,6 @@
     📄 __init__.py
     📂 bookstore/
       📄 author.py
-      📄 book.py
-      📄 loan.py
       📄 __init__.py
     📂 core/
       📄 api.py
@@ -93,8 +90,6 @@
   📂 services/
     📂 bookstore/
       📄 author_service.py
-      📄 book_service.py
-      📄 loan_service.py
       📄 __init__.py
     📂 core/
       📄 notifications_service.py
@@ -113,16 +108,6 @@
         📄 manage.html
         📂 _modals/
           📄 author_form_modal.html
-      📂 books/
-        📄 detail.html
-        📄 manage.html
-        📂 _modals/
-          📄 book_form_modal.html
-      📂 loans/
-        📄 detail.html
-        📄 manage.html
-        📂 _modals/
-          📄 loan_form_modal.html
     📂 core/
       📄 556.html
       📄 base.html
@@ -144,6 +129,7 @@
         📄 model_builder.html
         📄 query_playground.html
     📂 _components/
+      📄 fk_selector_modal.html
       📄 smart_list.html
   📂 tests/
     📄 test_book.py
@@ -156,11 +142,13 @@
     📄 refactoryng_black_and_isort.py
     📂 generate_model/
       📄 menu_builder.py
+      📄 old_bkp_template_loader.py
       📄 template_loader.py
       📄 __init__.py
       📂 templates/
         📂 standard/
     📂 smart_list/
+      📄 builder.py
       📄 config.py
       📄 export.py
       📄 renderer.py
@@ -306,70 +294,10 @@ def register_context_processors(app):
     print("\n")
     print(50 * "=")  # Debug    
     print("Registrando context processors do menu dinâmico")
-#    #@app.context_processor
-#    def inject_menu_from_yaml():
-#        """
-#        Carrega o menu do arquivo YAML correspondente à seção atual.
-#        A estrutura esperada nos arquivos YAML é:
-#
-#        menu:
-#          - name: "Nome do Item"
-#            endpoint: "nome.do.endpoint"
-#            icon: "bi bi-house"  # opcional
-#            children: [...]       # opcional, para submenus
-#        """
-#        # Determina a seção atual a partir do primeiro segmento da URL
-#        path = request.path.strip("/")
-#        section = path.split("/")[0] if path else "home"
-#        
-#        #print(1 * "\n")  # Debug
-#        #print("DEBUG MAIN.PY")
-#        #print(f"Carregando menu para seção: {section}")  # Debug
-#        #print(f"URL atual: {request.url}")  # Debug
-#        #print(f"Path atual: {path}")  # Debug
-#        #print("DEBUG MAIN.PY")
-#        #print(1 * "\n")  # Debug        
-#        
-#        # Caminhos possíveis para o arquivo YAML do menu
-#        section_yaml = os.path.join(app.template_folder, section, "core/menu.yaml")
-#        root_yaml = os.path.join(app.template_folder, "core/menu.yaml")
-#
-#        yaml_file = None
-#        if os.path.exists(section_yaml):
-#            yaml_file = section_yaml
-#        elif os.path.exists(root_yaml):
-#            yaml_file = root_yaml
-#
-#        menu_items = []
-#        if yaml_file:
-#            try:
-#                with open(yaml_file, "r", encoding="utf-8") as f:
-#                    data = yaml.safe_load(f)
-#                    if isinstance(data, dict):
-#                        menu_items = data.get("menu", [])
-#                    elif isinstance(data, list):
-#                        menu_items = data
-#            except Exception as e:
-#                app.logger.error("Erro ao carregar menu do YAML %s: %s", yaml_file, e)
-#
-#        # Helper para construir URLs de forma segura nos templates
-#        def safe_url_for(endpoint, **values):
-#            if not endpoint:
-#                return "#"
-#            try:
-#                return url_for(endpoint, **values)
-#            except Exception:
-#                app.logger.debug(
-#                    "Endpoint '%s' não encontrado, retornando '#'", endpoint
-#                )
-#                return "#"
-#
-#        return {"menu_items": menu_items, "safe_url_for": safe_url_for}
     
     from utils.generate_model.menu_builder import get_full_menu
     @app.context_processor
     def inject_dynamic_menu():
-        print("Passou em inject_dynamic_menu")  # Debug
         menu_items = get_full_menu()
         
         def safe_url_for(endpoint, **values):
@@ -379,8 +307,7 @@ def register_context_processors(app):
                 return url_for(endpoint, **values)
             except Exception:
                 app.logger.debug("Endpoint '%s' não encontrado", endpoint)
-                return "#"
-        print("Menu dinâmico injetado:", menu_items)  # Debug    
+                return "#" 
         return {"menu_items": menu_items, "safe_url_for": safe_url_for}    
     
     
@@ -731,6 +658,13 @@ def min_value(field: str, min: int, message: Optional[str] = None):
         return cls
     return decorator
 
+def display_field(value: str):
+    """Define qual campo deve ser usado como display name para este model (ex: 'username', 'title')."""
+    def decorator(cls):
+        cls._display_field = value
+        return cls
+    return decorator
+
 # ---- Extração de metadados ----
 def get_model_metadata(cls) -> Dict[str, Any]:
     """Extrai todos os metadados anotados de uma classe."""
@@ -741,7 +675,8 @@ def get_model_metadata(cls) -> Dict[str, Any]:
         "ui_listview": getattr(cls, '_ui_listview', None),
         "ui_form": getattr(cls, '_ui_form', None),
         "validations": getattr(cls, '_validations', {}),
-    }
+    }    
+    
 # ---- Ajustes para o menu ----
 def menu_icon(value: str):
     def decorator(cls):
@@ -1483,7 +1418,6 @@ def _build_form_fields(fields: list[str]) -> str:
         )
     return "\n".join(rows)
 
-
 def _build_context(
     class_name: str,
     plural: str,
@@ -1497,26 +1431,124 @@ def _build_context(
     label            = metadata.get("label", class_name)
     default_sort     = metadata.get("ui_listview", {}).get("default_sort", "id")
     form_fields_list = metadata.get("ui_form", {}).get("fields", [])
-    # detectar relacionamentos
+
+    # detectar relacionamentos (FK)
     relationship_fields = []
     if model_class:
         relationship_fields = _get_relationship_fields(model_class)
 
-    return {
-        "class_name":       class_name,
-        "class_name_lower": class_name_lower,
-        "module_name":      module_name,
-        "plural":           plural,
-        "label":            label,
-        "default_sort":     default_sort,
-        "columns":          _build_columns_block(metadata),
-        "filters":          _build_filters_block(metadata),
-        "fields_rows":      _build_fields_rows(class_name_lower, form_fields_list),
-        "form_fields":      _build_form_fields(form_fields_list),
-        "relationship_fields": relationship_fields, 
-        "output_subdir":     output_subdir
-    }
+    # detectar campos Enum
+    enum_fields = []
+    if model_class:
+        for field_name in form_fields_list:
+            if hasattr(model_class, field_name):
+                column = getattr(model_class, field_name)
+                if hasattr(column, 'type') and hasattr(column.type, 'enum_class'):
+                    enum_class = column.type.enum_class
+                    if enum_class:
+                        options = [(e.value, e.name.replace('_', ' ').title()) for e in enum_class]
+                        enum_fields.append({"name": field_name, "options": options})
 
+    # ============================================================
+    # Campos pesquisáveis (searchable_fields) e mapeamento de FKs
+    # ============================================================
+    searchable_fields = []
+    # 1. Prioriza colunas marcadas como filterable nas anotações @listview
+    for col in metadata.get("ui_listview", {}).get("columns", []):
+        if col.get("filterable"):
+            searchable_fields.append(col["name"])
+
+    # 2. Se não houver, tenta campos comuns do model (name, title, username)
+    if not searchable_fields and model_class:
+        for candidate in ('name', 'title', 'username'):
+            if hasattr(model_class, candidate):
+                searchable_fields.append(candidate)
+                break
+
+    # 3. Fallback: primeiro campo String do model
+    if not searchable_fields and model_class:
+        for prop in model_class.__mapper__.iterate_properties:
+            if hasattr(prop, 'columns') and str(prop.columns[0].type).startswith('VARCHAR'):
+                searchable_fields.append(prop.key)
+                break
+
+    # Mapeamento de FK -> (model_name, display_field)
+    fk_display_map = []
+    if model_class and relationship_fields:
+        import importlib
+        for rel in relationship_fields:
+            fk_name = rel['name']
+            foreign_table = rel['foreign_table']
+            # Converte nome da tabela para nome do model (ex: 'users' -> 'User', 'book' -> 'Book')
+            model_name = ''.join(word.capitalize() for word in foreign_table.split('_'))
+            if model_name.endswith('s'):
+                model_name = model_name[:-1]
+            # Tenta importar o model
+            module_path = None
+            for prefix in ['model.core', 'model.bookstore']:
+                try:
+                    module = importlib.import_module(f"{prefix}.{model_name.lower()}")
+                    model_class_rel = getattr(module, model_name)
+                    display_field = getattr(model_class_rel, '_display_field', None)
+                    if display_field:
+                        module_path = prefix
+                        break
+                except (ImportError, AttributeError):
+                    continue
+            if module_path and display_field:
+                fk_display_map.append({
+                    'fk_name': fk_name,
+                    'model_name': model_name,
+                    'module_path': module_path,
+                    'display_field': display_field
+                })
+
+    # ============================================================
+    # Geração do bloco de código Python para busca (service)
+    # ============================================================
+    search_block_lines = []
+    if searchable_fields or fk_display_map:
+        search_block_lines.append("        if search:")
+        search_block_lines.append('            pattern = f"%{search.strip()}%"')
+        search_block_lines.append("            from sqlalchemy import or_")
+        search_block_lines.append("            search_filters = []")
+        # Campos diretos
+        for field in searchable_fields:
+            search_block_lines.append(f"            search_filters.append({class_name}.{field}.ilike(pattern))")
+        # Campos de FKs (joins)
+        for fk in fk_display_map:
+            search_block_lines.append(f"            from {fk['module_path']}.{fk['model_name'].lower()} import {fk['model_name']}")
+            search_block_lines.append(f"            query = query.outerjoin({fk['model_name']}, {class_name}.{fk['fk_name']} == {fk['model_name']}.id)")
+            search_block_lines.append(f"            search_filters.append({fk['model_name']}.{fk['display_field']}.ilike(pattern))")
+        search_block_lines.append("            if search_filters:")
+        search_block_lines.append("                query = query.filter(or_(*search_filters))")
+    else:
+        # Fallback: busca pelo ID (caso não haja campos pesquisáveis)
+        search_block_lines.append("        if search:")
+        search_block_lines.append('            pattern = f"%{search.strip()}%"')
+        search_block_lines.append(f"            query = query.filter(cast(str({class_name}.id), String).ilike(pattern))")
+
+    search_block = "\n".join(search_block_lines)
+
+    # Monta o dicionário de contexto
+    return {
+        "class_name":         class_name,
+        "class_name_lower":   class_name_lower,
+        "module_name":        module_name,
+        "plural":             plural,
+        "label":              label,
+        "default_sort":       default_sort,
+        "columns":            _build_columns_block(metadata),
+        "filters":            _build_filters_block(metadata),
+        "fields_rows":        _build_fields_rows(class_name_lower, form_fields_list),
+        "form_fields":        _build_form_fields(form_fields_list),
+        "relationship_fields": relationship_fields,
+        "enum_fields":        enum_fields,
+        "searchable_fields":  searchable_fields,
+        "fk_display_map":     fk_display_map,
+        "search_block":       search_block,      
+        "output_subdir":      output_subdir,
+    }
 # ══════════════════════════════════════════════════════════════════════════════
 # HELPERS DE I/O
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1539,6 +1571,7 @@ def _write_file(path: Path, content: str, overwrite: bool = False) -> bool:
     return True
 
 
+### NÃO APAGAR: ESSAS FUNÇÕES DE GERAÇÃO DE MENU FORAM DESATIVADAS PARA EVITAR SOBRESCRITA INDESEJADA.
 ###################################################################################################################
 #      INICIO - GERAÇÃO DE MENU POR CRUD A PARTIR DE MODELO ANOTADO (CONTROLLER, SERVICE, ROUTES, TEMPLATES)
 #                                              DEIXAR DINAMICO
@@ -1620,23 +1653,88 @@ def _write_file(path: Path, content: str, overwrite: bool = False) -> bool:
 # DETECÇÃO DE RELACIONAMENTOS (FK)
 # ══════════════════════════════════════════════════════════════════════════════
 
+########### LIMPAR DEPOIS - APAGAR COMENTARIOS
+#
+#def _get_relationship_fields(model_class) -> list[dict]:
+#    """
+#    Retorna metadados das colunas que são chaves estrangeiras.
+#    Cada entrada contém: name, foreign_table, nullable.
+#    """
+#    rels = []
+#    if not hasattr(model_class, '__table__'):
+#        return rels
+#    for col in model_class.__table__.columns:
+#        if col.foreign_keys:
+#            fk = list(col.foreign_keys)[0]
+#            rels.append({
+#                'name': col.name,
+#                'foreign_table': fk.column.table.name,
+#                'nullable': col.nullable,
+#            })
+#    return rels
+
+
+##def _get_relationship_fields(model_class) -> list[dict]:
+##    """
+##    Retorna metadados das colunas que são chaves estrangeiras.
+##    Usa sqlalchemy.inspect para garantir detecção correta.
+##    """
+##    from sqlalchemy import inspect
+##    rels = []
+##        
+##    try:
+##        inspector = inspect(model_class)
+##        for column in inspector.columns:
+##            # Verifica se a coluna tem foreign_keys (SQLAlchemy >= 1.4)
+##            if column.foreign_keys:
+##                # Obtém a primeira FK (normalmente há apenas uma)
+##                fk = list(column.foreign_keys)[0]
+##                rels.append({
+##                    'name': column.name,
+##                    'foreign_table': fk.column.table.name,
+##                    'nullable': column.nullable,
+##                })
+##    except Exception as e:
+##        # Fallback: método antigo
+##        if hasattr(model_class, '__table__'):
+##            for col in model_class.__table__.columns:
+##                if col.foreign_keys:
+##                    fk = list(col.foreign_keys)[0]
+##                    rels.append({
+##                        'name': col.name,
+##                        'foreign_table': fk.column.table.name,
+##                        'nullable': col.nullable,
+##                    })
+##    return rels
+
+
 def _get_relationship_fields(model_class) -> list[dict]:
-    """
-    Retorna metadados das colunas que são chaves estrangeiras.
-    Cada entrada contém: name, foreign_table, nullable.
-    """
+    from sqlalchemy import inspect
     rels = []
-    if not hasattr(model_class, '__table__'):
-        return rels
-    for col in model_class.__table__.columns:
-        if col.foreign_keys:
-            fk = list(col.foreign_keys)[0]
-            rels.append({
-                'name': col.name,
-                'foreign_table': fk.column.table.name,
-                'nullable': col.nullable,
-            })
+    try:
+        ins = inspect(model_class)
+        for col in ins.columns:
+            if col.foreign_keys:
+                fk = list(col.foreign_keys)[0]
+                rels.append({
+                    'name': col.name,
+                    'foreign_table': fk.column.table.name,
+                    'nullable': col.nullable,
+                })
+    except Exception:
+        # fallback
+        if hasattr(model_class, '__table__'):
+            for col in model_class.__table__.columns:
+                if col.foreign_keys:
+                    fk = list(col.foreign_keys)[0]
+                    rels.append({
+                        'name': col.name,
+                        'foreign_table': fk.column.table.name,
+                        'nullable': col.nullable,
+                    })
     return rels
+
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # FUNÇÕES DE GERAÇÃO (com suporte a subdiretórios)
@@ -1730,7 +1828,7 @@ def generate_templates(
     _write_file(modals_dir / f"{class_name.lower()}_form_modal.html",
                 loader.render("form_modal.html.j2", ctx), overwrite)
 
-    _generate_menu_yaml(templates_dir, class_name, plural, ctx["label"], overwrite)
+#    _generate_menu_yaml(templates_dir, class_name, plural, ctx["label"], overwrite)
 
     if add_to_root_menu:
         _add_to_root_menu(class_name, plural, ctx["label"], overwrite)
@@ -1821,6 +1919,14 @@ def generate(model_path: str, theme: str = "standard", overwrite: bool = False, 
     loader = get_loader(theme)
     print(f"Tema de templates: '{theme}'  |  overwrite={overwrite}")
     _run_generation(file_path, None, None, loader, overwrite, add_to_root_menu=add_to_root_menu)
+    
+    try:
+        from api.routes.core.options_routes import refresh_options_cache
+        refresh_options_cache()
+        print("Cache de opções recarregado.")
+    except Exception as e:
+        print(f"Não foi possível recarregar o cache: {e}")    
+    
 
 --- FIM DO ARQUIVO ---
 
@@ -2224,6 +2330,7 @@ def get_items_from_models() -> list[dict]:
         if not label or not plural:
             continue
         endpoint = f"{plural}.list"
+        
         try:
             url_for(endpoint)
         except Exception:
@@ -2390,11 +2497,135 @@ def get_full_menu(user_id=None):
 
     # 2. Sem customização: fluxo original
     all_items = []
+    
     all_items.extend(get_registered_items())
     all_items.extend(get_items_from_yaml())
     all_items.extend(get_items_from_models())
     return build_tree(all_items)
 
+
+
+--- FIM DO ARQUIVO ---
+
+
+--- ARQUIVO: utils\generate_model\old_bkp_template_loader.py ---
+# utils/generate_model/template_loader.py
+"""
+Carrega templates .j2 de uma pasta configurável e os renderiza
+usando um motor de substituição simples (sem dependência do Jinja2 da app).
+
+Estrutura de pastas esperada:
+    utils/generate_model/templates/
+        standard/          ← pasta padrão (fallback)
+            controller.py.j2
+            service.py.j2
+            routes.py.j2
+            manage.html.j2
+            detail.html.j2
+            form_modal.html.j2
+        meu_tema/          ← pasta customizada (configurável via YAML)
+            ...
+
+Variáveis disponíveis nos templates (passadas no contexto):
+    {{ class_name }}       ex: "Author"
+    {{ class_name_lower }} ex: "author"
+    {{ module_name }}      ex: "author"  (nome do arquivo .py sem extensão)
+    {{ plural }}           ex: "authors"
+    {{ label }}            ex: "Autor"
+    {{ default_sort }}     ex: "name"
+    {{ columns }}          bloco já formatado com ColumnDef(...)
+    {{ filters }}          bloco já formatado com FilterDef(...)
+    {{ fields_rows }}      linhas <tr> para o detail.html
+    {{ form_fields }}      campos <div class="mb-3"> para o modal
+"""
+
+from __future__ import annotations
+
+import re
+from pathlib import Path
+
+
+# ── Diretório raiz dos templates de geração ───────────────────────────────────
+_TEMPLATES_ROOT = Path(__file__).parent / "templates"
+_DEFAULT_THEME  = "standard"
+
+
+class TemplateLoader:
+    """
+    Carrega e renderiza templates .j2 de uma pasta de tema.
+
+    Uso:
+        loader = TemplateLoader(theme="standard")
+        content = loader.render("controller.py.j2", context)
+    """
+
+    def __init__(self, theme: str = _DEFAULT_THEME):
+        theme_path = _TEMPLATES_ROOT / theme
+        if not theme_path.is_dir():
+            print(f"⚠  Tema '{theme}' não encontrado em {_TEMPLATES_ROOT}. "
+                  f"Usando 'standard'.")
+            theme_path = _TEMPLATES_ROOT / _DEFAULT_THEME
+
+        if not theme_path.is_dir():
+            raise FileNotFoundError(
+                f"Pasta de templates padrão não encontrada: {theme_path}"
+            )
+
+        self.theme_path = theme_path
+        self.theme = theme
+
+    # ── API pública ───────────────────────────────────────────────────────────
+
+    def render(self, template_name: str, context: dict) -> str:
+        """
+        Lê o arquivo .j2 e substitui variáveis {{ var }} pelo valor em context.
+        Suporta apenas substituição simples — não é um motor Jinja2 completo.
+        """
+        path = self.theme_path / template_name
+        if not path.exists():
+            # Tenta fallback para standard
+            fallback = _TEMPLATES_ROOT / _DEFAULT_THEME / template_name
+            if fallback.exists() and self.theme != _DEFAULT_THEME:
+                print(f"   ↩  '{template_name}' não existe em '{self.theme}', "
+                      f"usando standard.")
+                path = fallback
+            else:
+                raise FileNotFoundError(
+                    f"Template não encontrado: {path}"
+                )
+
+        raw = path.read_text(encoding="utf-8")
+        return self._substitute(raw, context)
+
+    def list_templates(self) -> list[str]:
+        """Retorna os nomes de todos os templates disponíveis no tema."""
+        return [f.name for f in self.theme_path.glob("*.j2")]
+
+    # ── Motor de substituição ─────────────────────────────────────────────────
+
+    @staticmethod
+    def _substitute(template: str, context: dict) -> str:
+        """
+        Substitui {{ key }} pelo valor correspondente em context.
+        Chaves não encontradas são mantidas intactas.
+        """
+        def replacer(match: re.Match) -> str:
+            key = match.group(1).strip()
+            if key in context:
+                return str(context[key])
+            return match.group(0)  # mantém {{ key }} se não encontrado
+
+        return re.sub(r"\{\{\s*(\w+)\s*\}\}", replacer, template)
+
+
+# ── Fábrica conveniente ───────────────────────────────────────────────────────
+
+def get_loader(theme: str | None = None) -> TemplateLoader:
+    """
+    Retorna um TemplateLoader configurado.
+    theme=None usa o padrão 'standard'.
+    """
+    return TemplateLoader(theme=theme or _DEFAULT_THEME)
 
 
 --- FIM DO ARQUIVO ---
@@ -2544,6 +2775,104 @@ Estrutura:
 
 __version__ = "0.2.0"
 
+
+--- FIM DO ARQUIVO ---
+
+
+--- ARQUIVO: utils\smart_list\builder.py ---
+# utils/smart_list/builder.py
+from __future__ import annotations
+
+from typing import List, Type, Any, Optional
+from sqlalchemy import Enum as SAEnum
+from sqlalchemy.orm import ColumnProperty
+
+from utils.smart_list.config import FilterDef
+
+
+def build_filters_from_model(
+    model_class: Type,
+    *,
+    include_enum: bool = True,
+    include_fk: bool = True,  # por padrão gera filtro para FK
+) -> List[FilterDef]:
+    """
+    Gera automaticamente FilterDef a partir das colunas do model SQLAlchemy.
+
+    - Para colunas do tipo Enum: cria FilterDef com type='select' e options extraídas
+      do próprio Enum (usa a classe enum guardada no tipo da coluna).
+    - Para colunas FK: se include_fk=True, cria FilterDef com type='text' e placeholder
+      genérico (ou pode criar um tipo especial 'fk' para ser tratado pelo renderer).
+    - Demais colunas não são convertidas automaticamente para evitar poluição visual.
+
+    A função também pode ser estendida para ler as anotações @listview.filters
+    (definidas no model com `Filter`), mas isso é opcional.
+
+    Args:
+        model_class: Classe do model (ex: Book, Loan).
+        include_enum: Se True (padrão), adiciona filtros para colunas Enum.
+        include_fk: Se False (padrão), ignora FKs. Se True, adiciona filtros de texto.
+    Returns:
+        Lista de FilterDef.
+    """
+    filters = []
+    # [OPCIONAL] Lista de colunas a ignorar
+    #IGNORED_COLUMNS = {"created_at", "updated_at", "trashed_at", "deleted_at"}
+    IGNORED_COLUMNS = {}
+
+    # Percorre todas as colunas mapeadas do model
+    for prop in model_class.__mapper__.iterate_properties:
+        if not isinstance(prop, ColumnProperty):
+            continue
+
+        column = prop.columns[0]
+        col_name = prop.key
+        col_type = column.type
+        
+        # [OPCIONAL] Pular colunas de auditoria
+        if col_name in IGNORED_COLUMNS:
+            continue        
+
+        # --- Detecta coluna Enum (SQLAlchemy) ---
+        if include_enum and isinstance(col_type, SAEnum):
+            # Recupera a classe Python do Enum (ex: BookStatus)
+            enum_class = col_type.enum_class
+            if enum_class is not None:
+                # Converte os membros do Enum para opções (value, label)
+                options = [
+                    (member.value, member.name.replace('_', ' ').title())
+                    for member in enum_class
+                ]
+                label = col_name.replace('_', ' ').title()
+                filters.append(
+                    FilterDef(
+                        name=col_name,
+                        label=label,
+                        type="select",
+                        options=options,
+                        placeholder=f"Selecione {label.lower()}",
+                    )
+                )
+            elif col_type.enums:
+                options = [(v, v.replace('_', ' ').title()) for v in col_type.enums]
+                label = col_name.replace('_', ' ').title()
+                filters.append(FilterDef(...))
+
+        # --- Coluna FK (estrangeira) ---
+        elif include_fk and column.foreign_keys:
+            label = col_name.replace('_', ' ').title()
+            # Por enquanto, cria um filtro de texto simples.
+            # Futuramente, poderíamos usar type="fk" para disparar um modal.
+            filters.append(
+                FilterDef(
+                    name=col_name,
+                    label=label,
+                    type="fk",  # tipo especial para ser tratado pelo renderer
+                    placeholder=f"Buscar {label.lower()}...",
+                )
+            )
+
+    return filters
 
 --- FIM DO ARQUIVO ---
 
@@ -6530,6 +6859,45 @@ function showAlert(message, type) {
 --- FIM DO ARQUIVO ---
 
 
+--- ARQUIVO: templates\_components\fk_selector_modal.html ---
+<!-- _components/fk_selector_modal.html -->
+<div class="modal fade" id="fkModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Selecionar <span id="fkModalTitle"></span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="height: 70vh;">
+        <iframe id="fkIframe" src="" style="width:100%; height:100%; border:none;"></iframe>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function openForeignKeySelector(url, fieldId, displayFieldId, title) {
+    document.getElementById('fkModalTitle').innerText = title;
+    const iframe = document.getElementById('fkIframe');
+    iframe.src = url;
+    // Aguarda mensagem do iframe com o objeto selecionado
+    window.addEventListener('message', function(event) {
+      if (event.data && event.data.type === 'fk_selected') {
+        document.getElementById(fieldId).value = event.data.id;
+        document.getElementById(displayFieldId).value = event.data.text;
+        bootstrap.Modal.getInstance(document.getElementById('fkModal')).hide();
+      }
+    });
+    new bootstrap.Modal(document.getElementById('fkModal')).show();
+  }
+</script>
+
+--- FIM DO ARQUIVO ---
+
+
 --- ARQUIVO: templates\_components\smart_list.html ---
 {% macro render(sl, row_actions=none, extra_filters=none) %}
 {#
@@ -7367,17 +7735,17 @@ function showAlert(message, type) {
 {% extends "core/base.html" %}
 
 {% block title %}
-    {{ author.title }} - Detalhe do Autores
+    {{ class_name_lower.title }} - Detalhe do Autores
 {% endblock %}
 
 {% block content %}
 <div class="pagetitle">
-  <h1>{{ author.title }}</h1>
+  <h1>{{ class_name_lower.title }}</h1>
   <nav>
     <ol class="breadcrumb">
       <li class="breadcrumb-item"><a href="{{ url_for('web.dashboard') }}">Home</a></li>
-      <li class="breadcrumb-item"><a href="{{ url_for('authors.list') }}">Autoress</a></li>
-      <li class="breadcrumb-item active">{{ author.title }}</li>
+      <li class="breadcrumb-item"><a href="{{ url_for(plural ~ '.list') }}">Autoress</a></li>
+      <li class="breadcrumb-item active">{{ class_name_lower.title }}</li>
     </ol>
   </nav>
 </div>
@@ -7405,30 +7773,27 @@ function showAlert(message, type) {
 
           <div class="mt-4">
             <div class="btn-group">
-              <a href="{{ url_for('authors.list') }}" class="btn btn-secondary">Voltar</a>
+              <a href="{{ url_for(plural ~ '.list') }}" class="btn btn-secondary">Voltar</a>
 
-              {% if author.status == 'active' %}
-                <button type="button" class="btn btn-primary" id="btnEditAuthor" data-id="{{ author.id }}">Editar</button>
-                <form method="post" action="{{ url_for('authors.trash', author_id=author.id) }}" class="d-inline" onsubmit="return confirm('Mover para lixeira?')">
+              {% if class_name_lower.status == 'active' %}
+                <button type="button" class="btn btn-primary" id="btnEditAuthor" data-id="{{ class_name_lower.id }}">Editar</button>
+                <form method="post" action="{{ url_for(plural ~ '.trash', **{class_name_lower ~ '_id': class_name_lower.id}) }}" class="d-inline" onsubmit="return confirm('Mover para lixeira?')">
                   <button type="submit" class="btn btn-outline-danger">Mover para lixeira</button>
                 </form>
-
-              {% elif author.status == 'draft' %}
-                <button type="button" class="btn btn-primary" id="btnEditAuthor" data-id="{{ author.id }}">Continuar edição</button>
-                <form method="post" action="{{ url_for('authors.discard_draft', author_id=author.id) }}" class="d-inline" onsubmit="return confirm('Descartar rascunho?')">
+              {% elif class_name_lower.status == 'draft' %}
+                <button type="button" class="btn btn-primary" id="btnEditAuthor" data-id="{{ class_name_lower.id }}">Continuar edição</button>
+                <form method="post" action="{{ url_for(plural ~ '.discard_draft', **{class_name_lower ~ '_id': class_name_lower.id}) }}" class="d-inline" onsubmit="return confirm('Descartar rascunho?')">
                   <button type="submit" class="btn btn-danger">Descartar</button>
                 </form>
-
-              {% elif author.status == 'trash' %}
-                <form method="post" action="{{ url_for('authors.restore', author_id=author.id) }}" class="d-inline">
+              {% elif class_name_lower.status == 'trash' %}
+                <form method="post" action="{{ url_for(plural ~ '.restore', **{class_name_lower ~ '_id': class_name_lower.id}) }}" class="d-inline">
                   <button type="submit" class="btn btn-success">Restaurar</button>
                 </form>
                 {% if current_user.is_admin %}
-                <form method="post" action="{{ url_for('authors.delete_permanent', author_id=author.id) }}" class="d-inline" onsubmit="return confirm('Excluir permanentemente?')">
+                <form method="post" action="{{ url_for(plural ~ '.delete_permanent', **{class_name_lower ~ '_id': class_name_lower.id}) }}" class="d-inline" onsubmit="return confirm('Excluir permanentemente?')">
                   <button type="submit" class="btn btn-danger">Excluir permanentemente</button>
                 </form>
                 {% endif %}
-
               {% endif %}
             </div>
           </div>
@@ -7438,21 +7803,19 @@ function showAlert(message, type) {
   </div>
 </section>
 
-{% include "bookstore/authors/_modals/author_form_modal.html" %}
+{% include output_subdir ~ '/' ~ plural ~ '/_modals/' ~ class_name_lower ~ '_form_modal.html' %}
 {% endblock %}
 
 {% block extra_js %}
 <script>
   (function() {
-    // O mesmo script do manage.html é utilizado para edição
     const modal = new bootstrap.Modal(document.getElementById('authorModal'));
     const editBtn = document.getElementById('btnEditAuthor');
     if (!editBtn) return;
 
-    // Função loadData (igual à do manage) – aqui simplificada, mas pode ser compartilhada
     async function loadData(id) {
       try {
-        const response = await fetch(`/api/authors/${id}`);
+        const response = await fetch(`/api/bookstore/authors/${id}`);
         const result = await response.json();
         if (result.success) {
           const data = result.data;
@@ -7462,6 +7825,15 @@ function showAlert(message, type) {
           }
           document.getElementById('authorId').value = id;
           document.getElementById('authorModalTitle').innerText = 'Editar Autores';
+          // Preencher FKs (similar ao manage)
+          {% for rel in relationship_fields %}
+            const fkField = '{{ rel.name }}';
+            const fkDisplayField = '{{ rel.name }}_name';
+            if (data[fkField] !== undefined) {
+              let displayText = data[fkDisplayField] || data[fkField];
+              window.setForeignKeyValue('authorModal', fkField, data[fkField], displayText);
+            }
+          {% endfor %}
         } else {
           alert('Erro ao carregar dados: ' + (result.error || 'Desconhecido'));
           modal.hide();
@@ -7478,6 +7850,12 @@ function showAlert(message, type) {
       if (form) form.reset();
       document.getElementById('authorId').value = '';
       document.getElementById('authorModalTitle').innerText = 'Editar Autores';
+      document.querySelectorAll('#authorModal .fk-field').forEach(container => {
+        const hidden = container.querySelector('.fk-hidden-id');
+        const search = container.querySelector('.fk-search-input');
+        if (hidden) hidden.value = '';
+        if (search) search.value = '';
+      });
     }
 
     editBtn.addEventListener('click', () => {
@@ -7496,15 +7874,15 @@ function showAlert(message, type) {
 {% extends "core/base.html" %}
 {% from "_components/smart_list.html" import render as smart_list, scripts as sl_scripts %}
 
-{% block title %}Autoress{% endblock %}
+{% block title %}authors{% endblock %}
 
 {% block content %}
 <div class="pagetitle">
-  <h1>Autoress</h1>
+  <h1>authors</h1>
   <nav>
     <ol class="breadcrumb">
       <li class="breadcrumb-item"><a href="{{ url_for('web.dashboard') }}">Home</a></li>
-      <li class="breadcrumb-item active">Autoress</li>
+      <li class="breadcrumb-item active">authorss</li>
     </ol>
   </nav>
 </div>
@@ -7519,7 +7897,7 @@ function showAlert(message, type) {
     {% for value, icon, label_tab, count in tab_map %}
     <li class="nav-item">
       <a class="nav-link {% if current_status == value %}active{% endif %}"
-         href="{{ url_for('authors.list', status=value) }}">
+         href="{{ url_for(plural ~ '.list', status=value) }}">
         <i class="bi {{ icon }} me-1"></i>{{ label_tab }}
         {% if count > 0 %}
           <span class="badge ms-1
@@ -7546,22 +7924,22 @@ function showAlert(message, type) {
 
       {% macro _row_actions(row, status=current_status) %}
         {% if status == 'active' %}
-          <a href="{{ url_for('authors.detail', item_id=row.id) }}" class="btn btn-outline-primary" title="Visualizar"><i class="bi bi-eye"></i></a>
+          <a href="{{ url_for(plural ~ '.detail', item_id=row.id) }}" class="btn btn-outline-primary" title="Visualizar"><i class="bi bi-eye"></i></a>
           <button type="button" class="btn btn-outline-secondary btn-edit" data-id="{{ row.id }}" title="Editar"><i class="bi bi-pencil"></i></button>
-          <form method="post" action="{{ url_for('authors.trash', author_id=row.id) }}" class="d-inline" onsubmit="return confirm('Mover para a lixeira?')">
+          <form method="post" action="{{ url_for(plural ~ '.trash', **{class_name_lower ~ '_id': row.id}) }}" class="d-inline" onsubmit="return confirm('Mover para a lixeira?')">
             <button class="btn btn-outline-danger" title="Lixeira"><i class="bi bi-trash3"></i></button>
           </form>
         {% elif status == 'draft' %}
           <button type="button" class="btn btn-outline-primary btn-edit" data-id="{{ row.id }}" title="Continuar editando"><i class="bi bi-pencil"></i></button>
-          <form method="post" action="{{ url_for('authors.discard_draft', author_id=row.id) }}" class="d-inline" onsubmit="return confirm('Descartar rascunho?')">
+          <form method="post" action="{{ url_for(plural ~ '.discard_draft', **{class_name_lower ~ '_id': row.id}) }}" class="d-inline" onsubmit="return confirm('Descartar rascunho?')">
             <button class="btn btn-outline-danger" title="Descartar"><i class="bi bi-x-circle"></i></button>
           </form>
         {% elif status == 'trash' %}
-          <form method="post" action="{{ url_for('authors.restore', author_id=row.id) }}" class="d-inline">
+          <form method="post" action="{{ url_for(plural ~ '.restore', **{class_name_lower ~ '_id': row.id}) }}" class="d-inline">
             <button class="btn btn-outline-success" title="Restaurar"><i class="bi bi-arrow-counterclockwise"></i></button>
           </form>
           {% if current_user.is_admin %}
-          <form method="post" action="{{ url_for('authors.delete_permanent', author_id=row.id) }}" class="d-inline" onsubmit="return confirm('Excluir PERMANENTEMENTE?')">
+          <form method="post" action="{{ url_for(plural ~ '.delete_permanent', **{class_name_lower ~ '_id': row.id}) }}" class="d-inline" onsubmit="return confirm('Excluir PERMANENTEMENTE?')">
             <button class="btn btn-danger" title="Excluir permanente"><i class="bi bi-trash3-fill"></i></button>
           </form>
           {% endif %}
@@ -7573,7 +7951,7 @@ function showAlert(message, type) {
   </div>
 </section>
 
-{% include "bookstore/authors/_modals/author_form_modal.html" %}
+{% include output_subdir ~ '/' ~ plural ~ '/_modals/' ~ class_name_lower ~ '_form_modal.html' %}
 {% endblock %}
 
 {% block extra_js %}
@@ -7590,24 +7968,39 @@ function showAlert(message, type) {
       form.reset();
       idElem.value = '';
       titleElem.innerText = 'Novo Autores';
-      const qty = document.getElementById('quantity');
-      if (qty) qty.value = 0;
-      const avail = document.getElementById('available');
-      if (avail) avail.value = 0;
+      // Limpar campos de FK também (já que reset não limpa os hidden e search)
+      document.querySelectorAll('#authorModal .fk-field').forEach(container => {
+        const hidden = container.querySelector('.fk-hidden-id');
+        const search = container.querySelector('.fk-search-input');
+        if (hidden) hidden.value = '';
+        if (search) search.value = '';
+      });
     }
 
     async function loadData(id) {
       try {
-        const response = await fetch(`/api/authors/${id}`);
+        const response = await fetch('/api/bookstore/authors/' + id);
         const result = await response.json();
         if (result.success) {
           const data = result.data;
+          // Preenche campos comuns
           for (const [key, value] of Object.entries(data)) {
             const field = document.getElementById(key);
             if (field) field.value = value ?? '';
           }
           idElem.value = id;
           titleElem.innerText = 'Editar Autores';
+
+          // Preenche campos FK (a API deve retornar também os nomes descritivos)
+          // Itera sobre os relacionamentos definidos no controller
+          {% for rel in relationship_fields %}
+            const fkField = '{{ rel.name }}';
+            const fkDisplayField = '{{ rel.name }}_name';
+            if (data[fkField] !== undefined) {
+              let displayText = data[fkDisplayField] || data[fkField];
+              window.setForeignKeyValue('authorModal', fkField, data[fkField], displayText);
+            }
+          {% endfor %}
         } else {
           alert('Erro ao carregar dados: ' + (result.error || 'Desconhecido'));
           modal.hide();
@@ -7622,35 +8015,38 @@ function showAlert(message, type) {
     async function save() {
       const id = idElem.value;
       const data = {};
-      const fields = form.querySelectorAll('[name]');
-      fields.forEach(field => {
+      // Captura campos comuns (input, select normal)
+      form.querySelectorAll('input:not(.fk-hidden-id):not(.fk-search-input), select:not(.relationship-select)').forEach(field => {
         let value = field.value;
         if (field.type === 'number') value = parseInt(value) || null;
         data[field.name] = value;
       });
-      //Inicio Validação campos obrigatórios
-      //if (!data.title || !data.author) {
-      //  alert('Campos obrigatórios não preenchidos.');
-      //  return;
-      //}
-      //Final Validação campos obrigatórios
+      // Captura campos FK (hidden)
+      form.querySelectorAll('.fk-hidden-id').forEach(hidden => {
+        if (hidden.name) data[hidden.name] = hidden.value;
+      });
+      // Captura campos Enum (select)
+      form.querySelectorAll('select').forEach(select => {
+        if (select.name) data[select.name] = select.value;
+      });
+
       const saveBtn = document.getElementById('btnSaveAuthor');
       saveBtn.disabled = true;
       saveBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Salvando...';
       try {
         let response;
         if (id) {
-          response = await fetch(`/api/authors/${id}`, {
+          response = await fetch('/api/bookstore/authors/' + id, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
           });
         } else {
-          const draftRes = await fetch(`/api/authors/draft`, { method: 'POST' });
+          const draftRes = await fetch('/api/bookstore/authors/draft', { method: 'POST' });
           const draftData = await draftRes.json();
           if (!draftData.success) throw new Error(draftData.error);
           const draftId = draftData.data.id;
-          response = await fetch(`/api/authors/${draftId}/publish`, {
+          response = await fetch('/api/bookstore/authors/' + draftId + '/publish', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
@@ -7693,968 +8089,6 @@ function showAlert(message, type) {
 --- FIM DO ARQUIVO ---
 
 
---- ARQUIVO: templates\bookstore\books\detail.html ---
-{% extends "core/base.html" %}
-
-{% block title %}
-    {{ book.title }} - Detalhe do Livros
-{% endblock %}
-
-{% block content %}
-<div class="pagetitle">
-  <h1>{{ book.title }}</h1>
-  <nav>
-    <ol class="breadcrumb">
-      <li class="breadcrumb-item"><a href="{{ url_for('web.dashboard') }}">Home</a></li>
-      <li class="breadcrumb-item"><a href="{{ url_for('books.list') }}">Livross</a></li>
-      <li class="breadcrumb-item active">{{ book.title }}</li>
-    </ol>
-  </nav>
-</div>
-
-<section class="section">
-  <div class="row">
-    <div class="col-lg-12">
-      <div class="card">
-        <div class="card-body">
-          <h5 class="card-title">Informações</h5>
-          <table class="table table-bordered">
-                          <td>
-                <th style="width:30%">Title</th>
-                <td>{{ book.title or '—' }}</td>
-              </tr>
-              <td>
-                <th style="width:30%">Author</th>
-                <td>{{ book.author or '—' }}</td>
-              </tr>
-              <td>
-                <th style="width:30%">Isbn</th>
-                <td>{{ book.isbn or '—' }}</td>
-              </tr>
-              <td>
-                <th style="width:30%">Publisher</th>
-                <td>{{ book.publisher or '—' }}</td>
-              </tr>
-              <td>
-                <th style="width:30%">Year</th>
-                <td>{{ book.year or '—' }}</td>
-              </tr>
-              <td>
-                <th style="width:30%">Edition</th>
-                <td>{{ book.edition or '—' }}</td>
-              </tr>
-              <td>
-                <th style="width:30%">Genre</th>
-                <td>{{ book.genre or '—' }}</td>
-              </tr>
-              <td>
-                <th style="width:30%">Description</th>
-                <td>{{ book.description or '—' }}</td>
-              </tr>
-              <td>
-                <th style="width:30%">Cover Url</th>
-                <td>{{ book.cover_url or '—' }}</td>
-              </tr>
-              <td>
-                <th style="width:30%">Language</th>
-                <td>{{ book.language or '—' }}</td>
-              </tr>
-              <td>
-                <th style="width:30%">Quantity</th>
-                <td>{{ book.quantity or '—' }}</td>
-              </tr>
-              <td>
-                <th style="width:30%">Available</th>
-                <td>{{ book.available or '—' }}</td>
-              </tr>
-          </table>
-
-          <div class="mt-4">
-            <div class="btn-group">
-              <a href="{{ url_for('books.list') }}" class="btn btn-secondary">Voltar</a>
-
-              {% if book.status == 'active' %}
-                <button type="button" class="btn btn-primary" id="btnEditBook" data-id="{{ book.id }}">Editar</button>
-                <form method="post" action="{{ url_for('books.trash', book_id=book.id) }}" class="d-inline" onsubmit="return confirm('Mover para lixeira?')">
-                  <button type="submit" class="btn btn-outline-danger">Mover para lixeira</button>
-                </form>
-
-              {% elif book.status == 'draft' %}
-                <button type="button" class="btn btn-primary" id="btnEditBook" data-id="{{ book.id }}">Continuar edição</button>
-                <form method="post" action="{{ url_for('books.discard_draft', book_id=book.id) }}" class="d-inline" onsubmit="return confirm('Descartar rascunho?')">
-                  <button type="submit" class="btn btn-danger">Descartar</button>
-                </form>
-
-              {% elif book.status == 'trash' %}
-                <form method="post" action="{{ url_for('books.restore', book_id=book.id) }}" class="d-inline">
-                  <button type="submit" class="btn btn-success">Restaurar</button>
-                </form>
-                {% if current_user.is_admin %}
-                <form method="post" action="{{ url_for('books.delete_permanent', book_id=book.id) }}" class="d-inline" onsubmit="return confirm('Excluir permanentemente?')">
-                  <button type="submit" class="btn btn-danger">Excluir permanentemente</button>
-                </form>
-                {% endif %}
-
-              {% endif %}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-{% include "bookstore/books/_modals/book_form_modal.html" %}
-{% endblock %}
-
-{% block extra_js %}
-<script>
-  (function() {
-    // O mesmo script do manage.html é utilizado para edição
-    const modal = new bootstrap.Modal(document.getElementById('bookModal'));
-    const editBtn = document.getElementById('btnEditBook');
-    if (!editBtn) return;
-
-    // Função loadData (igual à do manage) – aqui simplificada, mas pode ser compartilhada
-    async function loadData(id) {
-      try {
-        const response = await fetch(`/api/books/${id}`);
-        const result = await response.json();
-        if (result.success) {
-          const data = result.data;
-          for (const [key, value] of Object.entries(data)) {
-            const field = document.getElementById(key);
-            if (field) field.value = value ?? '';
-          }
-          document.getElementById('bookId').value = id;
-          document.getElementById('bookModalTitle').innerText = 'Editar Livros';
-        } else {
-          alert('Erro ao carregar dados: ' + (result.error || 'Desconhecido'));
-          modal.hide();
-        }
-      } catch (err) {
-        console.error(err);
-        alert('Erro de conexão.');
-        modal.hide();
-      }
-    }
-
-    function resetForm() {
-      const form = document.getElementById('bookForm');
-      if (form) form.reset();
-      document.getElementById('bookId').value = '';
-      document.getElementById('bookModalTitle').innerText = 'Editar Livros';
-    }
-
-    editBtn.addEventListener('click', () => {
-      resetForm();
-      loadData(editBtn.dataset.id);
-      modal.show();
-    });
-  })();
-</script>
-{% endblock %}
-
---- FIM DO ARQUIVO ---
-
-
---- ARQUIVO: templates\bookstore\books\manage.html ---
-{% extends "core/base.html" %}
-{% from "_components/smart_list.html" import render as smart_list, scripts as sl_scripts %}
-
-{% block title %}Livross{% endblock %}
-
-{% block content %}
-<div class="pagetitle">
-  <h1>Livross</h1>
-  <nav>
-    <ol class="breadcrumb">
-      <li class="breadcrumb-item"><a href="{{ url_for('web.dashboard') }}">Home</a></li>
-      <li class="breadcrumb-item active">Livross</li>
-    </ol>
-  </nav>
-</div>
-
-<section class="section">
-  <ul class="nav nav-tabs mb-3">
-    {% set tab_map = [
-      ('active', 'bi-book', 'Publicados', counts.active | default(0)),
-      ('draft',  'bi-pencil-square', 'Rascunhos', counts.draft | default(0)),
-      ('trash',  'bi-trash3', 'Lixeira', counts.trash | default(0)),
-    ] %}
-    {% for value, icon, label_tab, count in tab_map %}
-    <li class="nav-item">
-      <a class="nav-link {% if current_status == value %}active{% endif %}"
-         href="{{ url_for('books.list', status=value) }}">
-        <i class="bi {{ icon }} me-1"></i>{{ label_tab }}
-        {% if count > 0 %}
-          <span class="badge ms-1
-            {% if value == 'trash' %}bg-danger
-            {% elif value == 'draft' %}bg-warning text-dark
-            {% else %}bg-primary{% endif %}">
-            {{ count }}
-          </span>
-        {% endif %}
-      </a>
-    </li>
-    {% endfor %}
-  </ul>
-
-  <div class="card">
-    <div class="card-body pt-3">
-      {% if current_status != 'trash' %}
-      <div class="d-flex justify-content-end mb-2">
-        <button type="button" class="btn btn-primary btn-sm" id="btnNovoBook">
-          <i class="bi bi-plus-lg me-1"></i>Novo Livros
-        </button>
-      </div>
-      {% endif %}
-
-      {% macro _row_actions(row, status=current_status) %}
-        {% if status == 'active' %}
-          <a href="{{ url_for('books.detail', item_id=row.id) }}" class="btn btn-outline-primary" title="Visualizar"><i class="bi bi-eye"></i></a>
-          <button type="button" class="btn btn-outline-secondary btn-edit" data-id="{{ row.id }}" title="Editar"><i class="bi bi-pencil"></i></button>
-          <form method="post" action="{{ url_for('books.trash', book_id=row.id) }}" class="d-inline" onsubmit="return confirm('Mover para a lixeira?')">
-            <button class="btn btn-outline-danger" title="Lixeira"><i class="bi bi-trash3"></i></button>
-          </form>
-        {% elif status == 'draft' %}
-          <button type="button" class="btn btn-outline-primary btn-edit" data-id="{{ row.id }}" title="Continuar editando"><i class="bi bi-pencil"></i></button>
-          <form method="post" action="{{ url_for('books.discard_draft', book_id=row.id) }}" class="d-inline" onsubmit="return confirm('Descartar rascunho?')">
-            <button class="btn btn-outline-danger" title="Descartar"><i class="bi bi-x-circle"></i></button>
-          </form>
-        {% elif status == 'trash' %}
-          <form method="post" action="{{ url_for('books.restore', book_id=row.id) }}" class="d-inline">
-            <button class="btn btn-outline-success" title="Restaurar"><i class="bi bi-arrow-counterclockwise"></i></button>
-          </form>
-          {% if current_user.is_admin %}
-          <form method="post" action="{{ url_for('books.delete_permanent', book_id=row.id) }}" class="d-inline" onsubmit="return confirm('Excluir PERMANENTEMENTE?')">
-            <button class="btn btn-danger" title="Excluir permanente"><i class="bi bi-trash3-fill"></i></button>
-          </form>
-          {% endif %}
-        {% endif %}
-      {% endmacro %}
-
-      {{ smart_list(sl, row_actions=_row_actions) }}
-    </div>
-  </div>
-</section>
-
-{% include "bookstore/books/_modals/book_form_modal.html" %}
-{% endblock %}
-
-{% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
-{{ sl_scripts() }}
-<script>
-  (function() {
-    const modal = new bootstrap.Modal(document.getElementById('bookModal'));
-    const form = document.getElementById('bookForm');
-    const titleElem = document.getElementById('bookModalTitle');
-    const idElem = document.getElementById('bookId');
-
-    function resetForm() {
-      form.reset();
-      idElem.value = '';
-      titleElem.innerText = 'Novo Livros';
-      const qty = document.getElementById('quantity');
-      if (qty) qty.value = 0;
-      const avail = document.getElementById('available');
-      if (avail) avail.value = 0;
-    }
-
-    async function loadData(id) {
-      try {
-        const response = await fetch(`/api/books/${id}`);
-        const result = await response.json();
-        if (result.success) {
-          const data = result.data;
-          for (const [key, value] of Object.entries(data)) {
-            const field = document.getElementById(key);
-            if (field) field.value = value ?? '';
-          }
-          idElem.value = id;
-          titleElem.innerText = 'Editar Livros';
-        } else {
-          alert('Erro ao carregar dados: ' + (result.error || 'Desconhecido'));
-          modal.hide();
-        }
-      } catch (err) {
-        console.error(err);
-        alert('Erro de conexão.');
-        modal.hide();
-      }
-    }
-
-    async function save() {
-      const id = idElem.value;
-      const data = {};
-      const fields = form.querySelectorAll('[name]');
-      fields.forEach(field => {
-        let value = field.value;
-        if (field.type === 'number') value = parseInt(value) || null;
-        data[field.name] = value;
-      });
-      //Inicio Validação campos obrigatórios
-      //if (!data.title || !data.author) {
-      //  alert('Campos obrigatórios não preenchidos.');
-      //  return;
-      //}
-      //Final Validação campos obrigatórios
-      const saveBtn = document.getElementById('btnSaveBook');
-      saveBtn.disabled = true;
-      saveBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Salvando...';
-      try {
-        let response;
-        if (id) {
-          response = await fetch(`/api/books/${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-          });
-        } else {
-          const draftRes = await fetch(`/api/books/draft`, { method: 'POST' });
-          const draftData = await draftRes.json();
-          if (!draftData.success) throw new Error(draftData.error);
-          const draftId = draftData.data.id;
-          response = await fetch(`/api/books/${draftId}/publish`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-          });
-        }
-        const result = await response.json();
-        if (result.success) {
-          modal.hide();
-          window.location.reload();
-        } else {
-          alert('Erro: ' + (result.error || 'Falha ao salvar'));
-        }
-      } catch (err) {
-        console.error(err);
-        alert('Erro de conexão.');
-      } finally {
-        saveBtn.disabled = false;
-        saveBtn.innerHTML = 'Salvar';
-      }
-    }
-
-    document.getElementById('btnNovoBook')?.addEventListener('click', () => {
-      resetForm();
-      modal.show();
-    });
-    document.getElementById('btnSaveBook')?.addEventListener('click', save);
-    document.body.addEventListener('click', (e) => {
-      const btn = e.target.closest('.btn-edit');
-      if (btn && btn.dataset.id) {
-        e.preventDefault();
-        resetForm();
-        loadData(btn.dataset.id);
-        modal.show();
-      }
-    });
-  })();
-</script>
-{% endblock %}
-
---- FIM DO ARQUIVO ---
-
-
---- ARQUIVO: templates\bookstore\loans\detail.html ---
-{% extends "core/base.html" %}
-
-{% block title %}
-    {{ loan.title }} - Detalhe do Empréstimos
-{% endblock %}
-
-{% block content %}
-<div class="pagetitle">
-  <h1>{{ loan.title }}</h1>
-  <nav>
-    <ol class="breadcrumb">
-      <li class="breadcrumb-item"><a href="{{ url_for('web.dashboard') }}">Home</a></li>
-      <li class="breadcrumb-item"><a href="{{ url_for('loans.list') }}">Empréstimoss</a></li>
-      <li class="breadcrumb-item active">{{ loan.title }}</li>
-    </ol>
-  </nav>
-</div>
-
-<section class="section">
-  <div class="row">
-    <div class="col-lg-12">
-      <div class="card">
-        <div class="card-body">
-          <h5 class="card-title">Informações</h5>
-          <table class="table table-bordered">
-                          <td>
-                <th style="width:30%">User Id</th>
-                <td>{{ loan.user_id or '—' }}</td>
-              </tr>
-              <td>
-                <th style="width:30%">Book Id</th>
-                <td>{{ loan.book_id or '—' }}</td>
-              </tr>
-              <td>
-                <th style="width:30%">Loan Date</th>
-                <td>{{ loan.loan_date or '—' }}</td>
-              </tr>
-              <td>
-                <th style="width:30%">Due Date</th>
-                <td>{{ loan.due_date or '—' }}</td>
-              </tr>
-              <td>
-                <th style="width:30%">Status</th>
-                <td>{{ loan.status or '—' }}</td>
-              </tr>
-              <td>
-                <th style="width:30%">Notes</th>
-                <td>{{ loan.notes or '—' }}</td>
-              </tr>
-          </table>
-
-          <div class="mt-4">
-            <div class="btn-group">
-              <a href="{{ url_for('loans.list') }}" class="btn btn-secondary">Voltar</a>
-
-              {% if loan.status == 'active' %}
-                <button type="button" class="btn btn-primary" id="btnEditLoan" data-id="{{ loan.id }}">Editar</button>
-                <form method="post" action="{{ url_for('loans.trash', loan_id=loan.id) }}" class="d-inline" onsubmit="return confirm('Mover para lixeira?')">
-                  <button type="submit" class="btn btn-outline-danger">Mover para lixeira</button>
-                </form>
-
-              {% elif loan.status == 'draft' %}
-                <button type="button" class="btn btn-primary" id="btnEditLoan" data-id="{{ loan.id }}">Continuar edição</button>
-                <form method="post" action="{{ url_for('loans.discard_draft', loan_id=loan.id) }}" class="d-inline" onsubmit="return confirm('Descartar rascunho?')">
-                  <button type="submit" class="btn btn-danger">Descartar</button>
-                </form>
-
-              {% elif loan.status == 'trash' %}
-                <form method="post" action="{{ url_for('loans.restore', loan_id=loan.id) }}" class="d-inline">
-                  <button type="submit" class="btn btn-success">Restaurar</button>
-                </form>
-                {% if current_user.is_admin %}
-                <form method="post" action="{{ url_for('loans.delete_permanent', loan_id=loan.id) }}" class="d-inline" onsubmit="return confirm('Excluir permanentemente?')">
-                  <button type="submit" class="btn btn-danger">Excluir permanentemente</button>
-                </form>
-                {% endif %}
-
-              {% endif %}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-{% include "bookstore/loans/_modals/loan_form_modal.html" %}
-{% endblock %}
-
-{% block extra_js %}
-<script>
-  (function() {
-    // O mesmo script do manage.html é utilizado para edição
-    const modal = new bootstrap.Modal(document.getElementById('loanModal'));
-    const editBtn = document.getElementById('btnEditLoan');
-    if (!editBtn) return;
-
-    // Função loadData (igual à do manage) – aqui simplificada, mas pode ser compartilhada
-    async function loadData(id) {
-      try {
-        const response = await fetch(`/api/loans/${id}`);
-        const result = await response.json();
-        if (result.success) {
-          const data = result.data;
-          for (const [key, value] of Object.entries(data)) {
-            const field = document.getElementById(key);
-            if (field) field.value = value ?? '';
-          }
-          document.getElementById('loanId').value = id;
-          document.getElementById('loanModalTitle').innerText = 'Editar Empréstimos';
-        } else {
-          alert('Erro ao carregar dados: ' + (result.error || 'Desconhecido'));
-          modal.hide();
-        }
-      } catch (err) {
-        console.error(err);
-        alert('Erro de conexão.');
-        modal.hide();
-      }
-    }
-
-    function resetForm() {
-      const form = document.getElementById('loanForm');
-      if (form) form.reset();
-      document.getElementById('loanId').value = '';
-      document.getElementById('loanModalTitle').innerText = 'Editar Empréstimos';
-    }
-
-    editBtn.addEventListener('click', () => {
-      resetForm();
-      loadData(editBtn.dataset.id);
-      modal.show();
-    });
-  })();
-</script>
-{% endblock %}
-
---- FIM DO ARQUIVO ---
-
-
---- ARQUIVO: templates\bookstore\loans\manage.html ---
-{% extends "core/base.html" %}
-{% from "_components/smart_list.html" import render as smart_list, scripts as sl_scripts %}
-
-{% block title %}Empréstimoss{% endblock %}
-
-{% block content %}
-<div class="pagetitle">
-  <h1>Empréstimoss</h1>
-  <nav>
-    <ol class="breadcrumb">
-      <li class="breadcrumb-item"><a href="{{ url_for('web.dashboard') }}">Home</a></li>
-      <li class="breadcrumb-item active">Empréstimoss</li>
-    </ol>
-  </nav>
-</div>
-
-<section class="section">
-  <ul class="nav nav-tabs mb-3">
-    {% set tab_map = [
-      ('active', 'bi-book', 'Publicados', counts.active | default(0)),
-      ('draft',  'bi-pencil-square', 'Rascunhos', counts.draft | default(0)),
-      ('trash',  'bi-trash3', 'Lixeira', counts.trash | default(0)),
-    ] %}
-    {% for value, icon, label_tab, count in tab_map %}
-    <li class="nav-item">
-      <a class="nav-link {% if current_status == value %}active{% endif %}"
-         href="{{ url_for('loans.list', status=value) }}">
-        <i class="bi {{ icon }} me-1"></i>{{ label_tab }}
-        {% if count > 0 %}
-          <span class="badge ms-1
-            {% if value == 'trash' %}bg-danger
-            {% elif value == 'draft' %}bg-warning text-dark
-            {% else %}bg-primary{% endif %}">
-            {{ count }}
-          </span>
-        {% endif %}
-      </a>
-    </li>
-    {% endfor %}
-  </ul>
-
-  <div class="card">
-    <div class="card-body pt-3">
-      {% if current_status != 'trash' %}
-      <div class="d-flex justify-content-end mb-2">
-        <button type="button" class="btn btn-primary btn-sm" id="btnNovoLoan">
-          <i class="bi bi-plus-lg me-1"></i>Novo Empréstimos
-        </button>
-      </div>
-      {% endif %}
-
-      {% macro _row_actions(row, status=current_status) %}
-        {% if status == 'active' %}
-          <a href="{{ url_for('loans.detail', item_id=row.id) }}" class="btn btn-outline-primary" title="Visualizar"><i class="bi bi-eye"></i></a>
-          <button type="button" class="btn btn-outline-secondary btn-edit" data-id="{{ row.id }}" title="Editar"><i class="bi bi-pencil"></i></button>
-          <form method="post" action="{{ url_for('loans.trash', loan_id=row.id) }}" class="d-inline" onsubmit="return confirm('Mover para a lixeira?')">
-            <button class="btn btn-outline-danger" title="Lixeira"><i class="bi bi-trash3"></i></button>
-          </form>
-        {% elif status == 'draft' %}
-          <button type="button" class="btn btn-outline-primary btn-edit" data-id="{{ row.id }}" title="Continuar editando"><i class="bi bi-pencil"></i></button>
-          <form method="post" action="{{ url_for('loans.discard_draft', loan_id=row.id) }}" class="d-inline" onsubmit="return confirm('Descartar rascunho?')">
-            <button class="btn btn-outline-danger" title="Descartar"><i class="bi bi-x-circle"></i></button>
-          </form>
-        {% elif status == 'trash' %}
-          <form method="post" action="{{ url_for('loans.restore', loan_id=row.id) }}" class="d-inline">
-            <button class="btn btn-outline-success" title="Restaurar"><i class="bi bi-arrow-counterclockwise"></i></button>
-          </form>
-          {% if current_user.is_admin %}
-          <form method="post" action="{{ url_for('loans.delete_permanent', loan_id=row.id) }}" class="d-inline" onsubmit="return confirm('Excluir PERMANENTEMENTE?')">
-            <button class="btn btn-danger" title="Excluir permanente"><i class="bi bi-trash3-fill"></i></button>
-          </form>
-          {% endif %}
-        {% endif %}
-      {% endmacro %}
-
-      {{ smart_list(sl, row_actions=_row_actions) }}
-    </div>
-  </div>
-</section>
-
-{% include "bookstore/loans/_modals/loan_form_modal.html" %}
-{% endblock %}
-
-{% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
-{{ sl_scripts() }}
-<script>
-  (function() {
-    const modal = new bootstrap.Modal(document.getElementById('loanModal'));
-    const form = document.getElementById('loanForm');
-    const titleElem = document.getElementById('loanModalTitle');
-    const idElem = document.getElementById('loanId');
-
-    function resetForm() {
-      form.reset();
-      idElem.value = '';
-      titleElem.innerText = 'Novo Empréstimos';
-      const qty = document.getElementById('quantity');
-      if (qty) qty.value = 0;
-      const avail = document.getElementById('available');
-      if (avail) avail.value = 0;
-    }
-
-    async function loadData(id) {
-      try {
-        const response = await fetch(`/api/loans/${id}`);
-        const result = await response.json();
-        if (result.success) {
-          const data = result.data;
-          for (const [key, value] of Object.entries(data)) {
-            const field = document.getElementById(key);
-            if (field) field.value = value ?? '';
-          }
-          idElem.value = id;
-          titleElem.innerText = 'Editar Empréstimos';
-        } else {
-          alert('Erro ao carregar dados: ' + (result.error || 'Desconhecido'));
-          modal.hide();
-        }
-      } catch (err) {
-        console.error(err);
-        alert('Erro de conexão.');
-        modal.hide();
-      }
-    }
-
-    async function save() {
-      const id = idElem.value;
-      const data = {};
-      const fields = form.querySelectorAll('[name]');
-      fields.forEach(field => {
-        let value = field.value;
-        if (field.type === 'number') value = parseInt(value) || null;
-        data[field.name] = value;
-      });
-      //Inicio Validação campos obrigatórios
-      //if (!data.title || !data.author) {
-      //  alert('Campos obrigatórios não preenchidos.');
-      //  return;
-      //}
-      //Final Validação campos obrigatórios
-      const saveBtn = document.getElementById('btnSaveLoan');
-      saveBtn.disabled = true;
-      saveBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Salvando...';
-      try {
-        let response;
-        if (id) {
-          response = await fetch(`/api/loans/${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-          });
-        } else {
-          const draftRes = await fetch(`/api/loans/draft`, { method: 'POST' });
-          const draftData = await draftRes.json();
-          if (!draftData.success) throw new Error(draftData.error);
-          const draftId = draftData.data.id;
-          response = await fetch(`/api/loans/${draftId}/publish`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-          });
-        }
-        const result = await response.json();
-        if (result.success) {
-          modal.hide();
-          window.location.reload();
-        } else {
-          alert('Erro: ' + (result.error || 'Falha ao salvar'));
-        }
-      } catch (err) {
-        console.error(err);
-        alert('Erro de conexão.');
-      } finally {
-        saveBtn.disabled = false;
-        saveBtn.innerHTML = 'Salvar';
-      }
-    }
-
-    document.getElementById('btnNovoLoan')?.addEventListener('click', () => {
-      resetForm();
-      modal.show();
-    });
-    document.getElementById('btnSaveLoan')?.addEventListener('click', save);
-    document.body.addEventListener('click', (e) => {
-      const btn = e.target.closest('.btn-edit');
-      if (btn && btn.dataset.id) {
-        e.preventDefault();
-        resetForm();
-        loadData(btn.dataset.id);
-        modal.show();
-      }
-    });
-  })();
-</script>
-{% endblock %}
-
---- FIM DO ARQUIVO ---
-
-
---- ARQUIVO: templates\bookstore\loans\_modals\loan_form_modal.html ---
-{# Modal de formulário para Loan #}
-<div class="modal fade" id="loanModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-lg">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="loanModalTitle">Novo Empréstimos</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <form id="loanForm">
-          <input type="hidden" id="loanId">
-          {% for field in form_fields_list %}
-            {# Verifica se o campo é uma chave estrangeira #}
-            {% set is_fk = false %}
-            {% for rel in relationship_fields %}
-              {% if rel.name == field %}
-                {% set is_fk = true %}
-              {% endif %}
-            {% endfor %}
-
-            {% if is_fk %}
-              {# Campo FK: select com busca dinâmica #}
-              <div class="row mb-3">
-                <label for="{{ field }}" class="col-sm-3 col-form-label">{{ field|replace('_',' ')|title }}</label>
-                <div class="col-sm-9">
-                  <select class="form-select relationship-select" data-field="{{ field }}" data-foreign-table="{{ rel.foreign_table }}" name="{{ field }}">
-                    <option value="">Selecione...</option>
-                  </select>
-                  <div class="invalid-feedback">Selecione um valor válido.</div>
-                </div>
-              </div>
-            {% else %}
-              {# Campo normal (input text) #}
-              <div class="row mb-3">
-                <label for="{{ field }}" class="col-sm-3 col-form-label">{{ field|replace('_',' ')|title }}</label>
-                <div class="col-sm-9">
-                  <input type="text" class="form-control" id="{{ field }}" name="{{ field }}">
-                </div>
-              </div>
-            {% endif %}
-          {% endfor %}
-        </form>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-        <button type="button" class="btn btn-primary" id="btnSaveLoan">Salvar</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<script>
-  // Inicialização dos selects de relacionamento (busca via API)
-  (function() {
-    function initRelationshipSelects(modalId) {
-      const modal = document.getElementById(modalId);
-      if (!modal) return;
-      modal.querySelectorAll('.relationship-select').forEach(select => {
-        // Converte para um campo com autocomplete usando datalist
-        const wrapper = select.parentNode;
-        const hidden = document.createElement('input');
-        hidden.type = 'hidden';
-        hidden.name = select.name;
-        const searchInput = document.createElement('input');
-        searchInput.type = 'text';
-        searchInput.classList.add('form-control');
-        searchInput.placeholder = 'Digite para buscar...';
-        searchInput.autocomplete = 'off';
-        select.style.display = 'none';
-        wrapper.insertBefore(searchInput, select);
-        wrapper.appendChild(hidden);
-        const table = select.dataset.foreignTable;
-        let currentId = null;
-
-        async function loadOptions(search) {
-          const response = await fetch(`/api/options/${table}?search=${encodeURIComponent(search)}`);
-          const data = await response.json();
-          const datalistId = `datalist-${select.name}-${Date.now()}`;
-          let datalist = document.getElementById(datalistId);
-          if (!datalist) {
-            datalist = document.createElement('datalist');
-            datalist.id = datalistId;
-            searchInput.setAttribute('list', datalistId);
-            wrapper.appendChild(datalist);
-          }
-          datalist.innerHTML = '';
-          data.results.forEach(opt => {
-            const option = document.createElement('option');
-            option.value = opt.text;
-            option.dataset.id = opt.id;
-            datalist.appendChild(option);
-          });
-        }
-
-        searchInput.addEventListener('input', (e) => {
-          loadOptions(e.target.value);
-        });
-        searchInput.addEventListener('change', () => {
-          const list = document.getElementById(searchInput.getAttribute('list'));
-          if (list) {
-            const selectedOption = Array.from(list.options).find(opt => opt.value === searchInput.value);
-            if (selectedOption) {
-              hidden.value = selectedOption.dataset.id;
-              currentId = selectedOption.dataset.id;
-            } else {
-              hidden.value = '';
-              currentId = null;
-            }
-          }
-        });
-      });
-    }
-
-    // Observa a abertura do modal para inicializar os selects
-    const modalElement = document.getElementById('loanModal');
-    if (modalElement) {
-      modalElement.addEventListener('shown.bs.modal', function() {
-        initRelationshipSelects('loanModal');
-      });
-    }
-  })();
-</script>
-
---- FIM DO ARQUIVO ---
-
-
---- ARQUIVO: templates\bookstore\books\_modals\book_form_modal.html ---
-{# Modal de formulário para Book #}
-<div class="modal fade" id="bookModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-lg">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="bookModalTitle">Novo Livros</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <form id="bookForm">
-          <input type="hidden" id="bookId">
-          {% for field in form_fields_list %}
-            {# Verifica se o campo é uma chave estrangeira #}
-            {% set is_fk = false %}
-            {% for rel in relationship_fields %}
-              {% if rel.name == field %}
-                {% set is_fk = true %}
-              {% endif %}
-            {% endfor %}
-
-            {% if is_fk %}
-              {# Campo FK: select com busca dinâmica #}
-              <div class="row mb-3">
-                <label for="{{ field }}" class="col-sm-3 col-form-label">{{ field|replace('_',' ')|title }}</label>
-                <div class="col-sm-9">
-                  <select class="form-select relationship-select" data-field="{{ field }}" data-foreign-table="{{ rel.foreign_table }}" name="{{ field }}">
-                    <option value="">Selecione...</option>
-                  </select>
-                  <div class="invalid-feedback">Selecione um valor válido.</div>
-                </div>
-              </div>
-            {% else %}
-              {# Campo normal (input text) #}
-              <div class="row mb-3">
-                <label for="{{ field }}" class="col-sm-3 col-form-label">{{ field|replace('_',' ')|title }}</label>
-                <div class="col-sm-9">
-                  <input type="text" class="form-control" id="{{ field }}" name="{{ field }}">
-                </div>
-              </div>
-            {% endif %}
-          {% endfor %}
-        </form>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-        <button type="button" class="btn btn-primary" id="btnSaveBook">Salvar</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<script>
-  // Inicialização dos selects de relacionamento (busca via API)
-  (function() {
-    function initRelationshipSelects(modalId) {
-      const modal = document.getElementById(modalId);
-      if (!modal) return;
-      modal.querySelectorAll('.relationship-select').forEach(select => {
-        // Converte para um campo com autocomplete usando datalist
-        const wrapper = select.parentNode;
-        const hidden = document.createElement('input');
-        hidden.type = 'hidden';
-        hidden.name = select.name;
-        const searchInput = document.createElement('input');
-        searchInput.type = 'text';
-        searchInput.classList.add('form-control');
-        searchInput.placeholder = 'Digite para buscar...';
-        searchInput.autocomplete = 'off';
-        select.style.display = 'none';
-        wrapper.insertBefore(searchInput, select);
-        wrapper.appendChild(hidden);
-        const table = select.dataset.foreignTable;
-        let currentId = null;
-
-        async function loadOptions(search) {
-          const response = await fetch(`/api/options/${table}?search=${encodeURIComponent(search)}`);
-          const data = await response.json();
-          const datalistId = `datalist-${select.name}-${Date.now()}`;
-          let datalist = document.getElementById(datalistId);
-          if (!datalist) {
-            datalist = document.createElement('datalist');
-            datalist.id = datalistId;
-            searchInput.setAttribute('list', datalistId);
-            wrapper.appendChild(datalist);
-          }
-          datalist.innerHTML = '';
-          data.results.forEach(opt => {
-            const option = document.createElement('option');
-            option.value = opt.text;
-            option.dataset.id = opt.id;
-            datalist.appendChild(option);
-          });
-        }
-
-        searchInput.addEventListener('input', (e) => {
-          loadOptions(e.target.value);
-        });
-        searchInput.addEventListener('change', () => {
-          const list = document.getElementById(searchInput.getAttribute('list'));
-          if (list) {
-            const selectedOption = Array.from(list.options).find(opt => opt.value === searchInput.value);
-            if (selectedOption) {
-              hidden.value = selectedOption.dataset.id;
-              currentId = selectedOption.dataset.id;
-            } else {
-              hidden.value = '';
-              currentId = null;
-            }
-          }
-        });
-      });
-    }
-
-    // Observa a abertura do modal para inicializar os selects
-    const modalElement = document.getElementById('bookModal');
-    if (modalElement) {
-      modalElement.addEventListener('shown.bs.modal', function() {
-        initRelationshipSelects('bookModal');
-      });
-    }
-  })();
-</script>
-
---- FIM DO ARQUIVO ---
-
-
 --- ARQUIVO: templates\bookstore\authors\_modals\author_form_modal.html ---
 {# Modal de formulário para Author #}
 <div class="modal fade" id="authorModal" tabindex="-1" aria-hidden="true">
@@ -8668,23 +8102,50 @@ function showAlert(message, type) {
         <form id="authorForm">
           <input type="hidden" id="authorId">
           {% for field in form_fields_list %}
-            {# Verifica se o campo é uma chave estrangeira #}
+            {# Verifica se o campo é FK #}
             {% set is_fk = false %}
             {% for rel in relationship_fields %}
               {% if rel.name == field %}
                 {% set is_fk = true %}
+                {% set foreign_table = rel.foreign_table %}
+              {% endif %}
+            {% endfor %}
+
+            {# Verifica se o campo é Enum (precisa ser passado no contexto como enum_fields) #}
+            {% set is_enum = false %}
+            {% for enum_def in enum_fields|default([]) %}
+              {% if enum_def.name == field %}
+                {% set is_enum = true %}
+                {% set enum_options = enum_def.options %}
               {% endif %}
             {% endfor %}
 
             {% if is_fk %}
-              {# Campo FK: select com busca dinâmica #}
+              {# Campo FK com busca via datalist #}
+              <div class="row mb-3 fk-field" data-field="{{ field }}" data-foreign-table="{{ foreign_table }}">
+                <label class="col-sm-3 col-form-label">{{ field|replace('_',' ')|title }}</label>
+                <div class="col-sm-9">
+                  <input type="hidden" name="{{ field }}" class="fk-hidden-id">
+                  <div class="input-group">
+                    <input type="text" class="form-control fk-search-input" placeholder="Digite para buscar..." autocomplete="off">
+                    <button class="btn btn-outline-secondary fk-clear-btn" type="button" title="Limpar">
+                      <i class="bi bi-x"></i>
+                    </button>
+                  </div>
+                  <div class="invalid-feedback">Selecione um valor válido.</div>
+                </div>
+              </div>
+            {% elif is_enum %}
+              {# Campo Enum: select com opções #}
               <div class="row mb-3">
                 <label for="{{ field }}" class="col-sm-3 col-form-label">{{ field|replace('_',' ')|title }}</label>
                 <div class="col-sm-9">
-                  <select class="form-select relationship-select" data-field="{{ field }}" data-foreign-table="{{ rel.foreign_table }}" name="{{ field }}">
+                  <select class="form-select" id="{{ field }}" name="{{ field }}">
                     <option value="">Selecione...</option>
+                    {% for value, label in enum_options %}
+                      <option value="{{ value }}">Autores</option>
+                    {% endfor %}
                   </select>
-                  <div class="invalid-feedback">Selecione um valor válido.</div>
                 </div>
               </div>
             {% else %}
@@ -8708,39 +8169,57 @@ function showAlert(message, type) {
 </div>
 
 <script>
-  // Inicialização dos selects de relacionamento (busca via API)
   (function() {
-    function initRelationshipSelects(modalId) {
-      const modal = document.getElementById(modalId);
-      if (!modal) return;
-      modal.querySelectorAll('.relationship-select').forEach(select => {
-        // Converte para um campo com autocomplete usando datalist
-        const wrapper = select.parentNode;
-        const hidden = document.createElement('input');
-        hidden.type = 'hidden';
-        hidden.name = select.name;
-        const searchInput = document.createElement('input');
-        searchInput.type = 'text';
-        searchInput.classList.add('form-control');
-        searchInput.placeholder = 'Digite para buscar...';
-        searchInput.autocomplete = 'off';
-        select.style.display = 'none';
-        wrapper.insertBefore(searchInput, select);
-        wrapper.appendChild(hidden);
-        const table = select.dataset.foreignTable;
-        let currentId = null;
+    // Armazena controllers de abort para cada campo FK
+    const abortControllers = new Map();
 
-        async function loadOptions(search) {
-          const response = await fetch(`/api/options/${table}?search=${encodeURIComponent(search)}`);
+    function getOrCreateDatalist(fieldName) {
+      let datalist = document.getElementById(`datalist-${fieldName}`);
+      if (!datalist) {
+        datalist = document.createElement('datalist');
+        datalist.id = `datalist-${fieldName}`;
+        document.body.appendChild(datalist);
+      }
+      return datalist;
+    }
+
+    function setupForeignKeyField(container) {
+      const fieldName = container.dataset.field;
+      const foreignTable = container.dataset.foreignTable;
+      const hiddenInput = container.querySelector('.fk-hidden-id');
+      const searchInput = container.querySelector('.fk-search-input');
+      const clearBtn = container.querySelector('.fk-clear-btn');
+
+      const datalist = getOrCreateDatalist(fieldName);
+      searchInput.setAttribute('list', datalist.id);
+
+      clearBtn.addEventListener('click', () => {
+        searchInput.value = '';
+        hiddenInput.value = '';
+        searchInput.focus();
+      });
+
+      let debounceTimer;
+      searchInput.addEventListener('input', (e) => {
+        clearTimeout(debounceTimer);
+        const query = e.target.value.trim();
+        if (query.length < 2) {
+          datalist.innerHTML = '';
+          return;
+        }
+        debounceTimer = setTimeout(() => loadOptions(query), 300);
+      });
+
+      async function loadOptions(search) {
+        if (abortControllers.has(fieldName)) {
+          abortControllers.get(fieldName).abort();
+        }
+        const controller = new AbortController();
+        abortControllers.set(fieldName, controller);
+        try {
+          const url = `/api/options/${foreignTable}?search=${encodeURIComponent(search)}`;
+          const response = await fetch(url, { signal: controller.signal });
           const data = await response.json();
-          const datalistId = `datalist-${select.name}-${Date.now()}`;
-          let datalist = document.getElementById(datalistId);
-          if (!datalist) {
-            datalist = document.createElement('datalist');
-            datalist.id = datalistId;
-            searchInput.setAttribute('list', datalistId);
-            wrapper.appendChild(datalist);
-          }
           datalist.innerHTML = '';
           data.results.forEach(opt => {
             const option = document.createElement('option');
@@ -8748,32 +8227,43 @@ function showAlert(message, type) {
             option.dataset.id = opt.id;
             datalist.appendChild(option);
           });
+        } catch (err) {
+          if (err.name === 'AbortError') return;
+          console.error('Erro ao buscar opções:', err);
+        } finally {
+          abortControllers.delete(fieldName);
         }
+      }
 
-        searchInput.addEventListener('input', (e) => {
-          loadOptions(e.target.value);
-        });
-        searchInput.addEventListener('change', () => {
-          const list = document.getElementById(searchInput.getAttribute('list'));
-          if (list) {
-            const selectedOption = Array.from(list.options).find(opt => opt.value === searchInput.value);
-            if (selectedOption) {
-              hidden.value = selectedOption.dataset.id;
-              currentId = selectedOption.dataset.id;
-            } else {
-              hidden.value = '';
-              currentId = null;
-            }
-          }
-        });
+      searchInput.addEventListener('change', () => {
+        const selectedOption = Array.from(datalist.options).find(opt => opt.value === searchInput.value);
+        if (selectedOption) {
+          hiddenInput.value = selectedOption.dataset.id;
+        } else {
+          hiddenInput.value = '';
+        }
       });
     }
 
-    // Observa a abertura do modal para inicializar os selects
+    // Função pública para pré-carregar valor FK (chamada pelo manage.html)
+    window.setForeignKeyValue = function(modalId, fieldName, id, text) {
+      const modal = document.getElementById(modalId);
+      if (!modal) return;
+      const container = modal.querySelector(`.fk-field[data-field="${fieldName}"]`);
+      if (!container) return;
+      const hidden = container.querySelector('.fk-hidden-id');
+      const search = container.querySelector('.fk-search-input');
+      if (hidden && search) {
+        hidden.value = id;
+        search.value = text || '';
+      }
+    };
+
+    // Inicializa todos os FK quando o modal for aberto
     const modalElement = document.getElementById('authorModal');
     if (modalElement) {
       modalElement.addEventListener('shown.bs.modal', function() {
-        initRelationshipSelects('authorModal');
+        modalElement.querySelectorAll('.fk-field').forEach(setupForeignKeyField);
       });
     }
   })();
@@ -8827,12 +8317,28 @@ class AuthorService:
         sort: str = "id",
         direction: str = "asc",
     ) -> AuthorListResult:
+        
+        
         query = Author.query
         if status != "all":
             query = query.filter(Author.status == status)
+        
+        
         if search:
             pattern = f"%{search.strip()}%"
-            query = query.filter(Author.name.ilike(pattern))
+            from sqlalchemy import or_
+            search_filters = []
+            search_filters.append(Author.name.ilike(pattern))
+            if search_filters:
+                query = query.filter(or_(*search_filters))
+         
+        
+        #if search:
+        #    pattern = f"%{search.strip()}%"
+        #    #query = query.filter(Author.name.ilike(pattern))
+        #    query = query.filter(Author.name.ilike(pattern))
+        #    
+            
         sort_col = getattr(Author, sort, Author.id)
         query = query.order_by(sort_col.desc() if direction == "desc" else sort_col.asc())
         pagination = query.paginate(page=page, per_page=per_page, error_out=False)
@@ -8957,380 +8463,6 @@ class AuthorService:
     # ── Helpers ───────────────────────────────────────────────────────────────
 
     def _apply_fields(self, obj: Author, data: dict, strict: bool = True) -> None:
-        """Aplica campos do dict ao objeto ORM. Sobrescreva para validação customizada."""
-        for key, value in data.items():
-            if key in ("id", "status", "created_at", "updated_at", "trashed_at"):
-                continue
-            if hasattr(obj, key):
-                setattr(obj, key, value)
-        obj.updated_at = datetime.now(timezone.utc)
-
-
---- FIM DO ARQUIVO ---
-
-
---- ARQUIVO: services\bookstore\book_service.py ---
-from __future__ import annotations
-
-from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Any
-
-from sqlalchemy import func
-
-from db.database import db
-from model.bookstore.book import Book, BookStatus
-
-
-@dataclass
-class BookListResult:
-    items: list[Book]
-    total: int
-    page: int
-    per_page: int
-    pages: int
-
-
-@dataclass
-class ServiceResult:
-    success: bool
-    data: Any = None
-    error: str | None = None
-    code: int = 200
-
-
-class BookService:
-    """Camada de negócio para Livros."""
-
-    # ── Listagem ──────────────────────────────────────────────────────────────
-
-    def list(
-        self,
-        *,
-        page: int = 1,
-        per_page: int = 20,
-        status: str = BookStatus.ACTIVE,
-        search: str | None = None,
-        sort: str = "id",
-        direction: str = "asc",
-    ) -> BookListResult:
-        query = Book.query
-        if status != "all":
-            query = query.filter(Book.status == status)
-        if search:
-            pattern = f"%{search.strip()}%"
-            query = query.filter(Book.name.ilike(pattern))
-        sort_col = getattr(Book, sort, Book.id)
-        query = query.order_by(sort_col.desc() if direction == "desc" else sort_col.asc())
-        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
-        return BookListResult(
-            items=pagination.items,
-            total=pagination.total,
-            page=page,
-            per_page=per_page,
-            pages=pagination.pages,
-        )
-
-    def get_by_id(self, id: int) -> Book | None:
-        return db.session.get(Book, id)
-
-    def count_by_status(self) -> dict[str, int]:
-        rows = (
-            db.session.query(Book.status, func.count(Book.id))
-            .group_by(Book.status)
-            .all()
-        )
-        result = {s.value: 0 for s in BookStatus}
-        for status, count in rows:
-            result[status] = count
-        return result
-
-    # ── Draft ─────────────────────────────────────────────────────────────────
-
-    def create_draft(self) -> ServiceResult:
-        obj = Book(status=BookStatus.DRAFT)
-        db.session.add(obj)
-        db.session.commit()
-        return ServiceResult(success=True, data=obj, code=201)
-
-    def autosave_draft(self, id: int, data: dict) -> ServiceResult:
-        obj = self.get_by_id(id)
-        if not obj:
-            return ServiceResult(success=False, error="Não encontrado.", code=404)
-        if obj.status != BookStatus.DRAFT:
-            return ServiceResult(success=False, error="Auto-save só é permitido em rascunhos.", code=400)
-        self._apply_fields(obj, data, strict=False)
-        db.session.commit()
-        return ServiceResult(success=True, data=obj)
-
-    def publish_draft(self, id: int, data: dict | None = None) -> ServiceResult:
-        obj = self.get_by_id(id)
-        if not obj or obj.status != BookStatus.DRAFT:
-            return ServiceResult(success=False, error="Rascunho não encontrado.", code=404)
-        if data:
-            self._apply_fields(obj, data)
-        obj.status = BookStatus.ACTIVE
-        obj.updated_at = datetime.now(timezone.utc)
-        db.session.commit()
-        return ServiceResult(success=True, data=obj)
-
-    # ── CRUD ──────────────────────────────────────────────────────────────────
-
-    def create(self, data: dict) -> ServiceResult:
-        obj = Book(status=BookStatus.ACTIVE)
-        self._apply_fields(obj, data)
-        db.session.add(obj)
-        db.session.commit()
-        return ServiceResult(success=True, data=obj, code=201)
-
-    def update(self, id: int, data: dict) -> ServiceResult:
-        obj = self.get_by_id(id)
-        if not obj:
-            return ServiceResult(success=False, error="Registro não encontrado.", code=404)
-        if obj.status == BookStatus.TRASH:
-            return ServiceResult(success=False, error="Não é possível editar um registro na lixeira.", code=400)
-        self._apply_fields(obj, data)
-        db.session.commit()
-        return ServiceResult(success=True, data=obj)
-
-    def trash(self, id: int) -> ServiceResult:
-        obj = self.get_by_id(id)
-        if not obj:
-            return ServiceResult(success=False, error="Não encontrado.", code=404)
-        if obj.status == BookStatus.TRASH:
-            return ServiceResult(success=False, error="Já está na lixeira.", code=400)
-        obj.status = BookStatus.TRASH
-        obj.trashed_at = datetime.now(timezone.utc)
-        obj.updated_at = datetime.now(timezone.utc)
-        db.session.commit()
-        return ServiceResult(success=True, data=obj)
-
-    def restore(self, id: int) -> ServiceResult:
-        obj = self.get_by_id(id)
-        if not obj:
-            return ServiceResult(success=False, error="Não encontrado.", code=404)
-        if obj.status != BookStatus.TRASH:
-            return ServiceResult(success=False, error="Não está na lixeira.", code=400)
-        obj.status = BookStatus.ACTIVE
-        obj.trashed_at = None
-        obj.updated_at = datetime.now(timezone.utc)
-        db.session.commit()
-        return ServiceResult(success=True, data=obj)
-
-    def delete_permanent(self, id: int) -> ServiceResult:
-        obj = self.get_by_id(id)
-        if not obj:
-            return ServiceResult(success=False, error="Não encontrado.", code=404)
-        if obj.status != BookStatus.TRASH:
-            return ServiceResult(
-                success=False,
-                error="Apenas registros na lixeira podem ser excluídos permanentemente.",
-                code=400,
-            )
-        db.session.delete(obj)
-        db.session.commit()
-        return ServiceResult(success=True, data={"id": id})
-
-    def discard_draft(self, id: int) -> ServiceResult:
-        obj = self.get_by_id(id)
-        if not obj:
-            return ServiceResult(success=False, error="Rascunho não encontrado.", code=404)
-        if obj.status != BookStatus.DRAFT:
-            return ServiceResult(success=False, error="Apenas rascunhos podem ser descartados.", code=400)
-        db.session.delete(obj)
-        db.session.commit()
-        return ServiceResult(success=True, data={"id": id})
-
-    # ── Helpers ───────────────────────────────────────────────────────────────
-
-    def _apply_fields(self, obj: Book, data: dict, strict: bool = True) -> None:
-        """Aplica campos do dict ao objeto ORM. Sobrescreva para validação customizada."""
-        for key, value in data.items():
-            if key in ("id", "status", "created_at", "updated_at", "trashed_at"):
-                continue
-            if hasattr(obj, key):
-                setattr(obj, key, value)
-        obj.updated_at = datetime.now(timezone.utc)
-
-
---- FIM DO ARQUIVO ---
-
-
---- ARQUIVO: services\bookstore\loan_service.py ---
-from __future__ import annotations
-
-from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Any
-
-from sqlalchemy import func
-
-from db.database import db
-from model.bookstore.loan import Loan, LoanStatus
-
-
-@dataclass
-class LoanListResult:
-    items: list[Loan]
-    total: int
-    page: int
-    per_page: int
-    pages: int
-
-
-@dataclass
-class ServiceResult:
-    success: bool
-    data: Any = None
-    error: str | None = None
-    code: int = 200
-
-
-class LoanService:
-    """Camada de negócio para Empréstimos."""
-
-    # ── Listagem ──────────────────────────────────────────────────────────────
-
-    def list(
-        self,
-        *,
-        page: int = 1,
-        per_page: int = 20,
-        status: str = LoanStatus.ACTIVE,
-        search: str | None = None,
-        sort: str = "id",
-        direction: str = "asc",
-    ) -> LoanListResult:
-        query = Loan.query
-        if status != "all":
-            query = query.filter(Loan.status == status)
-        if search:
-            pattern = f"%{search.strip()}%"
-            query = query.filter(Loan.name.ilike(pattern))
-        sort_col = getattr(Loan, sort, Loan.id)
-        query = query.order_by(sort_col.desc() if direction == "desc" else sort_col.asc())
-        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
-        return LoanListResult(
-            items=pagination.items,
-            total=pagination.total,
-            page=page,
-            per_page=per_page,
-            pages=pagination.pages,
-        )
-
-    def get_by_id(self, id: int) -> Loan | None:
-        return db.session.get(Loan, id)
-
-    def count_by_status(self) -> dict[str, int]:
-        rows = (
-            db.session.query(Loan.status, func.count(Loan.id))
-            .group_by(Loan.status)
-            .all()
-        )
-        result = {s.value: 0 for s in LoanStatus}
-        for status, count in rows:
-            result[status] = count
-        return result
-
-    # ── Draft ─────────────────────────────────────────────────────────────────
-
-    def create_draft(self) -> ServiceResult:
-        obj = Loan(status=LoanStatus.DRAFT)
-        db.session.add(obj)
-        db.session.commit()
-        return ServiceResult(success=True, data=obj, code=201)
-
-    def autosave_draft(self, id: int, data: dict) -> ServiceResult:
-        obj = self.get_by_id(id)
-        if not obj:
-            return ServiceResult(success=False, error="Não encontrado.", code=404)
-        if obj.status != LoanStatus.DRAFT:
-            return ServiceResult(success=False, error="Auto-save só é permitido em rascunhos.", code=400)
-        self._apply_fields(obj, data, strict=False)
-        db.session.commit()
-        return ServiceResult(success=True, data=obj)
-
-    def publish_draft(self, id: int, data: dict | None = None) -> ServiceResult:
-        obj = self.get_by_id(id)
-        if not obj or obj.status != LoanStatus.DRAFT:
-            return ServiceResult(success=False, error="Rascunho não encontrado.", code=404)
-        if data:
-            self._apply_fields(obj, data)
-        obj.status = LoanStatus.ACTIVE
-        obj.updated_at = datetime.now(timezone.utc)
-        db.session.commit()
-        return ServiceResult(success=True, data=obj)
-
-    # ── CRUD ──────────────────────────────────────────────────────────────────
-
-    def create(self, data: dict) -> ServiceResult:
-        obj = Loan(status=LoanStatus.ACTIVE)
-        self._apply_fields(obj, data)
-        db.session.add(obj)
-        db.session.commit()
-        return ServiceResult(success=True, data=obj, code=201)
-
-    def update(self, id: int, data: dict) -> ServiceResult:
-        obj = self.get_by_id(id)
-        if not obj:
-            return ServiceResult(success=False, error="Registro não encontrado.", code=404)
-        if obj.status == LoanStatus.TRASH:
-            return ServiceResult(success=False, error="Não é possível editar um registro na lixeira.", code=400)
-        self._apply_fields(obj, data)
-        db.session.commit()
-        return ServiceResult(success=True, data=obj)
-
-    def trash(self, id: int) -> ServiceResult:
-        obj = self.get_by_id(id)
-        if not obj:
-            return ServiceResult(success=False, error="Não encontrado.", code=404)
-        if obj.status == LoanStatus.TRASH:
-            return ServiceResult(success=False, error="Já está na lixeira.", code=400)
-        obj.status = LoanStatus.TRASH
-        obj.trashed_at = datetime.now(timezone.utc)
-        obj.updated_at = datetime.now(timezone.utc)
-        db.session.commit()
-        return ServiceResult(success=True, data=obj)
-
-    def restore(self, id: int) -> ServiceResult:
-        obj = self.get_by_id(id)
-        if not obj:
-            return ServiceResult(success=False, error="Não encontrado.", code=404)
-        if obj.status != LoanStatus.TRASH:
-            return ServiceResult(success=False, error="Não está na lixeira.", code=400)
-        obj.status = LoanStatus.ACTIVE
-        obj.trashed_at = None
-        obj.updated_at = datetime.now(timezone.utc)
-        db.session.commit()
-        return ServiceResult(success=True, data=obj)
-
-    def delete_permanent(self, id: int) -> ServiceResult:
-        obj = self.get_by_id(id)
-        if not obj:
-            return ServiceResult(success=False, error="Não encontrado.", code=404)
-        if obj.status != LoanStatus.TRASH:
-            return ServiceResult(
-                success=False,
-                error="Apenas registros na lixeira podem ser excluídos permanentemente.",
-                code=400,
-            )
-        db.session.delete(obj)
-        db.session.commit()
-        return ServiceResult(success=True, data={"id": id})
-
-    def discard_draft(self, id: int) -> ServiceResult:
-        obj = self.get_by_id(id)
-        if not obj:
-            return ServiceResult(success=False, error="Rascunho não encontrado.", code=404)
-        if obj.status != LoanStatus.DRAFT:
-            return ServiceResult(success=False, error="Apenas rascunhos podem ser descartados.", code=400)
-        db.session.delete(obj)
-        db.session.commit()
-        return ServiceResult(success=True, data={"id": id})
-
-    # ── Helpers ───────────────────────────────────────────────────────────────
-
-    def _apply_fields(self, obj: Loan, data: dict, strict: bool = True) -> None:
         """Aplica campos do dict ao objeto ORM. Sobrescreva para validação customizada."""
         for key, value in data.items():
             if key in ("id", "status", "created_at", "updated_at", "trashed_at"):
@@ -9769,7 +8901,7 @@ from flask import current_app
 from jinja2 import Environment, FileSystemLoader
 from db.database import db
 from model.core.builder.model_definition import ModelDefinition
-from utils.generate_model import generate
+from utils.generate_from_model import generate
 
 class ModelGenerator:
     @classmethod
@@ -9868,8 +9000,11 @@ class QueryExecutor:
 from __future__ import annotations
 from enum import Enum as PyEnum
 
-from annotations import label, plural, listview, Column, Filter, form, Group, required, max_length
+from annotations import * # label, plural, listview, Column, Filter, form, Group, required, max_length, display_field
 from db.database import db
+
+from sqlalchemy import ForeignKey, DateTime, Integer, String, Text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 
 class AuthorStatus(str, PyEnum):
@@ -9907,6 +9042,9 @@ class Author(db.Model):
     birth_year = db.Column(db.Integer)
     bio = db.Column(db.Text)
     status = db.Column(db.String(20), default=AuthorStatus.DRAFT, nullable=False)
+    
+    # Relacionamento com livros (opcional, pode ser usado para navegação)
+    books: Mapped[list["Book"]] = relationship(back_populates="author")
 
     def publish(self) -> None:
         """Muda o status para ACTIVE."""
@@ -9960,7 +9098,7 @@ from sqlalchemy import DateTime, Enum, Index, Integer, String, Text, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from db.database import db
-from annotations import label, plural, listview, Column, Filter, form, Group, required
+from annotations import * # label, plural, listview, Column, Filter, form, Group, required, max_length, display_field
 
 
 class BookStatus(str, PyEnum):
@@ -9988,20 +9126,21 @@ class BookStatus(str, PyEnum):
     ]
 )
 @form(
-    fields=["title", "author", "isbn", "publisher", "year", "edition", "genre", "description", "cover_url", "language", "quantity", "available"],
+    fields=["title", "author_id", "isbn", "publisher", "year", "edition", "genre", "description", "cover_url", "language", "quantity", "available"],
     groups=[
-        Group("basic", "Informações Básicas", ["title", "author", "isbn", "publisher", "year", "edition"]),
+        Group("basic", "Informações Básicas", ["title", "author_id", "isbn", "publisher", "year", "edition"]),
         Group("details", "Detalhes", ["genre", "description", "cover_url", "language"], collapsible=True),
         Group("stock", "Estoque", ["quantity", "available"], collapsible=True),
     ]
 )
+@display_field("title")
 @required("title", "O título é obrigatório")
-@required("author", "O autor é obrigatório")
+@required("author_id", "O autor é obrigatório")
 class Book(db.Model):
     __tablename__ = "book"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     title: Mapped[str] = mapped_column(String(255), nullable=False, default="")
-    author: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    author_id: Mapped[int] = mapped_column(ForeignKey("authors.id"), nullable=False)
     isbn: Mapped[str | None] = mapped_column(String(20), nullable=True, unique=True)
     publisher: Mapped[str | None] = mapped_column(String(255), nullable=True)
     year: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -10017,6 +9156,10 @@ class Book(db.Model):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
     trashed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+
+    # Relacionamento
+    author: Mapped["Author"] = relationship(back_populates="books")
+     
     __table_args__ = (Index("ix_book_status_title", "status", "title"),)
 
     # Relacionamento com empréstimos (opcional, pode ser usado para navegação)
@@ -10056,7 +9199,7 @@ class Book(db.Model):
         return {
             "id": self.id,
             "title": self.title,
-            "author": self.author,
+            "author_id": self.author_id,
             "isbn": self.isbn,
             "publisher": self.publisher,
             "year": self.year,
@@ -10090,9 +9233,9 @@ from sqlalchemy import ForeignKey, DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from db.database import db
-from annotations import label, plural, listview, Column, Filter, form, Group, required
-from model.core.user import User
-from model.bookstore.book import Book
+from annotations import * # label, plural, listview, Column, Filter, form, Group, required, max_length, display_field
+#from model.core.user import User
+#from model.bookstore.book import Book
 
 class LoanStatus(str, PyEnum):
     ACTIVE = "active"
@@ -10363,10 +9506,10 @@ from flask_login import UserMixin
 from sqlalchemy import Boolean, Column, DateTime, Integer, String, Text
 from sqlalchemy.sql import func
 from werkzeug.security import check_password_hash, generate_password_hash
-
+from annotations import display_field
 from db.database import db
 
-
+@display_field("username")
 class User(UserMixin, db.Model):
     """Modelo de usuário para autenticação"""
 
@@ -10400,6 +9543,8 @@ class User(UserMixin, db.Model):
     notificacao_ofertas = Column(Boolean, default=False)
     # Preferências de tema
     modo_escuro = Column(Boolean, default=False)
+    # dentro da classe User
+    roles = db.relationship("Role", secondary="user_roles", back_populates="users")    
 
     # No seu models.py
     @property
@@ -10427,6 +9572,14 @@ class User(UserMixin, db.Model):
 
     def verify_password(self, password: str) -> bool:
         return self.check_password(password)
+    
+    def has_permission(self, permission_name):
+        for role in self.roles:
+            for perm in role.permissions:
+                if perm.name == permission_name:
+                    return True
+        return False
+    
 
     def to_dict(self):
         return {
@@ -10482,19 +9635,8 @@ class RegistrationRequest(db.Model):
     reviewed_by = Column(Integer, nullable=True)  # ID do admin que revisou
     notes = Column(Text, nullable=True)  # Notas do administrador
 
-    # dentro da classe User
-    roles = db.relationship("Role", secondary="user_roles", back_populates="users")
-
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-    
-    # dentro da classe User
-    def has_permission(self, permission_name):
-        for role in self.roles:
-            for perm in role.permissions:
-                if perm.name == permission_name:
-                    return True
-        return False
 
 
 --- FIM DO ARQUIVO ---
@@ -10587,9 +9729,6 @@ class UserLayoutPref(db.Model):
 
 
 --- ARQUIVO: model\core\user_roles.py ---
-
-# model/core/user_roles.py
-
 from db.database import db
 
 user_roles = db.Table(
@@ -10839,10 +9978,12 @@ from __future__ import annotations
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
+
+from annotations import get_model_metadata                   
+from utils.generate_from_model import _get_relationship_fields
 from model.bookstore.author import Author, AuthorStatus
 from model.core.user_layout_pref import UserLayoutPref
 from services.bookstore.author_service import AuthorService
-from utils.generate_model.menu_builder import menu_item
 from utils.smart_list import ColumnDef, FilterDef, SmartListConfig, SmartListRenderer
 from utils.smart_list.export import export_csv, export_excel, export_pdf
 
@@ -10869,12 +10010,12 @@ SMART_LIST_CONFIG = SmartListConfig(
     export_filename="authors",
 )
 
+enum_fields = []
 
 # ── Listagem ──────────────────────────────────────────────────────────────────
-#Biblioteca
+
 @author_bp.route("/")
 @login_required
-@menu_item("556", icon="bi-speedometer2", parent="Biblioteca", endpoint="authors.list", clickable_parent=True)
 def list():
     status = request.args.get("status", AuthorStatus.ACTIVE.value)
     export = request.args.get("export", "")
@@ -10917,12 +10058,28 @@ def list():
         pages=result.pages,
         user_layout=user_layout,
     )
+    
+    metadata = get_model_metadata(Author)
+    form_fields_list = metadata.get("ui_form", {}).get("fields", [])
+    relationship_fields = _get_relationship_fields(Author)
+
+    class_name = "Author"
+    class_name_lower = "author"
+    plural = "authors"
+    output_subdir = "bookstore"
 
     return render_template(
         "bookstore/authors/manage.html",
         sl=sl,
         counts=service.count_by_status(),
         current_status=status,
+        form_fields_list=form_fields_list,
+        relationship_fields=relationship_fields,
+        enum_fields=enum_fields,
+        class_name=class_name,
+        class_name_lower=class_name_lower,
+        plural=plural,
+        output_subdir=output_subdir,
     )
 
 
@@ -10935,7 +10092,27 @@ def detail(item_id: int):
     item = service.get_by_id(item_id)
     if not item:
         abort(404)
-    return render_template("bookstore/authors/detail.html", author=item)
+        
+    metadata = get_model_metadata(Author)
+    form_fields_list = metadata.get("ui_form", {}).get("fields", [])
+    relationship_fields = _get_relationship_fields(Author)
+
+    class_name = "Author"
+    class_name_lower = "author"
+    plural = "authors"
+    output_subdir = "bookstore"
+
+    return render_template(
+        "bookstore/authors/detail.html", 
+        author=item,
+        form_fields_list=form_fields_list,
+        relationship_fields=relationship_fields,
+        enum_fields=enum_fields,
+        class_name=class_name,
+        class_name_lower=class_name_lower,
+        plural=plural,
+        output_subdir=output_subdir,
+    )
 
 
 # ── Ações POST ────────────────────────────────────────────────────────────────
@@ -10980,315 +10157,6 @@ def discard_draft(author_id: int):
     flash("Rascunho descartado." if r.success else r.error,
           "info" if r.success else "danger")
     return redirect(url_for("authors.list"))
-
-
---- FIM DO ARQUIVO ---
-
-
---- ARQUIVO: controller\bookstore\book.py ---
-from __future__ import annotations
-
-from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
-from flask_login import current_user, login_required
-
-from model.bookstore.book import Book, BookStatus
-from model.core.user_layout_pref import UserLayoutPref
-from services.bookstore.book_service import BookService
-from utils.smart_list import ColumnDef, FilterDef, SmartListConfig, SmartListRenderer
-from utils.smart_list.export import export_csv, export_excel, export_pdf
-
-book_bp = Blueprint("books", __name__, url_prefix="/books")
-
-# ── Configuração SmartList ────────────────────────────────────────────────────
-
-SMART_LIST_CONFIG = SmartListConfig(
-    list_id="books",
-    endpoint="books.list",
-    columns=[
-        ColumnDef("id", "ID", sortable=True, width="60px", align="start"),
-        ColumnDef("title", "Título", sortable=True, width=None, align="start"),
-        ColumnDef("author", "Autor", sortable=True, width=None, align="start"),
-        ColumnDef("year", "Ano", sortable=False, width="80px", align="center"),
-        ColumnDef("available", "Disponível", sortable=False, width="90px", align="center"),
-        ColumnDef("status", "Status", sortable=False, width="100px", align="center")
-    ],
-    filters=[
-        FilterDef("search", "search", type="text", placeholder="Título ou autor..."),
-        FilterDef("genre", "genre", type="text", placeholder="Gênero")
-    ],
-    default_sort="title",
-    default_dir="asc",
-    page_sizes=[10, 20, 50, 100],
-    default_page_size=20,
-    exportable=True,
-    export_filename="books",
-)
-
-
-# ── Listagem ──────────────────────────────────────────────────────────────────
-
-@book_bp.route("/")
-@login_required
-def list():
-    status = request.args.get("status", BookStatus.ACTIVE.value)
-    export = request.args.get("export", "")
-
-    user_layout = None
-    if current_user.is_authenticated:
-        pref = UserLayoutPref.get_for_user(current_user.id, SMART_LIST_CONFIG.list_id)
-        if pref:
-            user_layout = pref.layout
-
-    per_page = int(request.args.get(
-        "per_page",
-        (user_layout or {}).get("per_page", SMART_LIST_CONFIG.default_page_size),
-    ))
-
-    service = BookService()
-    result = service.list(
-        page=int(request.args.get("page", 1)),
-        per_page=per_page,
-        status=status,
-        search=request.args.get("search", "").strip() or None,
-        sort=request.args.get("sort", SMART_LIST_CONFIG.default_sort),
-        direction=request.args.get("dir", SMART_LIST_CONFIG.default_dir),
-    )
-
-    if export in ("csv", "excel", "pdf"):
-        all_result = service.list(page=1, per_page=10_000, status=status)
-        visible_cols = (user_layout or {}).get("columns") or None
-        if export == "csv":
-            return export_csv(SMART_LIST_CONFIG, all_result.items, visible_cols)
-        if export == "excel":
-            return export_excel(SMART_LIST_CONFIG, all_result.items, visible_cols)
-        if export == "pdf":
-            return export_pdf(SMART_LIST_CONFIG, all_result.items, visible_cols, title="Livross")
-
-    renderer = SmartListRenderer(SMART_LIST_CONFIG)
-    sl = renderer.build_context(
-        items=result.items,
-        total=result.total,
-        pages=result.pages,
-        user_layout=user_layout,
-    )
-
-    return render_template(
-        "bookstore/books/manage.html",
-        sl=sl,
-        counts=service.count_by_status(),
-        current_status=status,
-    )
-
-
-# ── Detalhe ───────────────────────────────────────────────────────────────────
-
-@book_bp.route("/<int:item_id>")
-@login_required
-def detail(item_id: int):
-    service = BookService()
-    item = service.get_by_id(item_id)
-    if not item:
-        abort(404)
-    return render_template("bookstore/books/detail.html", book=item)
-
-
-# ── Ações POST ────────────────────────────────────────────────────────────────
-
-@book_bp.route("/<int:book_id>/trash", methods=["POST"])
-@login_required
-def trash(book_id: int):
-    service = BookService()
-    r = service.trash(book_id)
-    flash("Movido para a lixeira." if r.success else r.error,
-          "success" if r.success else "danger")
-    return redirect(request.referrer or url_for("books.list"))
-
-
-@book_bp.route("/<int:book_id>/restore", methods=["POST"])
-@login_required
-def restore(book_id: int):
-    service = BookService()
-    r = service.restore(book_id)
-    flash("Registro restaurado." if r.success else r.error,
-          "success" if r.success else "danger")
-    return redirect(request.referrer or url_for("books.list", status="trash"))
-
-
-@book_bp.route("/<int:book_id>/delete", methods=["POST"])
-@login_required
-def delete_permanent(book_id: int):
-    if not current_user.is_admin:
-        abort(403)
-    service = BookService()
-    r = service.delete_permanent(book_id)
-    flash("Excluído permanentemente." if r.success else r.error,
-          "success" if r.success else "danger")
-    return redirect(url_for("books.list", status="trash"))
-
-
-@book_bp.route("/<int:book_id>/discard", methods=["POST"])
-@login_required
-def discard_draft(book_id: int):
-    service = BookService()
-    r = service.discard_draft(book_id)
-    flash("Rascunho descartado." if r.success else r.error,
-          "info" if r.success else "danger")
-    return redirect(url_for("books.list"))
-
-
---- FIM DO ARQUIVO ---
-
-
---- ARQUIVO: controller\bookstore\loan.py ---
-from __future__ import annotations
-
-from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
-from flask_login import current_user, login_required
-
-from model.bookstore.loan import Loan, LoanStatus
-from model.core.user_layout_pref import UserLayoutPref
-from services.bookstore.loan_service import LoanService
-from utils.smart_list import ColumnDef, FilterDef, SmartListConfig, SmartListRenderer
-from utils.smart_list.export import export_csv, export_excel, export_pdf
-
-loan_bp = Blueprint("loans", __name__, url_prefix="/loans")
-
-# ── Configuração SmartList ────────────────────────────────────────────────────
-
-SMART_LIST_CONFIG = SmartListConfig(
-    list_id="loans",
-    endpoint="loans.list",
-    columns=[
-        ColumnDef("id", "ID", sortable=True, width="60px", align="start"),
-        ColumnDef("user.username", "Usuário", sortable=True, width=None, align="start"),
-        ColumnDef("book.title", "Livro", sortable=True, width=None, align="start"),
-        ColumnDef("loan_date", "Data Empréstimo", sortable=False, width="120px", align="center"),
-        ColumnDef("due_date", "Data Devolução", sortable=False, width="120px", align="center"),
-        ColumnDef("status", "Status", sortable=False, width="100px", align="center")
-    ],
-    filters=[
-        FilterDef("status", "status", type="select"),
-        FilterDef("search", "search", type="text", placeholder="Usuário ou livro...")
-    ],
-    default_sort="-loan_date",
-    default_dir="asc",
-    page_sizes=[10, 20, 50, 100],
-    default_page_size=20,
-    exportable=True,
-    export_filename="loans",
-)
-
-
-# ── Listagem ──────────────────────────────────────────────────────────────────
-
-@loan_bp.route("/")
-@login_required
-def list():
-    status = request.args.get("status", LoanStatus.ACTIVE.value)
-    export = request.args.get("export", "")
-
-    user_layout = None
-    if current_user.is_authenticated:
-        pref = UserLayoutPref.get_for_user(current_user.id, SMART_LIST_CONFIG.list_id)
-        if pref:
-            user_layout = pref.layout
-
-    per_page = int(request.args.get(
-        "per_page",
-        (user_layout or {}).get("per_page", SMART_LIST_CONFIG.default_page_size),
-    ))
-
-    service = LoanService()
-    result = service.list(
-        page=int(request.args.get("page", 1)),
-        per_page=per_page,
-        status=status,
-        search=request.args.get("search", "").strip() or None,
-        sort=request.args.get("sort", SMART_LIST_CONFIG.default_sort),
-        direction=request.args.get("dir", SMART_LIST_CONFIG.default_dir),
-    )
-
-    if export in ("csv", "excel", "pdf"):
-        all_result = service.list(page=1, per_page=10_000, status=status)
-        visible_cols = (user_layout or {}).get("columns") or None
-        if export == "csv":
-            return export_csv(SMART_LIST_CONFIG, all_result.items, visible_cols)
-        if export == "excel":
-            return export_excel(SMART_LIST_CONFIG, all_result.items, visible_cols)
-        if export == "pdf":
-            return export_pdf(SMART_LIST_CONFIG, all_result.items, visible_cols, title="Empréstimoss")
-
-    renderer = SmartListRenderer(SMART_LIST_CONFIG)
-    sl = renderer.build_context(
-        items=result.items,
-        total=result.total,
-        pages=result.pages,
-        user_layout=user_layout,
-    )
-
-    return render_template(
-        "bookstore/loans/manage.html",
-        sl=sl,
-        counts=service.count_by_status(),
-        current_status=status,
-    )
-
-
-# ── Detalhe ───────────────────────────────────────────────────────────────────
-
-@loan_bp.route("/<int:item_id>")
-@login_required
-def detail(item_id: int):
-    service = LoanService()
-    item = service.get_by_id(item_id)
-    if not item:
-        abort(404)
-    return render_template("bookstore/loans/detail.html", loan=item)
-
-
-# ── Ações POST ────────────────────────────────────────────────────────────────
-
-@loan_bp.route("/<int:loan_id>/trash", methods=["POST"])
-@login_required
-def trash(loan_id: int):
-    service = LoanService()
-    r = service.trash(loan_id)
-    flash("Movido para a lixeira." if r.success else r.error,
-          "success" if r.success else "danger")
-    return redirect(request.referrer or url_for("loans.list"))
-
-
-@loan_bp.route("/<int:loan_id>/restore", methods=["POST"])
-@login_required
-def restore(loan_id: int):
-    service = LoanService()
-    r = service.restore(loan_id)
-    flash("Registro restaurado." if r.success else r.error,
-          "success" if r.success else "danger")
-    return redirect(request.referrer or url_for("loans.list", status="trash"))
-
-
-@loan_bp.route("/<int:loan_id>/delete", methods=["POST"])
-@login_required
-def delete_permanent(loan_id: int):
-    if not current_user.is_admin:
-        abort(403)
-    service = LoanService()
-    r = service.delete_permanent(loan_id)
-    flash("Excluído permanentemente." if r.success else r.error,
-          "success" if r.success else "danger")
-    return redirect(url_for("loans.list", status="trash"))
-
-
-@loan_bp.route("/<int:loan_id>/discard", methods=["POST"])
-@login_required
-def discard_draft(loan_id: int):
-    service = LoanService()
-    r = service.discard_draft(loan_id)
-    flash("Rascunho descartado." if r.success else r.error,
-          "info" if r.success else "danger")
-    return redirect(url_for("loans.list"))
-
 
 --- FIM DO ARQUIVO ---
 
@@ -11797,7 +10665,7 @@ def render_app_template(template_name: str, **context):
 
 @web_bp.route("/556")
 @login_required
-@menu_item("556", icon="bi-speedometer2", parent="Configurações", endpoint="web.index_556", clickable_parent=True)
+@menu_item("556", icon="bi-speedometer2", parent="Configurações", endpoint="web.index_556")#, clickable_parent=True)
 def index_556():
     return render_app_template("core/556.html")#apenas exemplo
 
@@ -12237,328 +11105,6 @@ def discard_draft(id: int):
 --- FIM DO ARQUIVO ---
 
 
---- ARQUIVO: api\routes\bookstore\book_routes.py ---
-from __future__ import annotations
-
-from flask import Blueprint, jsonify, request
-from flask_login import current_user, login_required
-
-from services.bookstore.book_service import BookService
-from model.bookstore.book import BookStatus
-
-book_api_bp = Blueprint("book_api", __name__, url_prefix="/api/bookstore/books")
-
-
-def _ok(data, code: int = 200):
-    return jsonify({"success": True, "data": data}), code
-
-
-def _err(message: str, code: int = 400):
-    return jsonify({"success": False, "error": message}), code
-
-
-# ── Listagem ──────────────────────────────────────────────────────────────────
-
-@book_api_bp.route("/", methods=["GET"])
-@login_required
-def list():
-    status = request.args.get("status", BookStatus.ACTIVE.value)
-    search = request.args.get("search", "").strip() or None
-    sort = request.args.get("sort", "id")
-    direction = request.args.get("dir", "asc")
-    page = max(1, int(request.args.get("page", 1)))
-    per_page = min(100, int(request.args.get("per_page", 20)))
-
-    service = BookService()
-    result = service.list(
-        page=page, per_page=per_page, status=status,
-        search=search, sort=sort, direction=direction,
-    )
-    return _ok({
-        "items": [item.to_dict() for item in result.items],
-        "total": result.total,
-        "page": result.page,
-        "per_page": result.per_page,
-        "pages": result.pages,
-    })
-
-
-@book_api_bp.route("/<int:id>", methods=["GET"])
-@login_required
-def get(id: int):
-    service = BookService()
-    item = service.get_by_id(id)
-    if not item:
-        return _err("Não encontrado.", 404)
-    return _ok(item.to_dict())
-
-
-# ── Draft ─────────────────────────────────────────────────────────────────────
-
-@book_api_bp.route("/draft", methods=["POST"])
-@login_required
-def create_draft():
-    service = BookService()
-    result = service.create_draft()
-    if not result.success:
-        return _err(result.error, result.code)
-    return _ok(result.data.to_dict(), 201)
-
-
-@book_api_bp.route("/<int:id>/autosave", methods=["PATCH"])
-@login_required
-def autosave_draft(id: int):
-    data = request.get_json(silent=True) or {}
-    service = BookService()
-    result = service.autosave_draft(id, data)
-    if not result.success:
-        return _err(result.error, result.code)
-    return _ok({"id": result.data.id, "updated_at": result.data.updated_at.isoformat()})
-
-
-@book_api_bp.route("/<int:id>/publish", methods=["POST"])
-@login_required
-def publish_draft(id: int):
-    data = request.get_json(silent=True) or {}
-    service = BookService()
-    result = service.publish_draft(id, data)
-    if not result.success:
-        return _err(result.error, result.code)
-    return _ok(result.data.to_dict())
-
-
-# ── CRUD ──────────────────────────────────────────────────────────────────────
-
-@book_api_bp.route("/", methods=["POST"])
-@login_required
-def create():
-    data = request.get_json(silent=True) or {}
-    service = BookService()
-    result = service.create(data)
-    if not result.success:
-        return _err(result.error, result.code)
-    return _ok(result.data.to_dict(), 201)
-
-
-@book_api_bp.route("/<int:id>", methods=["PUT", "PATCH"])
-@login_required
-def update(id: int):
-    data = request.get_json(silent=True) or {}
-    service = BookService()
-    result = service.update(id, data)
-    if not result.success:
-        return _err(result.error, result.code)
-    return _ok(result.data.to_dict())
-
-
-# ── Lixeira ───────────────────────────────────────────────────────────────────
-
-@book_api_bp.route("/<int:id>/trash", methods=["POST"])
-@login_required
-def trash(id: int):
-    service = BookService()
-    result = service.trash(id)
-    if not result.success:
-        return _err(result.error, result.code)
-    return _ok(result.data.to_dict())
-
-
-@book_api_bp.route("/<int:id>/restore", methods=["POST"])
-@login_required
-def restore(id: int):
-    service = BookService()
-    result = service.restore(id)
-    if not result.success:
-        return _err(result.error, result.code)
-    return _ok(result.data.to_dict())
-
-
-@book_api_bp.route("/<int:id>", methods=["DELETE"])
-@login_required
-def delete_permanent(id: int):
-    if not current_user.is_admin:
-        return _err("Apenas administradores podem excluir permanentemente.", 403)
-    service = BookService()
-    result = service.delete_permanent(id)
-    if not result.success:
-        return _err(result.error, result.code)
-    return _ok(result.data)
-
-
-@book_api_bp.route("/<int:id>/discard", methods=["DELETE"])
-@login_required
-def discard_draft(id: int):
-    service = BookService()
-    result = service.discard_draft(id)
-    if not result.success:
-        return _err(result.error, result.code)
-    return _ok(result.data)
-
-
---- FIM DO ARQUIVO ---
-
-
---- ARQUIVO: api\routes\bookstore\loan_routes.py ---
-from __future__ import annotations
-
-from flask import Blueprint, jsonify, request
-from flask_login import current_user, login_required
-
-from services.bookstore.loan_service import LoanService
-from model.bookstore.loan import LoanStatus
-
-loan_api_bp = Blueprint("loan_api", __name__, url_prefix="/api/bookstore/loans")
-
-
-def _ok(data, code: int = 200):
-    return jsonify({"success": True, "data": data}), code
-
-
-def _err(message: str, code: int = 400):
-    return jsonify({"success": False, "error": message}), code
-
-
-# ── Listagem ──────────────────────────────────────────────────────────────────
-
-@loan_api_bp.route("/", methods=["GET"])
-@login_required
-def list():
-    status = request.args.get("status", LoanStatus.ACTIVE.value)
-    search = request.args.get("search", "").strip() or None
-    sort = request.args.get("sort", "id")
-    direction = request.args.get("dir", "asc")
-    page = max(1, int(request.args.get("page", 1)))
-    per_page = min(100, int(request.args.get("per_page", 20)))
-
-    service = LoanService()
-    result = service.list(
-        page=page, per_page=per_page, status=status,
-        search=search, sort=sort, direction=direction,
-    )
-    return _ok({
-        "items": [item.to_dict() for item in result.items],
-        "total": result.total,
-        "page": result.page,
-        "per_page": result.per_page,
-        "pages": result.pages,
-    })
-
-
-@loan_api_bp.route("/<int:id>", methods=["GET"])
-@login_required
-def get(id: int):
-    service = LoanService()
-    item = service.get_by_id(id)
-    if not item:
-        return _err("Não encontrado.", 404)
-    return _ok(item.to_dict())
-
-
-# ── Draft ─────────────────────────────────────────────────────────────────────
-
-@loan_api_bp.route("/draft", methods=["POST"])
-@login_required
-def create_draft():
-    service = LoanService()
-    result = service.create_draft()
-    if not result.success:
-        return _err(result.error, result.code)
-    return _ok(result.data.to_dict(), 201)
-
-
-@loan_api_bp.route("/<int:id>/autosave", methods=["PATCH"])
-@login_required
-def autosave_draft(id: int):
-    data = request.get_json(silent=True) or {}
-    service = LoanService()
-    result = service.autosave_draft(id, data)
-    if not result.success:
-        return _err(result.error, result.code)
-    return _ok({"id": result.data.id, "updated_at": result.data.updated_at.isoformat()})
-
-
-@loan_api_bp.route("/<int:id>/publish", methods=["POST"])
-@login_required
-def publish_draft(id: int):
-    data = request.get_json(silent=True) or {}
-    service = LoanService()
-    result = service.publish_draft(id, data)
-    if not result.success:
-        return _err(result.error, result.code)
-    return _ok(result.data.to_dict())
-
-
-# ── CRUD ──────────────────────────────────────────────────────────────────────
-
-@loan_api_bp.route("/", methods=["POST"])
-@login_required
-def create():
-    data = request.get_json(silent=True) or {}
-    service = LoanService()
-    result = service.create(data)
-    if not result.success:
-        return _err(result.error, result.code)
-    return _ok(result.data.to_dict(), 201)
-
-
-@loan_api_bp.route("/<int:id>", methods=["PUT", "PATCH"])
-@login_required
-def update(id: int):
-    data = request.get_json(silent=True) or {}
-    service = LoanService()
-    result = service.update(id, data)
-    if not result.success:
-        return _err(result.error, result.code)
-    return _ok(result.data.to_dict())
-
-
-# ── Lixeira ───────────────────────────────────────────────────────────────────
-
-@loan_api_bp.route("/<int:id>/trash", methods=["POST"])
-@login_required
-def trash(id: int):
-    service = LoanService()
-    result = service.trash(id)
-    if not result.success:
-        return _err(result.error, result.code)
-    return _ok(result.data.to_dict())
-
-
-@loan_api_bp.route("/<int:id>/restore", methods=["POST"])
-@login_required
-def restore(id: int):
-    service = LoanService()
-    result = service.restore(id)
-    if not result.success:
-        return _err(result.error, result.code)
-    return _ok(result.data.to_dict())
-
-
-@loan_api_bp.route("/<int:id>", methods=["DELETE"])
-@login_required
-def delete_permanent(id: int):
-    if not current_user.is_admin:
-        return _err("Apenas administradores podem excluir permanentemente.", 403)
-    service = LoanService()
-    result = service.delete_permanent(id)
-    if not result.success:
-        return _err(result.error, result.code)
-    return _ok(result.data)
-
-
-@loan_api_bp.route("/<int:id>/discard", methods=["DELETE"])
-@login_required
-def discard_draft(id: int):
-    service = LoanService()
-    result = service.discard_draft(id)
-    if not result.success:
-        return _err(result.error, result.code)
-    return _ok(result.data)
-
-
---- FIM DO ARQUIVO ---
-
-
 --- ARQUIVO: api\routes\bookstore\__init__.py ---
 # Auto-generated
 
@@ -12975,7 +11521,7 @@ def testeNotificacoes():
 --- FIM DO ARQUIVO ---
 
 
---- ARQUIVO: api\routes\core\options_routes.py ---
+--- ARQUIVO: api\routes\core\old_options_routes.py ---
 from __future__ import annotations
 
 from flask import Blueprint, jsonify, request
@@ -12985,6 +11531,7 @@ from sqlalchemy import or_
 from db.database import db
 from model.core.user import User
 from model.bookstore.book import Book
+
 
 options_bp = Blueprint("options", __name__, url_prefix="/api/options")
 
@@ -13019,6 +11566,147 @@ def get_options(table_name):
         return jsonify({"error": "Tabela não suportada"}), 400
 
     cfg = TABLE_MAP[table_name]
+    model = cfg["model"]
+    query = model.query
+    if search:
+        filters = []
+        for field in cfg["search_fields"]:
+            filters.append(getattr(model, field).ilike(f"%{search}%"))
+        query = query.filter(or_(*filters))
+
+    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+    results = [
+        {"id": item.id, "text": cfg["display"](item)}
+        for item in pagination.items
+    ]
+    return jsonify({
+        "results": results,
+        "pagination": {"more": pagination.has_next}
+    })
+
+--- FIM DO ARQUIVO ---
+
+
+--- ARQUIVO: api\routes\core\options_routes.py ---
+from __future__ import annotations
+
+from flask import Blueprint, jsonify, request
+from flask_login import login_required
+from sqlalchemy import or_, inspect
+from db.database import db
+from annotations import get_model_metadata
+
+options_bp = Blueprint("options", __name__, url_prefix="/api/options")
+
+# Cache para o mapeamento (recriado na inicialização ou sob demanda)
+_options_cache = None
+
+def _get_display_field(model_class):
+    """Retorna o nome do campo que deve ser usado para exibição."""
+    # Prioridade: anotação @display_field
+    meta = get_model_metadata(model_class)
+    display = meta.get('display_field')
+    if display:
+        return display
+    # Se não houver, tenta campos comuns
+    common = ['name', 'title', 'username']
+    for cand in common:
+        if hasattr(model_class, cand):
+            return cand
+    # Fallback: primeiro campo String
+    for col in inspect(model_class).columns:
+        if str(col.type).startswith('VARCHAR'):
+            return col.name
+    return 'id'
+
+def _get_search_fields(model_class):
+    """Retorna lista de campos pesquisáveis para o modelo."""
+    # Prioridade: colunas marcadas como filterable no @listview
+    meta = get_model_metadata(model_class)
+    ui_listview = meta.get('ui_listview')
+    if ui_listview and ui_listview.get('filters'):
+        # Extrai campos que são do tipo 'text' (busca textual)
+        # Mas pode ser simplificado: usar todos os filterable das colunas
+        pass
+    # Fallback: campos comuns
+    common = ['name', 'title', 'username', 'email']
+    search_fields = [f for f in common if hasattr(model_class, f)]
+    if not search_fields:
+        # Usa o primeiro campo String
+        for col in inspect(model_class).columns:
+            if str(col.type).startswith('VARCHAR'):
+                search_fields = [col.name]
+                break
+    return search_fields
+
+def _build_options_map():
+    """Constrói o mapeamento de todas as tabelas (modelos) disponíveis."""
+    mapping = {}
+    for model_class in db.Model.__subclasses__():
+        # Ignora modelos que não tenham tabela (ex: classes abstratas) ou que contenham 'Trash'
+        if not hasattr(model_class, '__tablename__'):
+            continue
+        if 'Trash' in model_class.__name__:
+            continue
+        table_name = model_class.__tablename__
+        display_field = _get_display_field(model_class)
+        search_fields = _get_search_fields(model_class)
+
+        # Função de display genérica
+        def display_func(obj, field=display_field):
+            val = getattr(obj, field, None)
+            if val is None:
+                return f"{obj.__class__.__name__} #{obj.id}"
+            return str(val)
+
+        mapping[table_name] = {
+            "model": model_class,
+            "search_fields": search_fields,
+            "display": display_func
+        }
+    return mapping
+
+def get_options_map():
+    """Retorna o mapa de opções com cache."""
+    global _options_cache
+    if _options_cache is None:
+        _options_cache = _build_options_map()
+    return _options_cache
+
+def refresh_options_cache():
+    """Força a recarga do cache (útil após gerar novos modelos)."""
+    global _options_cache
+    _options_cache = _build_options_map()
+    return _options_cache
+
+@options_bp.route("/refresh", methods=["POST"])
+@login_required
+def refresh_cache():
+    """Endpoint administrativo para recarregar o cache de opções."""
+    # Opcional: só permitir para admin
+    from flask_login import current_user
+    if not getattr(current_user, 'is_admin', False):
+        return jsonify({"error": "Apenas administradores"}), 403
+    refresh_options_cache()
+    return jsonify({"success": True, "tables": list(get_options_map().keys())})
+
+@options_bp.route("/<string:table_name>")
+@login_required
+def get_options(table_name):
+    """
+    Retorna opções paginadas para um campo de seleção.
+    Query params: ?search=xxx&page=1
+    Resposta: { results: [{id, text}], pagination: {more: bool} }
+    """
+    search = request.args.get("search", "").strip()
+    page = request.args.get("page", 1, type=int)
+    per_page = 20
+
+    mapping = get_options_map()
+    if table_name not in mapping:
+        return jsonify({"error": f"Tabela '{table_name}' não suportada"}), 400
+
+    cfg = mapping[table_name]
     model = cfg["model"]
     query = model.query
     if search:

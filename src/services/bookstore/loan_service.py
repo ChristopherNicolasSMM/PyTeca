@@ -42,12 +42,35 @@ class LoanService:
         sort: str = "id",
         direction: str = "asc",
     ) -> LoanListResult:
+        
+        
         query = Loan.query
         if status != "all":
             query = query.filter(Loan.status == status)
+        
+        
         if search:
             pattern = f"%{search.strip()}%"
-            query = query.filter(Loan.name.ilike(pattern))
+            from sqlalchemy import or_
+            search_filters = []
+            search_filters.append(Loan.user.username.ilike(pattern))
+            search_filters.append(Loan.book.title.ilike(pattern))
+            from model.core.user import User
+            query = query.outerjoin(User, Loan.user_id == User.id)
+            search_filters.append(User.username.ilike(pattern))
+            from model.bookstore.book import Book
+            query = query.outerjoin(Book, Loan.book_id == Book.id)
+            search_filters.append(Book.title.ilike(pattern))
+            if search_filters:
+                query = query.filter(or_(*search_filters))
+         
+        
+        #if search:
+        #    pattern = f"%{search.strip()}%"
+        #    #query = query.filter(Loan.name.ilike(pattern))
+        #    query = query.filter(Loan.name.ilike(pattern))
+        #    
+            
         sort_col = getattr(Loan, sort, Loan.id)
         query = query.order_by(sort_col.desc() if direction == "desc" else sort_col.asc())
         pagination = query.paginate(page=page, per_page=per_page, error_out=False)

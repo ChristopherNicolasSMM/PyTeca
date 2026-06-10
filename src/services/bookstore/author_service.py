@@ -42,12 +42,28 @@ class AuthorService:
         sort: str = "id",
         direction: str = "asc",
     ) -> AuthorListResult:
+        
+        
         query = Author.query
         if status != "all":
             query = query.filter(Author.status == status)
+        
+        
         if search:
             pattern = f"%{search.strip()}%"
-            query = query.filter(Author.name.ilike(pattern))
+            from sqlalchemy import or_
+            search_filters = []
+            search_filters.append(Author.name.ilike(pattern))
+            if search_filters:
+                query = query.filter(or_(*search_filters))
+         
+        
+        #if search:
+        #    pattern = f"%{search.strip()}%"
+        #    #query = query.filter(Author.name.ilike(pattern))
+        #    query = query.filter(Author.name.ilike(pattern))
+        #    
+            
         sort_col = getattr(Author, sort, Author.id)
         query = query.order_by(sort_col.desc() if direction == "desc" else sort_col.asc())
         pagination = query.paginate(page=page, per_page=per_page, error_out=False)

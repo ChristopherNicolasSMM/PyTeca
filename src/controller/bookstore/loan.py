@@ -3,6 +3,8 @@ from __future__ import annotations
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
+from annotations import get_model_metadata                   
+from utils.generate_from_model import _get_relationship_fields
 from model.bookstore.loan import Loan, LoanStatus
 from model.core.user_layout_pref import UserLayoutPref
 from services.bookstore.loan_service import LoanService
@@ -36,6 +38,7 @@ SMART_LIST_CONFIG = SmartListConfig(
     export_filename="loans",
 )
 
+enum_fields = []
 
 # ── Listagem ──────────────────────────────────────────────────────────────────
 
@@ -83,12 +86,28 @@ def list():
         pages=result.pages,
         user_layout=user_layout,
     )
+    
+    metadata = get_model_metadata(Loan)
+    form_fields_list = metadata.get("ui_form", {}).get("fields", [])
+    relationship_fields = _get_relationship_fields(Loan)
+
+    class_name = "Loan"
+    class_name_lower = "loan"
+    plural = "loans"
+    output_subdir = "bookstore"
 
     return render_template(
         "bookstore/loans/manage.html",
         sl=sl,
         counts=service.count_by_status(),
         current_status=status,
+        form_fields_list=form_fields_list,
+        relationship_fields=relationship_fields,
+        enum_fields=enum_fields,
+        class_name=class_name,
+        class_name_lower=class_name_lower,
+        plural=plural,
+        output_subdir=output_subdir,
     )
 
 
@@ -101,7 +120,27 @@ def detail(item_id: int):
     item = service.get_by_id(item_id)
     if not item:
         abort(404)
-    return render_template("bookstore/loans/detail.html", loan=item)
+        
+    metadata = get_model_metadata(Loan)
+    form_fields_list = metadata.get("ui_form", {}).get("fields", [])
+    relationship_fields = _get_relationship_fields(Loan)
+
+    class_name = "Loan"
+    class_name_lower = "loan"
+    plural = "loans"
+    output_subdir = "bookstore"
+
+    return render_template(
+        "bookstore/loans/detail.html", 
+        loan=item,
+        form_fields_list=form_fields_list,
+        relationship_fields=relationship_fields,
+        enum_fields=enum_fields,
+        class_name=class_name,
+        class_name_lower=class_name_lower,
+        plural=plural,
+        output_subdir=output_subdir,
+    )
 
 
 # ── Ações POST ────────────────────────────────────────────────────────────────

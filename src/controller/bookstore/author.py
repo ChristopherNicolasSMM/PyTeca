@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
+
+from annotations import get_model_metadata                   
+from utils.generate_from_model import _get_relationship_fields
 from model.bookstore.author import Author, AuthorStatus
 from model.core.user_layout_pref import UserLayoutPref
 from services.bookstore.author_service import AuthorService
-from utils.generate_model.menu_builder import menu_item
 from utils.smart_list import ColumnDef, FilterDef, SmartListConfig, SmartListRenderer
 from utils.smart_list.export import export_csv, export_excel, export_pdf
 
@@ -32,12 +34,12 @@ SMART_LIST_CONFIG = SmartListConfig(
     export_filename="authors",
 )
 
+enum_fields = []
 
 # ── Listagem ──────────────────────────────────────────────────────────────────
-#Biblioteca
+
 @author_bp.route("/")
 @login_required
-@menu_item("Autores", icon="bi-speedometer2", parent="Biblioteca", endpoint="authors.list", clickable_parent=True)
 def list():
     status = request.args.get("status", AuthorStatus.ACTIVE.value)
     export = request.args.get("export", "")
@@ -80,12 +82,28 @@ def list():
         pages=result.pages,
         user_layout=user_layout,
     )
+    
+    metadata = get_model_metadata(Author)
+    form_fields_list = metadata.get("ui_form", {}).get("fields", [])
+    relationship_fields = _get_relationship_fields(Author)
+
+    class_name = "Author"
+    class_name_lower = "author"
+    plural = "authors"
+    output_subdir = "bookstore"
 
     return render_template(
         "bookstore/authors/manage.html",
         sl=sl,
         counts=service.count_by_status(),
         current_status=status,
+        form_fields_list=form_fields_list,
+        relationship_fields=relationship_fields,
+        enum_fields=enum_fields,
+        class_name=class_name,
+        class_name_lower=class_name_lower,
+        plural=plural,
+        output_subdir=output_subdir,
     )
 
 
@@ -98,7 +116,27 @@ def detail(item_id: int):
     item = service.get_by_id(item_id)
     if not item:
         abort(404)
-    return render_template("bookstore/authors/detail.html", author=item)
+        
+    metadata = get_model_metadata(Author)
+    form_fields_list = metadata.get("ui_form", {}).get("fields", [])
+    relationship_fields = _get_relationship_fields(Author)
+
+    class_name = "Author"
+    class_name_lower = "author"
+    plural = "authors"
+    output_subdir = "bookstore"
+
+    return render_template(
+        "bookstore/authors/detail.html", 
+        author=item,
+        form_fields_list=form_fields_list,
+        relationship_fields=relationship_fields,
+        enum_fields=enum_fields,
+        class_name=class_name,
+        class_name_lower=class_name_lower,
+        plural=plural,
+        output_subdir=output_subdir,
+    )
 
 
 # ── Ações POST ────────────────────────────────────────────────────────────────

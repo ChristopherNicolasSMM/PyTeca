@@ -1,4 +1,4 @@
-{# Modal de formulário para {{ class_name }} #}
+{# Modal de formulário para {{ class_name }} — gerado automaticamente #}
 <div class="modal fade" id="{{ class_name_lower }}Modal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
@@ -9,36 +9,7 @@
       <div class="modal-body">
         <form id="{{ class_name_lower }}Form">
           <input type="hidden" id="{{ class_name_lower }}Id">
-          {% for field in form_fields_list %}
-            {# Verifica se o campo é uma chave estrangeira #}
-            {% set is_fk = false %}
-            {% for rel in relationship_fields %}
-              {% if rel.name == field %}
-                {% set is_fk = true %}
-              {% endif %}
-            {% endfor %}
-
-            {% if is_fk %}
-              {# Campo FK: select com busca dinâmica #}
-              <div class="row mb-3">
-                <label for="{{ field }}" class="col-sm-3 col-form-label">{{ field|replace('_',' ')|title }}</label>
-                <div class="col-sm-9">
-                  <select class="form-select relationship-select" data-field="{{ field }}" data-foreign-table="{{ rel.foreign_table }}" name="{{ field }}">
-                    <option value="">Selecione...</option>
-                  </select>
-                  <div class="invalid-feedback">Selecione um valor válido.</div>
-                </div>
-              </div>
-            {% else %}
-              {# Campo normal (input text) #}
-              <div class="row mb-3">
-                <label for="{{ field }}" class="col-sm-3 col-form-label">{{ field|replace('_',' ')|title }}</label>
-                <div class="col-sm-9">
-                  <input type="text" class="form-control" id="{{ field }}" name="{{ field }}">
-                </div>
-              </div>
-            {% endif %}
-          {% endfor %}
+          {{ form_fields }}
         </form>
       </div>
       <div class="modal-footer">
@@ -50,39 +21,51 @@
 </div>
 
 <script>
-  // Inicialização dos selects de relacionamento (busca via API)
   (function() {
-    function initRelationshipSelects(modalId) {
-      const modal = document.getElementById(modalId);
-      if (!modal) return;
-      modal.querySelectorAll('.relationship-select').forEach(select => {
-        // Converte para um campo com autocomplete usando datalist
-        const wrapper = select.parentNode;
-        const hidden = document.createElement('input');
-        hidden.type = 'hidden';
-        hidden.name = select.name;
-        const searchInput = document.createElement('input');
-        searchInput.type = 'text';
-        searchInput.classList.add('form-control');
-        searchInput.placeholder = 'Digite para buscar...';
-        searchInput.autocomplete = 'off';
-        select.style.display = 'none';
-        wrapper.insertBefore(searchInput, select);
-        wrapper.appendChild(hidden);
-        const table = select.dataset.foreignTable;
-        let currentId = null;
+    const abortControllers = new Map();
 
-        async function loadOptions(search) {
-          const response = await fetch(`/api/options/${table}?search=${encodeURIComponent(search)}`);
+    function getOrCreateDatalist(fieldName) {
+      let datalist = document.getElementById(`datalist-${fieldName}`);
+      if (!datalist) {
+        datalist = document.createElement('datalist');
+        datalist.id = `datalist-${fieldName}`;
+        document.body.appendChild(datalist);
+      }
+      return datalist;
+    }
+
+    function setupForeignKeyField(container) {
+      const fieldName = container.dataset.field;
+      const foreignTable = container.dataset.foreignTable;
+      const hiddenInput = container.querySelector('.fk-hidden-id');
+      const searchInput = container.querySelector('.fk-search-input');
+      const clearBtn = container.querySelector('.fk-clear-btn');
+
+      const datalist = getOrCreateDatalist(fieldName);
+      searchInput.setAttribute('list', datalist.id);
+
+      clearBtn.addEventListener('click', () => {
+        searchInput.value = '';
+        hiddenInput.value = '';
+        searchInput.focus();
+      });
+
+      let debounceTimer;
+      searchInput.addEventListener('input', (e) => {
+        clearTimeout(debounceTimer);
+        const query = e.target.value.trim();
+        if (query.length < 2) { datalist.innerHTML = ''; return; }
+        debounceTimer = setTimeout(() => loadOptions(query), 300);
+      });
+
+      async function loadOptions(search) {
+        if (abortControllers.has(fieldName)) abortControllers.get(fieldName).abort();
+        const controller = new AbortController();
+        abortControllers.set(fieldName, controller);
+        try {
+          const url = `/api/options/${foreignTable}?search=${encodeURIComponent(search)}`;
+          const response = await fetch(url, { signal: controller.signal });
           const data = await response.json();
-          const datalistId = `datalist-${select.name}-${Date.now()}`;
-          let datalist = document.getElementById(datalistId);
-          if (!datalist) {
-            datalist = document.createElement('datalist');
-            datalist.id = datalistId;
-            searchInput.setAttribute('list', datalistId);
-            wrapper.appendChild(datalist);
-          }
           datalist.innerHTML = '';
           data.results.forEach(opt => {
             const option = document.createElement('option');
@@ -90,32 +73,34 @@
             option.dataset.id = opt.id;
             datalist.appendChild(option);
           });
+        } catch (err) {
+          if (err.name === 'AbortError') return;
+          console.error('Erro ao buscar opções:', err);
+        } finally {
+          abortControllers.delete(fieldName);
         }
+      }
 
-        searchInput.addEventListener('input', (e) => {
-          loadOptions(e.target.value);
-        });
-        searchInput.addEventListener('change', () => {
-          const list = document.getElementById(searchInput.getAttribute('list'));
-          if (list) {
-            const selectedOption = Array.from(list.options).find(opt => opt.value === searchInput.value);
-            if (selectedOption) {
-              hidden.value = selectedOption.dataset.id;
-              currentId = selectedOption.dataset.id;
-            } else {
-              hidden.value = '';
-              currentId = null;
-            }
-          }
-        });
+      searchInput.addEventListener('change', () => {
+        const selected = Array.from(datalist.options).find(o => o.value === searchInput.value);
+        hiddenInput.value = selected ? selected.dataset.id : '';
       });
     }
 
-    // Observa a abertura do modal para inicializar os selects
+    window.setForeignKeyValue = function(modalId, fieldName, id, text) {
+      const modal = document.getElementById(modalId);
+      if (!modal) return;
+      const container = modal.querySelector(`.fk-field[data-field="${fieldName}"]`);
+      if (!container) return;
+      const hidden = container.querySelector('.fk-hidden-id');
+      const search = container.querySelector('.fk-search-input');
+      if (hidden && search) { hidden.value = id; search.value = text || ''; }
+    };
+
     const modalElement = document.getElementById('{{ class_name_lower }}Modal');
     if (modalElement) {
       modalElement.addEventListener('shown.bs.modal', function() {
-        initRelationshipSelects('{{ class_name_lower }}Modal');
+        modalElement.querySelectorAll('.fk-field').forEach(setupForeignKeyField);
       });
     }
   })();

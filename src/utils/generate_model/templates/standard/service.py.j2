@@ -42,12 +42,22 @@ class {{ class_name }}Service:
         sort: str = "id",
         direction: str = "asc",
     ) -> {{ class_name }}ListResult:
+        
+        
         query = {{ class_name }}.query
         if status != "all":
             query = query.filter({{ class_name }}.status == status)
-        if search:
-            pattern = f"%{search.strip()}%"
-            query = query.filter({{ class_name }}.name.ilike(pattern))
+        
+        
+{{ search_block }}
+         
+        
+        #if search:
+        #    pattern = f"%{search.strip()}%"
+        #    #query = query.filter({{ class_name }}.name.ilike(pattern))
+        #    query = query.filter({{ class_name }}.name.ilike(pattern))
+        #    
+            
         sort_col = getattr({{ class_name }}, sort, {{ class_name }}.id)
         query = query.order_by(sort_col.desc() if direction == "desc" else sort_col.asc())
         pagination = query.paginate(page=page, per_page=per_page, error_out=False)

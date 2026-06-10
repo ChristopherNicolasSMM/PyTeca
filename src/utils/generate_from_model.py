@@ -146,21 +146,56 @@ def _build_fields_rows(class_name_lower: str, fields: list[str]) -> str:
     return "\n".join(rows)
 
 
-def _build_form_fields(fields: list[str]) -> str:
-    """Gera campos <div class='mb-3'> para o form_modal."""
+def _build_form_fields(fields: list[str], relationship_fields: list[dict] = None, enum_fields: list[dict] = None) -> str:
+    """Gera campos <div class='mb-3'> para o form_modal, com suporte a FK e Enum."""
+    fk_names = {r["name"]: r["foreign_table"] for r in (relationship_fields or [])}
+    enum_map = {e["name"]: e["options"] for e in (enum_fields or [])}
     rows = []
     for field in fields:
         label = field.replace("_", " ").title()
-        rows.append(
-            f'          <div class="row mb-3">\n'
-            f'            <label for="{field}" class="col-sm-3 col-form-label">{label}</label>\n'
-            f'            <div class="col-sm-9">\n'
-            f'              <input type="text" class="form-control" id="{field}" name="{field}">\n'
-            f'            </div>\n'
-            f'          </div>'
-        )
+        if field in fk_names:
+            foreign_table = fk_names[field]
+            rows.append(
+                f'          <div class="row mb-3 fk-field" data-field="{field}" data-foreign-table="{foreign_table}">\n'
+                f'            <label class="col-sm-3 col-form-label">{label}</label>\n'
+                f'            <div class="col-sm-9">\n'
+                f'              <input type="hidden" name="{field}" class="fk-hidden-id">\n'
+                f'              <div class="input-group">\n'
+                f'                <input type="text" class="form-control fk-search-input" placeholder="Digite para buscar..." autocomplete="off">\n'
+                f'                <button class="btn btn-outline-secondary fk-clear-btn" type="button" title="Limpar">\n'
+                f'                  <i class="bi bi-x"></i>\n'
+                f'                </button>\n'
+                f'              </div>\n'
+                f'              <div class="invalid-feedback">Selecione um valor válido.</div>\n'
+                f'            </div>\n'
+                f'          </div>'
+            )
+        elif field in enum_map:
+            options_html = '\n'.join(
+                f'                    <option value="{v}">{lbl}</option>'
+                for v, lbl in enum_map[field]
+            )
+            rows.append(
+                f'          <div class="row mb-3">\n'
+                f'            <label for="{field}" class="col-sm-3 col-form-label">{label}</label>\n'
+                f'            <div class="col-sm-9">\n'
+                f'              <select class="form-select" id="{field}" name="{field}">\n'
+                f'                <option value="">Selecione...</option>\n'
+                f'{options_html}\n'
+                f'              </select>\n'
+                f'            </div>\n'
+                f'          </div>'
+            )
+        else:
+            rows.append(
+                f'          <div class="row mb-3">\n'
+                f'            <label for="{field}" class="col-sm-3 col-form-label">{label}</label>\n'
+                f'            <div class="col-sm-9">\n'
+                f'              <input type="text" class="form-control" id="{field}" name="{field}">\n'
+                f'            </div>\n'
+                f'          </div>'
+            )
     return "\n".join(rows)
-
 
 def _build_context(
     class_name: str,
@@ -175,26 +210,124 @@ def _build_context(
     label            = metadata.get("label", class_name)
     default_sort     = metadata.get("ui_listview", {}).get("default_sort", "id")
     form_fields_list = metadata.get("ui_form", {}).get("fields", [])
-    # detectar relacionamentos
+
+    # detectar relacionamentos (FK)
     relationship_fields = []
     if model_class:
         relationship_fields = _get_relationship_fields(model_class)
 
-    return {
-        "class_name":       class_name,
-        "class_name_lower": class_name_lower,
-        "module_name":      module_name,
-        "plural":           plural,
-        "label":            label,
-        "default_sort":     default_sort,
-        "columns":          _build_columns_block(metadata),
-        "filters":          _build_filters_block(metadata),
-        "fields_rows":      _build_fields_rows(class_name_lower, form_fields_list),
-        "form_fields":      _build_form_fields(form_fields_list),
-        "relationship_fields": relationship_fields, 
-        "output_subdir":     output_subdir
-    }
+    # detectar campos Enum
+    enum_fields = []
+    if model_class:
+        for field_name in form_fields_list:
+            if hasattr(model_class, field_name):
+                column = getattr(model_class, field_name)
+                if hasattr(column, 'type') and hasattr(column.type, 'enum_class'):
+                    enum_class = column.type.enum_class
+                    if enum_class:
+                        options = [(e.value, e.name.replace('_', ' ').title()) for e in enum_class]
+                        enum_fields.append({"name": field_name, "options": options})
 
+    # ============================================================
+    # Campos pesquisáveis (searchable_fields) e mapeamento de FKs
+    # ============================================================
+    searchable_fields = []
+    # 1. Prioriza colunas marcadas como filterable nas anotações @listview
+    for col in metadata.get("ui_listview", {}).get("columns", []):
+        if col.get("filterable"):
+            searchable_fields.append(col["name"])
+
+    # 2. Se não houver, tenta campos comuns do model (name, title, username)
+    if not searchable_fields and model_class:
+        for candidate in ('name', 'title', 'username'):
+            if hasattr(model_class, candidate):
+                searchable_fields.append(candidate)
+                break
+
+    # 3. Fallback: primeiro campo String do model
+    if not searchable_fields and model_class:
+        for prop in model_class.__mapper__.iterate_properties:
+            if hasattr(prop, 'columns') and str(prop.columns[0].type).startswith('VARCHAR'):
+                searchable_fields.append(prop.key)
+                break
+
+    # Mapeamento de FK -> (model_name, display_field)
+    fk_display_map = []
+    if model_class and relationship_fields:
+        import importlib
+        for rel in relationship_fields:
+            fk_name = rel['name']
+            foreign_table = rel['foreign_table']
+            # Converte nome da tabela para nome do model (ex: 'users' -> 'User', 'book' -> 'Book')
+            model_name = ''.join(word.capitalize() for word in foreign_table.split('_'))
+            if model_name.endswith('s'):
+                model_name = model_name[:-1]
+            # Tenta importar o model
+            module_path = None
+            for prefix in ['model.core', 'model.bookstore']:
+                try:
+                    module = importlib.import_module(f"{prefix}.{model_name.lower()}")
+                    model_class_rel = getattr(module, model_name)
+                    display_field = getattr(model_class_rel, '_display_field', None)
+                    if display_field:
+                        module_path = prefix
+                        break
+                except (ImportError, AttributeError):
+                    continue
+            if module_path and display_field:
+                fk_display_map.append({
+                    'fk_name': fk_name,
+                    'model_name': model_name,
+                    'module_path': module_path,
+                    'display_field': display_field
+                })
+
+    # ============================================================
+    # Geração do bloco de código Python para busca (service)
+    # ============================================================
+    search_block_lines = []
+    if searchable_fields or fk_display_map:
+        search_block_lines.append("        if search:")
+        search_block_lines.append('            pattern = f"%{search.strip()}%"')
+        search_block_lines.append("            from sqlalchemy import or_")
+        search_block_lines.append("            search_filters = []")
+        # Campos diretos
+        for field in searchable_fields:
+            search_block_lines.append(f"            search_filters.append({class_name}.{field}.ilike(pattern))")
+        # Campos de FKs (joins)
+        for fk in fk_display_map:
+            search_block_lines.append(f"            from {fk['module_path']}.{fk['model_name'].lower()} import {fk['model_name']}")
+            search_block_lines.append(f"            query = query.outerjoin({fk['model_name']}, {class_name}.{fk['fk_name']} == {fk['model_name']}.id)")
+            search_block_lines.append(f"            search_filters.append({fk['model_name']}.{fk['display_field']}.ilike(pattern))")
+        search_block_lines.append("            if search_filters:")
+        search_block_lines.append("                query = query.filter(or_(*search_filters))")
+    else:
+        # Fallback: busca pelo ID (caso não haja campos pesquisáveis)
+        search_block_lines.append("        if search:")
+        search_block_lines.append('            pattern = f"%{search.strip()}%"')
+        search_block_lines.append(f"            query = query.filter(cast(str({class_name}.id), String).ilike(pattern))")
+
+    search_block = "\n".join(search_block_lines)
+
+    # Monta o dicionário de contexto
+    return {
+        "class_name":         class_name,
+        "class_name_lower":   class_name_lower,
+        "module_name":        module_name,
+        "plural":             plural,
+        "label":              label,
+        "default_sort":       default_sort,
+        "columns":            _build_columns_block(metadata),
+        "filters":            _build_filters_block(metadata),
+        "fields_rows":        _build_fields_rows(class_name_lower, form_fields_list),
+        "form_fields":        _build_form_fields(form_fields_list, relationship_fields, enum_fields),
+        "relationship_fields": relationship_fields,
+        "enum_fields":        enum_fields,
+        "searchable_fields":  searchable_fields,
+        "fk_display_map":     fk_display_map,
+        "search_block":       search_block,      
+        "output_subdir":      output_subdir,
+    }
 # ══════════════════════════════════════════════════════════════════════════════
 # HELPERS DE I/O
 # ══════════════════════════════════════════════════════════════════════════════
@@ -217,6 +350,7 @@ def _write_file(path: Path, content: str, overwrite: bool = False) -> bool:
     return True
 
 
+### NÃO APAGAR: ESSAS FUNÇÕES DE GERAÇÃO DE MENU FORAM DESATIVADAS PARA EVITAR SOBRESCRITA INDESEJADA.
 ###################################################################################################################
 #      INICIO - GERAÇÃO DE MENU POR CRUD A PARTIR DE MODELO ANOTADO (CONTROLLER, SERVICE, ROUTES, TEMPLATES)
 #                                              DEIXAR DINAMICO
@@ -298,23 +432,88 @@ def _write_file(path: Path, content: str, overwrite: bool = False) -> bool:
 # DETECÇÃO DE RELACIONAMENTOS (FK)
 # ══════════════════════════════════════════════════════════════════════════════
 
+########### LIMPAR DEPOIS - APAGAR COMENTARIOS
+#
+#def _get_relationship_fields(model_class) -> list[dict]:
+#    """
+#    Retorna metadados das colunas que são chaves estrangeiras.
+#    Cada entrada contém: name, foreign_table, nullable.
+#    """
+#    rels = []
+#    if not hasattr(model_class, '__table__'):
+#        return rels
+#    for col in model_class.__table__.columns:
+#        if col.foreign_keys:
+#            fk = list(col.foreign_keys)[0]
+#            rels.append({
+#                'name': col.name,
+#                'foreign_table': fk.column.table.name,
+#                'nullable': col.nullable,
+#            })
+#    return rels
+
+
+##def _get_relationship_fields(model_class) -> list[dict]:
+##    """
+##    Retorna metadados das colunas que são chaves estrangeiras.
+##    Usa sqlalchemy.inspect para garantir detecção correta.
+##    """
+##    from sqlalchemy import inspect
+##    rels = []
+##        
+##    try:
+##        inspector = inspect(model_class)
+##        for column in inspector.columns:
+##            # Verifica se a coluna tem foreign_keys (SQLAlchemy >= 1.4)
+##            if column.foreign_keys:
+##                # Obtém a primeira FK (normalmente há apenas uma)
+##                fk = list(column.foreign_keys)[0]
+##                rels.append({
+##                    'name': column.name,
+##                    'foreign_table': fk.column.table.name,
+##                    'nullable': column.nullable,
+##                })
+##    except Exception as e:
+##        # Fallback: método antigo
+##        if hasattr(model_class, '__table__'):
+##            for col in model_class.__table__.columns:
+##                if col.foreign_keys:
+##                    fk = list(col.foreign_keys)[0]
+##                    rels.append({
+##                        'name': col.name,
+##                        'foreign_table': fk.column.table.name,
+##                        'nullable': col.nullable,
+##                    })
+##    return rels
+
+
 def _get_relationship_fields(model_class) -> list[dict]:
-    """
-    Retorna metadados das colunas que são chaves estrangeiras.
-    Cada entrada contém: name, foreign_table, nullable.
-    """
+    from sqlalchemy import inspect
     rels = []
-    if not hasattr(model_class, '__table__'):
-        return rels
-    for col in model_class.__table__.columns:
-        if col.foreign_keys:
-            fk = list(col.foreign_keys)[0]
-            rels.append({
-                'name': col.name,
-                'foreign_table': fk.column.table.name,
-                'nullable': col.nullable,
-            })
+    try:
+        ins = inspect(model_class)
+        for col in ins.columns:
+            if col.foreign_keys:
+                fk = list(col.foreign_keys)[0]
+                rels.append({
+                    'name': col.name,
+                    'foreign_table': fk.column.table.name,
+                    'nullable': col.nullable,
+                })
+    except Exception:
+        # fallback
+        if hasattr(model_class, '__table__'):
+            for col in model_class.__table__.columns:
+                if col.foreign_keys:
+                    fk = list(col.foreign_keys)[0]
+                    rels.append({
+                        'name': col.name,
+                        'foreign_table': fk.column.table.name,
+                        'nullable': col.nullable,
+                    })
     return rels
+
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # FUNÇÕES DE GERAÇÃO (com suporte a subdiretórios)
@@ -408,7 +607,7 @@ def generate_templates(
     _write_file(modals_dir / f"{class_name.lower()}_form_modal.html",
                 loader.render("form_modal.html.j2", ctx), overwrite)
 
-    _generate_menu_yaml(templates_dir, class_name, plural, ctx["label"], overwrite)
+#    _generate_menu_yaml(templates_dir, class_name, plural, ctx["label"], overwrite)
 
     if add_to_root_menu:
         _add_to_root_menu(class_name, plural, ctx["label"], overwrite)
@@ -499,3 +698,11 @@ def generate(model_path: str, theme: str = "standard", overwrite: bool = False, 
     loader = get_loader(theme)
     print(f"Tema de templates: '{theme}'  |  overwrite={overwrite}")
     _run_generation(file_path, None, None, loader, overwrite, add_to_root_menu=add_to_root_menu)
+    
+    try:
+        from api.routes.core.options_routes import refresh_options_cache
+        refresh_options_cache()
+        print("Cache de opções recarregado.")
+    except Exception as e:
+        print(f"Não foi possível recarregar o cache: {e}")    
+    

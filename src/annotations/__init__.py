@@ -107,6 +107,13 @@ def min_value(field: str, min: int, message: Optional[str] = None):
         return cls
     return decorator
 
+def display_field(value: str):
+    """Define qual campo deve ser usado como display name para este model (ex: 'username', 'title')."""
+    def decorator(cls):
+        cls._display_field = value
+        return cls
+    return decorator
+
 # ---- Extração de metadados ----
 def get_model_metadata(cls) -> Dict[str, Any]:
     """Extrai todos os metadados anotados de uma classe."""
@@ -117,7 +124,8 @@ def get_model_metadata(cls) -> Dict[str, Any]:
         "ui_listview": getattr(cls, '_ui_listview', None),
         "ui_form": getattr(cls, '_ui_form', None),
         "validations": getattr(cls, '_validations', {}),
-    }
+    }    
+    
 # ---- Ajustes para o menu ----
 def menu_icon(value: str):
     def decorator(cls):

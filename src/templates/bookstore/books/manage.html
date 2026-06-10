@@ -1,15 +1,15 @@
 {% extends "core/base.html" %}
 {% from "_components/smart_list.html" import render as smart_list, scripts as sl_scripts %}
 
-{% block title %}Livross{% endblock %}
+{% block title %}books{% endblock %}
 
 {% block content %}
 <div class="pagetitle">
-  <h1>Livross</h1>
+  <h1>books</h1>
   <nav>
     <ol class="breadcrumb">
       <li class="breadcrumb-item"><a href="{{ url_for('web.dashboard') }}">Home</a></li>
-      <li class="breadcrumb-item active">Livross</li>
+      <li class="breadcrumb-item active">bookss</li>
     </ol>
   </nav>
 </div>
@@ -24,7 +24,7 @@
     {% for value, icon, label_tab, count in tab_map %}
     <li class="nav-item">
       <a class="nav-link {% if current_status == value %}active{% endif %}"
-         href="{{ url_for('books.list', status=value) }}">
+         href="{{ url_for(plural ~ '.list', status=value) }}">
         <i class="bi {{ icon }} me-1"></i>{{ label_tab }}
         {% if count > 0 %}
           <span class="badge ms-1
@@ -51,22 +51,22 @@
 
       {% macro _row_actions(row, status=current_status) %}
         {% if status == 'active' %}
-          <a href="{{ url_for('books.detail', item_id=row.id) }}" class="btn btn-outline-primary" title="Visualizar"><i class="bi bi-eye"></i></a>
+          <a href="{{ url_for(plural ~ '.detail', item_id=row.id) }}" class="btn btn-outline-primary" title="Visualizar"><i class="bi bi-eye"></i></a>
           <button type="button" class="btn btn-outline-secondary btn-edit" data-id="{{ row.id }}" title="Editar"><i class="bi bi-pencil"></i></button>
-          <form method="post" action="{{ url_for('books.trash', book_id=row.id) }}" class="d-inline" onsubmit="return confirm('Mover para a lixeira?')">
+          <form method="post" action="{{ url_for(plural ~ '.trash', **{class_name_lower ~ '_id': row.id}) }}" class="d-inline" onsubmit="return confirm('Mover para a lixeira?')">
             <button class="btn btn-outline-danger" title="Lixeira"><i class="bi bi-trash3"></i></button>
           </form>
         {% elif status == 'draft' %}
           <button type="button" class="btn btn-outline-primary btn-edit" data-id="{{ row.id }}" title="Continuar editando"><i class="bi bi-pencil"></i></button>
-          <form method="post" action="{{ url_for('books.discard_draft', book_id=row.id) }}" class="d-inline" onsubmit="return confirm('Descartar rascunho?')">
+          <form method="post" action="{{ url_for(plural ~ '.discard_draft', **{class_name_lower ~ '_id': row.id}) }}" class="d-inline" onsubmit="return confirm('Descartar rascunho?')">
             <button class="btn btn-outline-danger" title="Descartar"><i class="bi bi-x-circle"></i></button>
           </form>
         {% elif status == 'trash' %}
-          <form method="post" action="{{ url_for('books.restore', book_id=row.id) }}" class="d-inline">
+          <form method="post" action="{{ url_for(plural ~ '.restore', **{class_name_lower ~ '_id': row.id}) }}" class="d-inline">
             <button class="btn btn-outline-success" title="Restaurar"><i class="bi bi-arrow-counterclockwise"></i></button>
           </form>
           {% if current_user.is_admin %}
-          <form method="post" action="{{ url_for('books.delete_permanent', book_id=row.id) }}" class="d-inline" onsubmit="return confirm('Excluir PERMANENTEMENTE?')">
+          <form method="post" action="{{ url_for(plural ~ '.delete_permanent', **{class_name_lower ~ '_id': row.id}) }}" class="d-inline" onsubmit="return confirm('Excluir PERMANENTEMENTE?')">
             <button class="btn btn-danger" title="Excluir permanente"><i class="bi bi-trash3-fill"></i></button>
           </form>
           {% endif %}
@@ -78,7 +78,7 @@
   </div>
 </section>
 
-{% include "bookstore/books/_modals/book_form_modal.html" %}
+{% include output_subdir ~ '/' ~ plural ~ '/_modals/' ~ class_name_lower ~ '_form_modal.html' %}
 {% endblock %}
 
 {% block extra_js %}
@@ -95,24 +95,39 @@
       form.reset();
       idElem.value = '';
       titleElem.innerText = 'Novo Livros';
-      const qty = document.getElementById('quantity');
-      if (qty) qty.value = 0;
-      const avail = document.getElementById('available');
-      if (avail) avail.value = 0;
+      // Limpar campos de FK também (já que reset não limpa os hidden e search)
+      document.querySelectorAll('#bookModal .fk-field').forEach(container => {
+        const hidden = container.querySelector('.fk-hidden-id');
+        const search = container.querySelector('.fk-search-input');
+        if (hidden) hidden.value = '';
+        if (search) search.value = '';
+      });
     }
 
     async function loadData(id) {
       try {
-        const response = await fetch(`/api/books/${id}`);
+        const response = await fetch('/api/bookstore/books/' + id);
         const result = await response.json();
         if (result.success) {
           const data = result.data;
+          // Preenche campos comuns
           for (const [key, value] of Object.entries(data)) {
             const field = document.getElementById(key);
             if (field) field.value = value ?? '';
           }
           idElem.value = id;
           titleElem.innerText = 'Editar Livros';
+
+          // Preenche campos FK (a API deve retornar também os nomes descritivos)
+          // Itera sobre os relacionamentos definidos no controller
+          {% for rel in relationship_fields %}
+            const fkField = '{{ rel.name }}';
+            const fkDisplayField = '{{ rel.name }}_name';
+            if (data[fkField] !== undefined) {
+              let displayText = data[fkDisplayField] || data[fkField];
+              window.setForeignKeyValue('bookModal', fkField, data[fkField], displayText);
+            }
+          {% endfor %}
         } else {
           alert('Erro ao carregar dados: ' + (result.error || 'Desconhecido'));
           modal.hide();
@@ -127,35 +142,38 @@
     async function save() {
       const id = idElem.value;
       const data = {};
-      const fields = form.querySelectorAll('[name]');
-      fields.forEach(field => {
+      // Captura campos comuns (input, select normal)
+      form.querySelectorAll('input:not(.fk-hidden-id):not(.fk-search-input), select:not(.relationship-select)').forEach(field => {
         let value = field.value;
         if (field.type === 'number') value = parseInt(value) || null;
         data[field.name] = value;
       });
-      //Inicio Validação campos obrigatórios
-      //if (!data.title || !data.author) {
-      //  alert('Campos obrigatórios não preenchidos.');
-      //  return;
-      //}
-      //Final Validação campos obrigatórios
+      // Captura campos FK (hidden)
+      form.querySelectorAll('.fk-hidden-id').forEach(hidden => {
+        if (hidden.name) data[hidden.name] = hidden.value;
+      });
+      // Captura campos Enum (select)
+      form.querySelectorAll('select').forEach(select => {
+        if (select.name) data[select.name] = select.value;
+      });
+
       const saveBtn = document.getElementById('btnSaveBook');
       saveBtn.disabled = true;
       saveBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Salvando...';
       try {
         let response;
         if (id) {
-          response = await fetch(`/api/books/${id}`, {
+          response = await fetch('/api/bookstore/books/' + id, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
           });
         } else {
-          const draftRes = await fetch(`/api/books/draft`, { method: 'POST' });
+          const draftRes = await fetch('/api/bookstore/books/draft', { method: 'POST' });
           const draftData = await draftRes.json();
           if (!draftData.success) throw new Error(draftData.error);
           const draftId = draftData.data.id;
-          response = await fetch(`/api/books/${draftId}/publish`, {
+          response = await fetch('/api/bookstore/books/' + draftId + '/publish', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)

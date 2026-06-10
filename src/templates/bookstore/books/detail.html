@@ -1,17 +1,17 @@
 {% extends "core/base.html" %}
 
 {% block title %}
-    {{ book.title }} - Detalhe do Livros
+    {{ class_name_lower.title }} - Detalhe do Livros
 {% endblock %}
 
 {% block content %}
 <div class="pagetitle">
-  <h1>{{ book.title }}</h1>
+  <h1>{{ class_name_lower.title }}</h1>
   <nav>
     <ol class="breadcrumb">
       <li class="breadcrumb-item"><a href="{{ url_for('web.dashboard') }}">Home</a></li>
-      <li class="breadcrumb-item"><a href="{{ url_for('books.list') }}">Livross</a></li>
-      <li class="breadcrumb-item active">{{ book.title }}</li>
+      <li class="breadcrumb-item"><a href="{{ url_for(plural ~ '.list') }}">Livross</a></li>
+      <li class="breadcrumb-item active">{{ class_name_lower.title }}</li>
     </ol>
   </nav>
 </div>
@@ -28,8 +28,8 @@
                 <td>{{ book.title or '—' }}</td>
               </tr>
               <td>
-                <th style="width:30%">Author</th>
-                <td>{{ book.author or '—' }}</td>
+                <th style="width:30%">Author Id</th>
+                <td>{{ book.author_id or '—' }}</td>
               </tr>
               <td>
                 <th style="width:30%">Isbn</th>
@@ -75,30 +75,27 @@
 
           <div class="mt-4">
             <div class="btn-group">
-              <a href="{{ url_for('books.list') }}" class="btn btn-secondary">Voltar</a>
+              <a href="{{ url_for(plural ~ '.list') }}" class="btn btn-secondary">Voltar</a>
 
-              {% if book.status == 'active' %}
-                <button type="button" class="btn btn-primary" id="btnEditBook" data-id="{{ book.id }}">Editar</button>
-                <form method="post" action="{{ url_for('books.trash', book_id=book.id) }}" class="d-inline" onsubmit="return confirm('Mover para lixeira?')">
+              {% if class_name_lower.status == 'active' %}
+                <button type="button" class="btn btn-primary" id="btnEditBook" data-id="{{ class_name_lower.id }}">Editar</button>
+                <form method="post" action="{{ url_for(plural ~ '.trash', **{class_name_lower ~ '_id': class_name_lower.id}) }}" class="d-inline" onsubmit="return confirm('Mover para lixeira?')">
                   <button type="submit" class="btn btn-outline-danger">Mover para lixeira</button>
                 </form>
-
-              {% elif book.status == 'draft' %}
-                <button type="button" class="btn btn-primary" id="btnEditBook" data-id="{{ book.id }}">Continuar edição</button>
-                <form method="post" action="{{ url_for('books.discard_draft', book_id=book.id) }}" class="d-inline" onsubmit="return confirm('Descartar rascunho?')">
+              {% elif class_name_lower.status == 'draft' %}
+                <button type="button" class="btn btn-primary" id="btnEditBook" data-id="{{ class_name_lower.id }}">Continuar edição</button>
+                <form method="post" action="{{ url_for(plural ~ '.discard_draft', **{class_name_lower ~ '_id': class_name_lower.id}) }}" class="d-inline" onsubmit="return confirm('Descartar rascunho?')">
                   <button type="submit" class="btn btn-danger">Descartar</button>
                 </form>
-
-              {% elif book.status == 'trash' %}
-                <form method="post" action="{{ url_for('books.restore', book_id=book.id) }}" class="d-inline">
+              {% elif class_name_lower.status == 'trash' %}
+                <form method="post" action="{{ url_for(plural ~ '.restore', **{class_name_lower ~ '_id': class_name_lower.id}) }}" class="d-inline">
                   <button type="submit" class="btn btn-success">Restaurar</button>
                 </form>
                 {% if current_user.is_admin %}
-                <form method="post" action="{{ url_for('books.delete_permanent', book_id=book.id) }}" class="d-inline" onsubmit="return confirm('Excluir permanentemente?')">
+                <form method="post" action="{{ url_for(plural ~ '.delete_permanent', **{class_name_lower ~ '_id': class_name_lower.id}) }}" class="d-inline" onsubmit="return confirm('Excluir permanentemente?')">
                   <button type="submit" class="btn btn-danger">Excluir permanentemente</button>
                 </form>
                 {% endif %}
-
               {% endif %}
             </div>
           </div>
@@ -108,21 +105,19 @@
   </div>
 </section>
 
-{% include "bookstore/books/_modals/book_form_modal.html" %}
+{% include output_subdir ~ '/' ~ plural ~ '/_modals/' ~ class_name_lower ~ '_form_modal.html' %}
 {% endblock %}
 
 {% block extra_js %}
 <script>
   (function() {
-    // O mesmo script do manage.html é utilizado para edição
     const modal = new bootstrap.Modal(document.getElementById('bookModal'));
     const editBtn = document.getElementById('btnEditBook');
     if (!editBtn) return;
 
-    // Função loadData (igual à do manage) – aqui simplificada, mas pode ser compartilhada
     async function loadData(id) {
       try {
-        const response = await fetch(`/api/books/${id}`);
+        const response = await fetch(`/api/bookstore/books/${id}`);
         const result = await response.json();
         if (result.success) {
           const data = result.data;
@@ -132,6 +127,15 @@
           }
           document.getElementById('bookId').value = id;
           document.getElementById('bookModalTitle').innerText = 'Editar Livros';
+          // Preencher FKs (similar ao manage)
+          {% for rel in relationship_fields %}
+            const fkField = '{{ rel.name }}';
+            const fkDisplayField = '{{ rel.name }}_name';
+            if (data[fkField] !== undefined) {
+              let displayText = data[fkDisplayField] || data[fkField];
+              window.setForeignKeyValue('bookModal', fkField, data[fkField], displayText);
+            }
+          {% endfor %}
         } else {
           alert('Erro ao carregar dados: ' + (result.error || 'Desconhecido'));
           modal.hide();
@@ -148,6 +152,12 @@
       if (form) form.reset();
       document.getElementById('bookId').value = '';
       document.getElementById('bookModalTitle').innerText = 'Editar Livros';
+      document.querySelectorAll('#bookModal .fk-field').forEach(container => {
+        const hidden = container.querySelector('.fk-hidden-id');
+        const search = container.querySelector('.fk-search-input');
+        if (hidden) hidden.value = '';
+        if (search) search.value = '';
+      });
     }
 
     editBtn.addEventListener('click', () => {

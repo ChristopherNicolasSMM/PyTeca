@@ -7,7 +7,9 @@ from sqlalchemy import DateTime, Enum, Index, Integer, String, Text, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from db.database import db
-from annotations import label, plural, listview, Column, Filter, form, Group, required
+from annotations import * # label, plural, listview, Column, Filter, form, Group, required, max_length, display_field
+
+from model.bookstore.author import Author
 
 
 class BookStatus(str, PyEnum):
@@ -35,20 +37,21 @@ class BookStatus(str, PyEnum):
     ]
 )
 @form(
-    fields=["title", "author", "isbn", "publisher", "year", "edition", "genre", "description", "cover_url", "language", "quantity", "available"],
+    fields=["title", "author_id", "isbn", "publisher", "year", "edition", "genre", "description", "cover_url", "language", "quantity", "available"],
     groups=[
-        Group("basic", "Informações Básicas", ["title", "author", "isbn", "publisher", "year", "edition"]),
+        Group("basic", "Informações Básicas", ["title", "author_id", "isbn", "publisher", "year", "edition"]),
         Group("details", "Detalhes", ["genre", "description", "cover_url", "language"], collapsible=True),
         Group("stock", "Estoque", ["quantity", "available"], collapsible=True),
     ]
 )
+@display_field("title")
 @required("title", "O título é obrigatório")
-@required("author", "O autor é obrigatório")
+@required("author_id", "O autor é obrigatório")
 class Book(db.Model):
     __tablename__ = "book"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     title: Mapped[str] = mapped_column(String(255), nullable=False, default="")
-    author: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    author_id: Mapped[int] = mapped_column(ForeignKey("authors.id"), nullable=False)
     isbn: Mapped[str | None] = mapped_column(String(20), nullable=True, unique=True)
     publisher: Mapped[str | None] = mapped_column(String(255), nullable=True)
     year: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -64,6 +67,10 @@ class Book(db.Model):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
     trashed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+
+    # Relacionamento
+    author: Mapped["Author"] = relationship(back_populates="books")
+     
     __table_args__ = (Index("ix_book_status_title", "status", "title"),)
 
     # Relacionamento com empréstimos (opcional, pode ser usado para navegação)
@@ -103,7 +110,7 @@ class Book(db.Model):
         return {
             "id": self.id,
             "title": self.title,
-            "author": self.author,
+            "author_id": self.author_id,
             "isbn": self.isbn,
             "publisher": self.publisher,
             "year": self.year,

@@ -92,6 +92,7 @@ def get_items_from_models() -> list[dict]:
         if not label or not plural:
             continue
         endpoint = f"{plural}.list"
+        
         try:
             url_for(endpoint)
         except Exception:
@@ -114,14 +115,12 @@ def get_items_from_yaml() -> list[dict]:
     # Sobe do diretório atual (utils/generate_model) até a raiz do projeto (src) e então entra em templates
     yaml_path = Path(__file__).parent.parent.parent / "templates" / "menu_complementar.yaml"
     if not yaml_path.exists():
-        print(f"[menu_builder] Arquivo de menu complementar não encontrado: {yaml_path}. Ignorando.")
         return []
     with open(yaml_path, 'r', encoding='utf-8') as f:
         data = yaml.safe_load(f) or {}
     # Aceita tanto 'items' (lista plana) quanto 'extra_items' (back compat)
     items = data.get('items', data.get('extra_items', []))
     # Itens podem ter campo 'parent'
-    print(f"[menu_builder] Carregados {len(items)} itens do YAML complementar.")
     return items
 
 # ------------------------------------------------------------

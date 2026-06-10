@@ -1,0 +1,34 @@
+<!-- _components/fk_selector_modal.html -->
+<div class="modal fade" id="fkModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Selecionar <span id="fkModalTitle"></span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="height: 70vh;">
+        <iframe id="fkIframe" src="" style="width:100%; height:100%; border:none;"></iframe>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function openForeignKeySelector(url, fieldId, displayFieldId, title) {
+    document.getElementById('fkModalTitle').innerText = title;
+    const iframe = document.getElementById('fkIframe');
+    iframe.src = url;
+    // Aguarda mensagem do iframe com o objeto selecionado
+    window.addEventListener('message', function(event) {
+      if (event.data && event.data.type === 'fk_selected') {
+        document.getElementById(fieldId).value = event.data.id;
+        document.getElementById(displayFieldId).value = event.data.text;
+        bootstrap.Modal.getInstance(document.getElementById('fkModal')).hide();
+      }
+    });
+    new bootstrap.Modal(document.getElementById('fkModal')).show();
+  }
+</script>

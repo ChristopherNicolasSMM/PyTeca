@@ -1,17 +1,17 @@
 {% extends "core/base.html" %}
 
 {% block title %}
-    {{ loan.title }} - Detalhe do Empréstimos
+    {{ class_name_lower.title }} - Detalhe do Empréstimos
 {% endblock %}
 
 {% block content %}
 <div class="pagetitle">
-  <h1>{{ loan.title }}</h1>
+  <h1>{{ class_name_lower.title }}</h1>
   <nav>
     <ol class="breadcrumb">
       <li class="breadcrumb-item"><a href="{{ url_for('web.dashboard') }}">Home</a></li>
-      <li class="breadcrumb-item"><a href="{{ url_for('loans.list') }}">Empréstimoss</a></li>
-      <li class="breadcrumb-item active">{{ loan.title }}</li>
+      <li class="breadcrumb-item"><a href="{{ url_for(plural ~ '.list') }}">Empréstimoss</a></li>
+      <li class="breadcrumb-item active">{{ class_name_lower.title }}</li>
     </ol>
   </nav>
 </div>
@@ -51,30 +51,27 @@
 
           <div class="mt-4">
             <div class="btn-group">
-              <a href="{{ url_for('loans.list') }}" class="btn btn-secondary">Voltar</a>
+              <a href="{{ url_for(plural ~ '.list') }}" class="btn btn-secondary">Voltar</a>
 
-              {% if loan.status == 'active' %}
-                <button type="button" class="btn btn-primary" id="btnEditLoan" data-id="{{ loan.id }}">Editar</button>
-                <form method="post" action="{{ url_for('loans.trash', loan_id=loan.id) }}" class="d-inline" onsubmit="return confirm('Mover para lixeira?')">
+              {% if class_name_lower.status == 'active' %}
+                <button type="button" class="btn btn-primary" id="btnEditLoan" data-id="{{ class_name_lower.id }}">Editar</button>
+                <form method="post" action="{{ url_for(plural ~ '.trash', **{class_name_lower ~ '_id': class_name_lower.id}) }}" class="d-inline" onsubmit="return confirm('Mover para lixeira?')">
                   <button type="submit" class="btn btn-outline-danger">Mover para lixeira</button>
                 </form>
-
-              {% elif loan.status == 'draft' %}
-                <button type="button" class="btn btn-primary" id="btnEditLoan" data-id="{{ loan.id }}">Continuar edição</button>
-                <form method="post" action="{{ url_for('loans.discard_draft', loan_id=loan.id) }}" class="d-inline" onsubmit="return confirm('Descartar rascunho?')">
+              {% elif class_name_lower.status == 'draft' %}
+                <button type="button" class="btn btn-primary" id="btnEditLoan" data-id="{{ class_name_lower.id }}">Continuar edição</button>
+                <form method="post" action="{{ url_for(plural ~ '.discard_draft', **{class_name_lower ~ '_id': class_name_lower.id}) }}" class="d-inline" onsubmit="return confirm('Descartar rascunho?')">
                   <button type="submit" class="btn btn-danger">Descartar</button>
                 </form>
-
-              {% elif loan.status == 'trash' %}
-                <form method="post" action="{{ url_for('loans.restore', loan_id=loan.id) }}" class="d-inline">
+              {% elif class_name_lower.status == 'trash' %}
+                <form method="post" action="{{ url_for(plural ~ '.restore', **{class_name_lower ~ '_id': class_name_lower.id}) }}" class="d-inline">
                   <button type="submit" class="btn btn-success">Restaurar</button>
                 </form>
                 {% if current_user.is_admin %}
-                <form method="post" action="{{ url_for('loans.delete_permanent', loan_id=loan.id) }}" class="d-inline" onsubmit="return confirm('Excluir permanentemente?')">
+                <form method="post" action="{{ url_for(plural ~ '.delete_permanent', **{class_name_lower ~ '_id': class_name_lower.id}) }}" class="d-inline" onsubmit="return confirm('Excluir permanentemente?')">
                   <button type="submit" class="btn btn-danger">Excluir permanentemente</button>
                 </form>
                 {% endif %}
-
               {% endif %}
             </div>
           </div>
@@ -84,21 +81,19 @@
   </div>
 </section>
 
-{% include "bookstore/loans/_modals/loan_form_modal.html" %}
+{% include output_subdir ~ '/' ~ plural ~ '/_modals/' ~ class_name_lower ~ '_form_modal.html' %}
 {% endblock %}
 
 {% block extra_js %}
 <script>
   (function() {
-    // O mesmo script do manage.html é utilizado para edição
     const modal = new bootstrap.Modal(document.getElementById('loanModal'));
     const editBtn = document.getElementById('btnEditLoan');
     if (!editBtn) return;
 
-    // Função loadData (igual à do manage) – aqui simplificada, mas pode ser compartilhada
     async function loadData(id) {
       try {
-        const response = await fetch(`/api/loans/${id}`);
+        const response = await fetch(`/api/bookstore/loans/${id}`);
         const result = await response.json();
         if (result.success) {
           const data = result.data;
@@ -108,6 +103,15 @@
           }
           document.getElementById('loanId').value = id;
           document.getElementById('loanModalTitle').innerText = 'Editar Empréstimos';
+          // Preencher FKs (similar ao manage)
+          {% for rel in relationship_fields %}
+            const fkField = '{{ rel.name }}';
+            const fkDisplayField = '{{ rel.name }}_name';
+            if (data[fkField] !== undefined) {
+              let displayText = data[fkDisplayField] || data[fkField];
+              window.setForeignKeyValue('loanModal', fkField, data[fkField], displayText);
+            }
+          {% endfor %}
         } else {
           alert('Erro ao carregar dados: ' + (result.error || 'Desconhecido'));
           modal.hide();
@@ -124,6 +128,12 @@
       if (form) form.reset();
       document.getElementById('loanId').value = '';
       document.getElementById('loanModalTitle').innerText = 'Editar Empréstimos';
+      document.querySelectorAll('#loanModal .fk-field').forEach(container => {
+        const hidden = container.querySelector('.fk-hidden-id');
+        const search = container.querySelector('.fk-search-input');
+        if (hidden) hidden.value = '';
+        if (search) search.value = '';
+      });
     }
 
     editBtn.addEventListener('click', () => {

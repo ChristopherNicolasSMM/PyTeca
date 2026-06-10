@@ -42,12 +42,29 @@ class BookService:
         sort: str = "id",
         direction: str = "asc",
     ) -> BookListResult:
+        
+        
         query = Book.query
         if status != "all":
             query = query.filter(Book.status == status)
+        
+        
         if search:
             pattern = f"%{search.strip()}%"
-            query = query.filter(Book.name.ilike(pattern))
+            from sqlalchemy import or_
+            search_filters = []
+            search_filters.append(Book.title.ilike(pattern))
+            search_filters.append(Book.author.ilike(pattern))
+            if search_filters:
+                query = query.filter(or_(*search_filters))
+         
+        
+        #if search:
+        #    pattern = f"%{search.strip()}%"
+        #    #query = query.filter(Book.name.ilike(pattern))
+        #    query = query.filter(Book.name.ilike(pattern))
+        #    
+            
         sort_col = getattr(Book, sort, Book.id)
         query = query.order_by(sort_col.desc() if direction == "desc" else sort_col.asc())
         pagination = query.paginate(page=page, per_page=per_page, error_out=False)

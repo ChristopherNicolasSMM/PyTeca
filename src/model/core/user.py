@@ -6,10 +6,10 @@ from flask_login import UserMixin
 from sqlalchemy import Boolean, Column, DateTime, Integer, String, Text
 from sqlalchemy.sql import func
 from werkzeug.security import check_password_hash, generate_password_hash
-
+from annotations import display_field
 from db.database import db
 
-
+@display_field("username")
 class User(UserMixin, db.Model):
     """Modelo de usuário para autenticação"""
 

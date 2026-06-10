@@ -6,7 +6,7 @@ from sqlalchemy import ForeignKey, DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from db.database import db
-from annotations import label, plural, listview, Column, Filter, form, Group, required
+from annotations import * # label, plural, listview, Column, Filter, form, Group, required, max_length, display_field
 from model.core.user import User
 from model.bookstore.book import Book
 
