@@ -100,71 +100,83 @@
 
 <script>
   (function() {
-    const abortControllers = new Map();
-
-    function getOrCreateDatalist(fieldName) {
-      let datalist = document.getElementById(`datalist-${fieldName}`);
-      if (!datalist) {
-        datalist = document.createElement('datalist');
-        datalist.id = `datalist-${fieldName}`;
-        document.body.appendChild(datalist);
-      }
-      return datalist;
-    }
+    const initializedFields = new WeakSet();
 
     function setupForeignKeyField(container) {
-      const fieldName = container.dataset.field;
-      const foreignTable = container.dataset.foreignTable;
-      const hiddenInput = container.querySelector('.fk-hidden-id');
-      const searchInput = container.querySelector('.fk-search-input');
-      const clearBtn = container.querySelector('.fk-clear-btn');
+      if (initializedFields.has(container)) return; // evita listeners duplicados
+      initializedFields.add(container);
 
-      const datalist = getOrCreateDatalist(fieldName);
-      searchInput.setAttribute('list', datalist.id);
+      const fieldName    = container.dataset.field;
+      const foreignTable = container.dataset.foreignTable;
+      const hiddenInput  = container.querySelector('.fk-hidden-id');
+      const searchInput  = container.querySelector('.fk-search-input');
+      const clearBtn     = container.querySelector('.fk-clear-btn');
+
+      // Cria dropdown de resultados
+      const dropdown = document.createElement('ul');
+      dropdown.className = 'fk-dropdown list-group position-absolute w-100 shadow';
+      dropdown.style.cssText = 'z-index:9999;max-height:200px;overflow-y:auto;display:none;';
+      container.querySelector('.input-group').style.position = 'relative';
+      container.querySelector('.input-group').appendChild(dropdown);
+
+      function showDropdown(results) {
+        dropdown.innerHTML = '';
+        if (!results.length) {
+          dropdown.style.display = 'none';
+          return;
+        }
+        results.forEach(opt => {
+          const li = document.createElement('li');
+          li.className = 'list-group-item list-group-item-action';
+          li.style.cursor = 'pointer';
+          li.textContent = opt.text;
+          li.addEventListener('mousedown', (e) => {
+            e.preventDefault(); // evita blur antes do click
+            hiddenInput.value = opt.id;
+            searchInput.value = opt.text;
+            dropdown.style.display = 'none';
+          });
+          dropdown.appendChild(li);
+        });
+        dropdown.style.display = 'block';
+      }
 
       clearBtn.addEventListener('click', () => {
-        searchInput.value = '';
-        hiddenInput.value = '';
+        searchInput.value  = '';
+        hiddenInput.value  = '';
+        dropdown.style.display = 'none';
         searchInput.focus();
       });
 
-      let debounceTimer;
-      searchInput.addEventListener('input', (e) => {
-        clearTimeout(debounceTimer);
-        const query = e.target.value.trim();
-        if (query.length < 2) { datalist.innerHTML = ''; return; }
-        debounceTimer = setTimeout(() => loadOptions(query), 300);
+      searchInput.addEventListener('blur', () => {
+        // Fecha dropdown ao perder foco (após mousedown já executou)
+        setTimeout(() => { dropdown.style.display = 'none'; }, 150);
       });
 
-      async function loadOptions(search) {
-        if (abortControllers.has(fieldName)) abortControllers.get(fieldName).abort();
-        const controller = new AbortController();
-        abortControllers.set(fieldName, controller);
-        try {
-          const url = `/api/options/${foreignTable}?search=${encodeURIComponent(search)}`;
-          const response = await fetch(url, { signal: controller.signal });
-          const data = await response.json();
-          datalist.innerHTML = '';
-          data.results.forEach(opt => {
-            const option = document.createElement('option');
-            option.value = opt.text;
-            option.dataset.id = opt.id;
-            datalist.appendChild(option);
-          });
-        } catch (err) {
-          if (err.name === 'AbortError') return;
-          console.error('Erro ao buscar opções:', err);
-        } finally {
-          abortControllers.delete(fieldName);
-        }
-      }
+      let debounceTimer;
+      let currentController = null;
 
-      searchInput.addEventListener('change', () => {
-        const selected = Array.from(datalist.options).find(o => o.value === searchInput.value);
-        hiddenInput.value = selected ? selected.dataset.id : '';
+      searchInput.addEventListener('input', (e) => {
+        hiddenInput.value = ''; // limpa seleção anterior ao redigitar
+        clearTimeout(debounceTimer);
+        const query = e.target.value.trim();
+        if (query.length < 2) { dropdown.style.display = 'none'; return; }
+        debounceTimer = setTimeout(async () => {
+          if (currentController) currentController.abort();
+          currentController = new AbortController();
+          try {
+            const url = `/api/options/${foreignTable}?search=${encodeURIComponent(query)}`;
+            const response = await fetch(url, { signal: currentController.signal });
+            const data = await response.json();
+            showDropdown(data.results || []);
+          } catch (err) {
+            if (err.name !== 'AbortError') console.error('Erro FK fetch:', err);
+          }
+        }, 300);
       });
     }
 
+    // Função global para preencher campo FK ao editar registro existente
     window.setForeignKeyValue = function(modalId, fieldName, id, text) {
       const modal = document.getElementById(modalId);
       if (!modal) return;
@@ -172,13 +184,23 @@
       if (!container) return;
       const hidden = container.querySelector('.fk-hidden-id');
       const search = container.querySelector('.fk-search-input');
-      if (hidden && search) { hidden.value = id; search.value = text || ''; }
+      if (hidden) hidden.value = id   || '';
+      if (search) search.value = text || '';
     };
 
     const modalElement = document.getElementById('bookModal');
     if (modalElement) {
       modalElement.addEventListener('shown.bs.modal', function() {
         modalElement.querySelectorAll('.fk-field').forEach(setupForeignKeyField);
+      });
+      // Limpa campos ao fechar
+      modalElement.addEventListener('hidden.bs.modal', function() {
+        modalElement.querySelectorAll('.fk-hidden-id, .fk-search-input').forEach(el => {
+          el.value = '';
+        });
+        modalElement.querySelectorAll('.fk-dropdown').forEach(el => {
+          el.style.display = 'none';
+        });
       });
     }
   })();

@@ -94,6 +94,8 @@ class BookService:
 
     def create_draft(self) -> ServiceResult:
         obj = Book(status=BookStatus.DRAFT)
+        print("Creating draft:", obj.author_id)
+        print("Creating draft:", obj)
         db.session.add(obj)
         db.session.commit()
         return ServiceResult(success=True, data=obj, code=201)
