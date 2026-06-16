@@ -13,19 +13,25 @@ from utils.smart_list.config import SmartListConfig
 def _get_cell_value(row: Any, key: str) -> str:
     """Extrai valor de um row (dict, objeto ORM ou dataclass).
     Para relacionamentos ORM, tenta <key>_name antes de cair no str().
+    Enum → .value; datetime → dd/mm/yyyy HH:MM
     """
+    from enum import Enum
+
     if isinstance(row, dict):
         val = row.get(key, "")
     else:
-        # Tenta <key>_name primeiro (ex: author → author_name)
+        # Tenta <key>_name primeiro (ex: author_id → author_id_name)
         val = getattr(row, f"{key}_name", None)
         if val is None:
             val = getattr(row, key, "")
     if val is None:
         return ""
+    # Enum → string limpa (evita "BookStatus.ACTIVE")
+    if isinstance(val, Enum):
+        return str(val.value)
     if isinstance(val, datetime):
         return val.strftime("%d/%m/%Y %H:%M")
-    # Se ainda for um objeto ORM (não primitivo), tenta .name ou str sem <>
+    # Objeto ORM com repr tipo <ClassName ...>
     raw = str(val)
     if raw.startswith("<") and raw.endswith(">"):
         return getattr(val, "name", getattr(val, "title", raw))

@@ -1,4 +1,4 @@
-{# Modal de formulário para Author #}
+{# Modal de formulário para Author — gerado automaticamente #}
 <div class="modal fade" id="authorModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
@@ -7,172 +7,261 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
-        <form id="authorForm">
+
+        <div class="alert alert-danger d-none" id="authorValidationAlert" role="alert">
+          <i class="bi bi-exclamation-triangle me-1"></i>
+          <span id="authorValidationMsg"></span>
+        </div>
+
+        <form id="authorForm" novalidate>
           <input type="hidden" id="authorId">
-          {% for field in form_fields_list %}
-            {# Verifica se o campo é FK #}
-            {% set is_fk = false %}
-            {% for rel in relationship_fields %}
-              {% if rel.name == field %}
-                {% set is_fk = true %}
-                {% set foreign_table = rel.foreign_table %}
-              {% endif %}
-            {% endfor %}
-
-            {# Verifica se o campo é Enum (precisa ser passado no contexto como enum_fields) #}
-            {% set is_enum = false %}
-            {% for enum_def in enum_fields|default([]) %}
-              {% if enum_def.name == field %}
-                {% set is_enum = true %}
-                {% set enum_options = enum_def.options %}
-              {% endif %}
-            {% endfor %}
-
-            {% if is_fk %}
-              {# Campo FK com busca via datalist #}
-              <div class="row mb-3 fk-field" data-field="{{ field }}" data-foreign-table="{{ foreign_table }}">
-                <label class="col-sm-3 col-form-label">{{ field|replace('_',' ')|title }}</label>
-                <div class="col-sm-9">
-                  <input type="hidden" name="{{ field }}" class="fk-hidden-id">
-                  <div class="input-group">
-                    <input type="text" class="form-control fk-search-input" placeholder="Digite para buscar..." autocomplete="off">
-                    <button class="btn btn-outline-secondary fk-clear-btn" type="button" title="Limpar">
-                      <i class="bi bi-x"></i>
-                    </button>
-                  </div>
-                  <div class="invalid-feedback">Selecione um valor válido.</div>
-                </div>
-              </div>
-            {% elif is_enum %}
-              {# Campo Enum: select com opções #}
-              <div class="row mb-3">
-                <label for="{{ field }}" class="col-sm-3 col-form-label">{{ field|replace('_',' ')|title }}</label>
-                <div class="col-sm-9">
-                  <select class="form-select" id="{{ field }}" name="{{ field }}">
-                    <option value="">Selecione...</option>
-                    {% for value, label in enum_options %}
-                      <option value="{{ value }}">Autores</option>
-                    {% endfor %}
-                  </select>
-                </div>
-              </div>
-            {% else %}
-              {# Campo normal (input text) #}
-              <div class="row mb-3">
-                <label for="{{ field }}" class="col-sm-3 col-form-label">{{ field|replace('_',' ')|title }}</label>
-                <div class="col-sm-9">
-                  <input type="text" class="form-control" id="{{ field }}" name="{{ field }}">
-                </div>
-              </div>
-            {% endif %}
-          {% endfor %}
+                    <div class="row mb-3">
+            <label for="name" class="col-sm-3 col-form-label">Name <span class="text-danger">*</span></label>
+            <div class="col-sm-9">
+              <input type="text" class="form-control required-field" id="name" name="name" data-field-name="name">
+              <div class="invalid-feedback" id="err-name"></div>
+            </div>
+          </div>
+          <div class="row mb-3">
+            <label for="birth_year" class="col-sm-3 col-form-label">Birth Year</label>
+            <div class="col-sm-9">
+              <input type="text" class="form-control" id="birth_year" name="birth_year" data-field-name="birth_year">
+              <div class="invalid-feedback" id="err-birth_year"></div>
+            </div>
+          </div>
+          <div class="row mb-3">
+            <label for="bio" class="col-sm-3 col-form-label">Bio</label>
+            <div class="col-sm-9">
+              <input type="text" class="form-control" id="bio" name="bio" data-field-name="bio">
+              <div class="invalid-feedback" id="err-bio"></div>
+            </div>
+          </div>
         </form>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-        <button type="button" class="btn btn-primary" id="btnSaveAuthor">Salvar</button>
+        <button type="button" class="btn btn-primary" id="btnSaveAuthor">
+          <i class="bi bi-save me-1"></i>Salvar
+        </button>
       </div>
     </div>
   </div>
 </div>
 
 <script>
-  (function() {
-    // Armazena controllers de abort para cada campo FK
-    const abortControllers = new Map();
+(function () {
+  'use strict';
 
-    function getOrCreateDatalist(fieldName) {
-      let datalist = document.getElementById(`datalist-${fieldName}`);
-      if (!datalist) {
-        datalist = document.createElement('datalist');
-        datalist.id = `datalist-${fieldName}`;
-        document.body.appendChild(datalist);
-      }
-      return datalist;
-    }
+  const MODAL_ID        = 'authorModal';
+  const REQUIRED_FIELDS = {{ required_fields | default([]) | tojson }};
+  const initializedFk   = new WeakSet();
 
-    function setupForeignKeyField(container) {
-      const fieldName = container.dataset.field;
-      const foreignTable = container.dataset.foreignTable;
-      const hiddenInput = container.querySelector('.fk-hidden-id');
-      const searchInput = container.querySelector('.fk-search-input');
-      const clearBtn = container.querySelector('.fk-clear-btn');
+  // ── FK: dropdown ao focar e ao digitar ────────────────────────────────────
+  function setupFkField(container) {
+    if (initializedFk.has(container)) return;
+    initializedFk.add(container);
 
-      const datalist = getOrCreateDatalist(fieldName);
-      searchInput.setAttribute('list', datalist.id);
+    const foreignTable = container.dataset.foreignTable;
+    const hidden       = container.querySelector('.fk-hidden-id');
+    const search       = container.querySelector('.fk-search-input');
+    const clearBtn     = container.querySelector('.fk-clear-btn');
+    const dropdown     = container.querySelector('.fk-dropdown');
 
-      clearBtn.addEventListener('click', () => {
-        searchInput.value = '';
-        hiddenInput.value = '';
-        searchInput.focus();
-      });
-
-      let debounceTimer;
-      searchInput.addEventListener('input', (e) => {
-        clearTimeout(debounceTimer);
-        const query = e.target.value.trim();
-        if (query.length < 2) {
-          datalist.innerHTML = '';
-          return;
-        }
-        debounceTimer = setTimeout(() => loadOptions(query), 300);
-      });
-
-      async function loadOptions(search) {
-        if (abortControllers.has(fieldName)) {
-          abortControllers.get(fieldName).abort();
-        }
-        const controller = new AbortController();
-        abortControllers.set(fieldName, controller);
-        try {
-          const url = `/api/options/${foreignTable}?search=${encodeURIComponent(search)}`;
-          const response = await fetch(url, { signal: controller.signal });
-          const data = await response.json();
-          datalist.innerHTML = '';
-          data.results.forEach(opt => {
-            const option = document.createElement('option');
-            option.value = opt.text;
-            option.dataset.id = opt.id;
-            datalist.appendChild(option);
+    function renderDropdown(results) {
+      dropdown.innerHTML = '';
+      if (!results.length) {
+        const li = document.createElement('li');
+        li.className   = 'list-group-item text-muted small';
+        li.textContent = 'Nenhum resultado.';
+        dropdown.appendChild(li);
+      } else {
+        results.forEach(opt => {
+          const li = document.createElement('li');
+          li.className = 'list-group-item list-group-item-action';
+          li.style.cursor = 'pointer';
+          li.textContent = opt.text;
+          li.addEventListener('mousedown', e => {
+            e.preventDefault();
+            hidden.value = opt.id;
+            search.value = opt.text;
+            dropdown.style.display = 'none';
+            clearErr(container.dataset.field);
           });
-        } catch (err) {
-          if (err.name === 'AbortError') return;
-          console.error('Erro ao buscar opções:', err);
-        } finally {
-          abortControllers.delete(fieldName);
-        }
+          dropdown.appendChild(li);
+        });
       }
-
-      searchInput.addEventListener('change', () => {
-        const selectedOption = Array.from(datalist.options).find(opt => opt.value === searchInput.value);
-        if (selectedOption) {
-          hiddenInput.value = selectedOption.dataset.id;
-        } else {
-          hiddenInput.value = '';
-        }
-      });
+      dropdown.style.display = 'block';
     }
 
-    // Função pública para pré-carregar valor FK (chamada pelo manage.html)
-    window.setForeignKeyValue = function(modalId, fieldName, id, text) {
-      const modal = document.getElementById(modalId);
-      if (!modal) return;
-      const container = modal.querySelector(`.fk-field[data-field="${fieldName}"]`);
-      if (!container) return;
-      const hidden = container.querySelector('.fk-hidden-id');
-      const search = container.querySelector('.fk-search-input');
-      if (hidden && search) {
-        hidden.value = id;
-        search.value = text || '';
-      }
-    };
-
-    // Inicializa todos os FK quando o modal for aberto
-    const modalElement = document.getElementById('authorModal');
-    if (modalElement) {
-      modalElement.addEventListener('shown.bs.modal', function() {
-        modalElement.querySelectorAll('.fk-field').forEach(setupForeignKeyField);
-      });
+    async function fetchOpts(q) {
+      try {
+        const qs  = q ? `?search=${encodeURIComponent(q)}` : '';
+        const res = await fetch(`/api/options/${foreignTable}${qs}`);
+        renderDropdown((await res.json()).results || []);
+      } catch (e) { console.error('FK fetch:', e); }
     }
-  })();
+
+    search.addEventListener('focus', () => fetchOpts(search.value.trim()));
+    search.addEventListener('blur',  () => setTimeout(() => { dropdown.style.display = 'none'; }, 180));
+    let debounce;
+    search.addEventListener('input', e => {
+      hidden.value = '';
+      clearTimeout(debounce);
+      debounce = setTimeout(() => fetchOpts(e.target.value.trim()), 280);
+    });
+    clearBtn.addEventListener('click', () => {
+      hidden.value = ''; search.value = '';
+      dropdown.style.display = 'none'; search.focus();
+    });
+  }
+
+  window.setForeignKeyValue = function (modalId, fieldName, id, text) {
+    const modal = document.getElementById(modalId);
+    if (!modal) return;
+    const c = modal.querySelector(`.fk-field[data-field="${fieldName}"]`);
+    if (!c) return;
+    const h = c.querySelector('.fk-hidden-id');
+    const s = c.querySelector('.fk-search-input');
+    if (h) h.value = id   || '';
+    if (s) s.value = text || '';
+  };
+
+  // ── ISO → YYYY-MM-DD ──────────────────────────────────────────────────────
+  function isoToDate(iso) { return iso ? iso.substring(0, 10) : ''; }
+
+  // ── Validação ─────────────────────────────────────────────────────────────
+  function clearErr(field) {
+    const el  = document.getElementById(field) || document.querySelector(`[name="${field}"]`);
+    const err = document.getElementById(`err-${field}`);
+    if (el)  el.classList.remove('is-invalid');
+    if (err) { err.textContent = ''; err.style.display = 'none'; }
+  }
+
+  function clearAllErrors() {
+    document.getElementById('authorValidationAlert').classList.add('d-none');
+    REQUIRED_FIELDS.forEach(clearErr);
+  }
+
+  function validateForm(data) {
+    const errors = [];
+    REQUIRED_FIELDS.forEach(field => {
+      if (!(data[field] ?? '').toString().trim()) {
+        const label = field.replace(/_/g, ' ');
+        const msg   = `${label.charAt(0).toUpperCase() + label.slice(1)} é obrigatório.`;
+        const el    = document.getElementById(field) || document.querySelector(`[name="${field}"]`);
+        const err   = document.getElementById(`err-${field}`);
+        if (el)  el.classList.add('is-invalid');
+        if (err) { err.textContent = msg; err.style.display = 'block'; }
+        errors.push(msg);
+      }
+    });
+    return errors;
+  }
+
+  // ── Coleta dados ──────────────────────────────────────────────────────────
+  function collectData() {
+    const form = document.getElementById('authorForm');
+    const data = {};
+    form.querySelectorAll(
+      'input:not(.fk-hidden-id):not(.fk-search-input)[name], textarea[name], select[name]'
+    ).forEach(el => {
+      let val = el.value;
+      if (el.type === 'number') val = val !== '' ? parseInt(val) || null : null;
+      if (el.name) data[el.name] = val;
+    });
+    form.querySelectorAll('.fk-hidden-id[name]').forEach(el => {
+      data[el.name] = el.value || null;
+    });
+    return data;
+  }
+
+  // ── Salvar ────────────────────────────────────────────────────────────────
+  document.getElementById('btnSaveAuthor').addEventListener('click', async () => {
+    clearAllErrors();
+    const id     = document.getElementById('authorId').value;
+    const data   = collectData();
+    const errors = validateForm(data);
+
+    if (errors.length) {
+      const a = document.getElementById('authorValidationAlert');
+      document.getElementById('authorValidationMsg').textContent = errors.join(' | ');
+      a.classList.remove('d-none');
+      return;
+    }
+
+    const btn = document.getElementById('btnSaveAuthor');
+    btn.disabled  = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Salvando...';
+
+    try {
+      const url    = id ? `/api/bookstore/authors/${id}` : '/api/bookstore/authors/';
+      const method = id ? 'PUT' : 'POST';
+      const res    = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      const result = await res.json();
+      if (result.success) {
+        bootstrap.Modal.getInstance(document.getElementById(MODAL_ID))?.hide();
+        window.location.reload();
+      } else {
+        const a = document.getElementById('authorValidationAlert');
+        document.getElementById('authorValidationMsg').textContent = result.error || 'Falha ao salvar.';
+        a.classList.remove('d-none');
+      }
+    } catch {
+      const a = document.getElementById('authorValidationAlert');
+      document.getElementById('authorValidationMsg').textContent = 'Erro de conexão.';
+      a.classList.remove('d-none');
+    } finally {
+      btn.disabled  = false;
+      btn.innerHTML = '<i class="bi bi-save me-1"></i>Salvar';
+    }
+  });
+
+  // ── Carrega dados para edição ─────────────────────────────────────────────
+  window['loadAuthorData'] = async function (id) {
+    try {
+      const result = await (await fetch(`/api/bookstore/authors/${id}`)).json();
+      if (!result.success) { alert('Erro ao carregar: ' + result.error); return; }
+      const data   = result.data;
+
+      document.getElementById('authorId').value = id;
+      document.getElementById('authorModalTitle').textContent = 'Editar Autores';
+
+      for (const [key, value] of Object.entries(data)) {
+        const el = document.getElementById(key);
+        if (!el) continue;
+        el.value = el.type === 'date' ? isoToDate(value) : (value ?? '');
+      }
+
+      {% for rel in relationship_fields %}
+      if (data['{{ rel.name }}'] !== undefined) {
+        window.setForeignKeyValue(MODAL_ID, '{{ rel.name }}',
+          data['{{ rel.name }}'],
+          data['{{ rel.name }}_name'] || data['{{ rel.name }}']
+        );
+      }
+      {% endfor %}
+    } catch { alert('Erro de conexão.'); }
+  };
+
+  // ── Setup do modal ────────────────────────────────────────────────────────
+  const modalEl = document.getElementById(MODAL_ID);
+  if (modalEl) {
+    modalEl.addEventListener('shown.bs.modal', () => {
+      modalEl.querySelectorAll('.fk-field').forEach(setupFkField);
+    });
+    modalEl.addEventListener('hidden.bs.modal', () => {
+      document.getElementById('authorForm').reset();
+      document.getElementById('authorId').value = '';
+      document.getElementById('authorModalTitle').textContent = 'Novo Autores';
+      document.getElementById('authorValidationAlert').classList.add('d-none');
+      modalEl.querySelectorAll('.fk-hidden-id, .fk-search-input').forEach(el => el.value = '');
+      modalEl.querySelectorAll('.fk-dropdown').forEach(el => el.style.display = 'none');
+      modalEl.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+    });
+  }
+})();
 </script>

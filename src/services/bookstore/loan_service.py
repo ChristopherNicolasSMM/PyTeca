@@ -65,9 +65,17 @@ def _friendly_db_error(exc: Exception) -> str:
         return f"Já existe um registro com este valor no campo '{m.group(1)}'. Verifique e tente novamente."
     m = re.search(r"NOT NULL constraint failed:\s*\w+\.(\w+)", msg, re.IGNORECASE)
     if m:
-        return f"O campo '{m.group(1)}' é obrigatório e não pode estar vazio."
+        field = m.group(1)
+        # NOT NULL em UPDATE (book_id=NULL) significa que outro registro depende deste
+        if "UPDATE" in msg.upper() or "update" in msg.lower():
+            return (
+                f"Não é possível excluir: outros registros dependem deste "
+                f"(campo '{field}' em tabela relacionada). "
+                f"Remova os registros dependentes primeiro."
+            )
+        return f"O campo '{field}' é obrigatório e não pode estar vazio."
     if "FOREIGN KEY" in msg.upper():
-        return "Referência inválida: o registro relacionado não existe."
+        return "Não é possível excluir: existem registros relacionados que dependem deste item."
     return f"Erro ao salvar: {msg.splitlines()[0][:200]}"
 
 
@@ -257,7 +265,12 @@ class LoanService:
                 code=400,
             )
         db.session.delete(obj)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            logger.warning("Erro ao excluir Loan id=%s: %s", id, e)
+            return ServiceResult(success=False, error=_friendly_db_error(e), code=422)
         return ServiceResult(success=True, data={"id": id})
 
     def discard_draft(self, id: int) -> ServiceResult:
@@ -277,8 +290,18 @@ class LoanService:
         Aplica campos do dict ao objeto ORM.
         - Ignora campos readonly (id, status, timestamps).
         - Converte strings de data para datetime automaticamente.
-        - Converte campos FK (sufixo _id) para int.
+        - Converte campos FK (_id) e colunas Integer para tipos corretos.
         """
+        from sqlalchemy import Integer
+        from sqlalchemy.orm import ColumnProperty
+
+        # Monta set de campos Integer do modelo para conversão automática
+        _int_fields: set[str] = set()
+        for _prop in obj.__class__.__mapper__.iterate_properties:
+            if isinstance(_prop, ColumnProperty):
+                if isinstance(_prop.columns[0].type, Integer):
+                    _int_fields.add(_prop.key)
+
         for key, value in data.items():
             if key in _READONLY:
                 continue
@@ -295,8 +318,8 @@ class LoanService:
                     logger.warning("Ignorando data inválida em '%s': %s", key, e)
                     continue
 
-            # Conversão de chaves estrangeiras para int
-            if key.endswith("_id") and value is not None and value != "":
+            # Conversão de inteiros (FKs e colunas Integer)
+            if (key.endswith("_id") or key in _int_fields) and value is not None and value != "":
                 try:
                     value = int(value)
                 except (ValueError, TypeError):

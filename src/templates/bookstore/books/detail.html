@@ -1,17 +1,16 @@
 {% extends "core/base.html" %}
 
-{% block title %}
-    {{ class_name_lower.title }} - Detalhe do Livros
-{% endblock %}
+{% block title %}Livros - Detalhe{% endblock %}
 
 {% block content %}
+{% set item = book %}
 <div class="pagetitle">
-  <h1>{{ class_name_lower.title }}</h1>
+  <h1>Livros</h1>
   <nav>
     <ol class="breadcrumb">
       <li class="breadcrumb-item"><a href="{{ url_for('web.dashboard') }}">Home</a></li>
       <li class="breadcrumb-item"><a href="{{ url_for(plural ~ '.list') }}">Livross</a></li>
-      <li class="breadcrumb-item active">{{ class_name_lower.title }}</li>
+      <li class="breadcrumb-item active">Detalhe #{{ item.id }}</li>
     </ol>
   </nav>
 </div>
@@ -23,53 +22,53 @@
         <div class="card-body">
           <h5 class="card-title">Informações</h5>
           <table class="table table-bordered">
-                          <td>
+                          <tr>
                 <th style="width:30%">Title</th>
-                <td>{{ book.title or '—' }}</td>
+                <td>{{ book.title|smart_val }}</td>
               </tr>
-              <td>
+              <tr>
                 <th style="width:30%">Author Id</th>
-                <td>{{ book.author_id or '—' }}</td>
+                <td>{{ book.author.name if book.author else '—' }}</td>
               </tr>
-              <td>
+              <tr>
                 <th style="width:30%">Isbn</th>
-                <td>{{ book.isbn or '—' }}</td>
+                <td>{{ book.isbn|smart_val }}</td>
               </tr>
-              <td>
+              <tr>
                 <th style="width:30%">Publisher</th>
-                <td>{{ book.publisher or '—' }}</td>
+                <td>{{ book.publisher|smart_val }}</td>
               </tr>
-              <td>
+              <tr>
                 <th style="width:30%">Year</th>
-                <td>{{ book.year or '—' }}</td>
+                <td>{{ book.year|smart_val }}</td>
               </tr>
-              <td>
+              <tr>
                 <th style="width:30%">Edition</th>
-                <td>{{ book.edition or '—' }}</td>
+                <td>{{ book.edition|smart_val }}</td>
               </tr>
-              <td>
+              <tr>
                 <th style="width:30%">Genre</th>
-                <td>{{ book.genre or '—' }}</td>
+                <td>{{ book.genre|smart_val }}</td>
               </tr>
-              <td>
+              <tr>
                 <th style="width:30%">Description</th>
-                <td>{{ book.description or '—' }}</td>
+                <td>{{ book.description|smart_val }}</td>
               </tr>
-              <td>
+              <tr>
                 <th style="width:30%">Cover Url</th>
-                <td>{{ book.cover_url or '—' }}</td>
+                <td>{{ book.cover_url|smart_val }}</td>
               </tr>
-              <td>
+              <tr>
                 <th style="width:30%">Language</th>
-                <td>{{ book.language or '—' }}</td>
+                <td>{{ book.language|smart_val }}</td>
               </tr>
-              <td>
+              <tr>
                 <th style="width:30%">Quantity</th>
-                <td>{{ book.quantity or '—' }}</td>
+                <td>{{ book.quantity|smart_val }}</td>
               </tr>
-              <td>
+              <tr>
                 <th style="width:30%">Available</th>
-                <td>{{ book.available or '—' }}</td>
+                <td>{{ book.available|smart_val }}</td>
               </tr>
           </table>
 
@@ -77,22 +76,24 @@
             <div class="btn-group">
               <a href="{{ url_for(plural ~ '.list') }}" class="btn btn-secondary">Voltar</a>
 
-              {% if class_name_lower.status == 'active' %}
-                <button type="button" class="btn btn-primary" id="btnEditBook" data-id="{{ class_name_lower.id }}">Editar</button>
-                <form method="post" action="{{ url_for(plural ~ '.trash', **{class_name_lower ~ '_id': class_name_lower.id}) }}" class="d-inline" onsubmit="return confirm('Mover para lixeira?')">
+              {% set item_status = item.status.value if item.status is not string else item.status %}
+
+              {% if item_status == 'active' %}
+                <button type="button" class="btn btn-primary" id="btnEditBook" data-id="{{ item.id }}">Editar</button>
+                <form method="post" action="{{ url_for(plural ~ '.trash', **{class_name_lower ~ '_id': item.id}) }}" class="d-inline" onsubmit="return confirm('Mover para lixeira?')">
                   <button type="submit" class="btn btn-outline-danger">Mover para lixeira</button>
                 </form>
-              {% elif class_name_lower.status == 'draft' %}
-                <button type="button" class="btn btn-primary" id="btnEditBook" data-id="{{ class_name_lower.id }}">Continuar edição</button>
-                <form method="post" action="{{ url_for(plural ~ '.discard_draft', **{class_name_lower ~ '_id': class_name_lower.id}) }}" class="d-inline" onsubmit="return confirm('Descartar rascunho?')">
+              {% elif item_status == 'draft' %}
+                <button type="button" class="btn btn-primary" id="btnEditBook" data-id="{{ item.id }}">Continuar edição</button>
+                <form method="post" action="{{ url_for(plural ~ '.discard_draft', **{class_name_lower ~ '_id': item.id}) }}" class="d-inline" onsubmit="return confirm('Descartar rascunho?')">
                   <button type="submit" class="btn btn-danger">Descartar</button>
                 </form>
-              {% elif class_name_lower.status == 'trash' %}
-                <form method="post" action="{{ url_for(plural ~ '.restore', **{class_name_lower ~ '_id': class_name_lower.id}) }}" class="d-inline">
+              {% elif item_status == 'trash' %}
+                <form method="post" action="{{ url_for(plural ~ '.restore', **{class_name_lower ~ '_id': item.id}) }}" class="d-inline">
                   <button type="submit" class="btn btn-success">Restaurar</button>
                 </form>
                 {% if current_user.is_admin %}
-                <form method="post" action="{{ url_for(plural ~ '.delete_permanent', **{class_name_lower ~ '_id': class_name_lower.id}) }}" class="d-inline" onsubmit="return confirm('Excluir permanentemente?')">
+                <form method="post" action="{{ url_for(plural ~ '.delete_permanent', **{class_name_lower ~ '_id': item.id}) }}" class="d-inline" onsubmit="return confirm('Excluir permanentemente?')">
                   <button type="submit" class="btn btn-danger">Excluir permanentemente</button>
                 </form>
                 {% endif %}
@@ -111,58 +112,17 @@
 {% block extra_js %}
 <script>
   (function() {
-    const modal = new bootstrap.Modal(document.getElementById('bookModal'));
+    const modalEl = document.getElementById('bookModal');
+    if (!modalEl) return;
+    const modal   = new bootstrap.Modal(modalEl);
     const editBtn = document.getElementById('btnEditBook');
     if (!editBtn) return;
 
-    async function loadData(id) {
-      try {
-        const response = await fetch(`/api/bookstore/books/${id}`);
-        const result = await response.json();
-        if (result.success) {
-          const data = result.data;
-          for (const [key, value] of Object.entries(data)) {
-            const field = document.getElementById(key);
-            if (field) field.value = value ?? '';
-          }
-          document.getElementById('bookId').value = id;
-          document.getElementById('bookModalTitle').innerText = 'Editar Livros';
-          // Preencher FKs (similar ao manage)
-          {% for rel in relationship_fields %}
-            const fkField = '{{ rel.name }}';
-            const fkDisplayField = '{{ rel.name }}_name';
-            if (data[fkField] !== undefined) {
-              let displayText = data[fkDisplayField] || data[fkField];
-              window.setForeignKeyValue('bookModal', fkField, data[fkField], displayText);
-            }
-          {% endfor %}
-        } else {
-          alert('Erro ao carregar dados: ' + (result.error || 'Desconhecido'));
-          modal.hide();
-        }
-      } catch (err) {
-        console.error(err);
-        alert('Erro de conexão.');
-        modal.hide();
-      }
-    }
-
-    function resetForm() {
-      const form = document.getElementById('bookForm');
-      if (form) form.reset();
-      document.getElementById('bookId').value = '';
-      document.getElementById('bookModalTitle').innerText = 'Editar Livros';
-      document.querySelectorAll('#bookModal .fk-field').forEach(container => {
-        const hidden = container.querySelector('.fk-hidden-id');
-        const search = container.querySelector('.fk-search-input');
-        if (hidden) hidden.value = '';
-        if (search) search.value = '';
-      });
-    }
-
     editBtn.addEventListener('click', () => {
-      resetForm();
-      loadData(editBtn.dataset.id);
+      modalEl.addEventListener('shown.bs.modal', function onShown() {
+        modalEl.removeEventListener('shown.bs.modal', onShown);
+        window['loadBookData']?.(editBtn.dataset.id);
+      }, { once: true });
       modal.show();
     });
   })();

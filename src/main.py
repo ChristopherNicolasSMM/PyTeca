@@ -63,6 +63,28 @@ def create_app():
 
     CORS(app)
 
+    # ── Filtro Jinja: smart_val ───────────────────────────────────────────────
+    # Converte valores ORM para exibição limpa no template:
+    #   Enum        → .value  (evita 'BookStatus.ACTIVE')
+    #   datetime    → dd/mm/yyyy HH:MM
+    #   ORM object  → .name ou .title (evita '<Author ...>')
+    #   None/''     → '—'
+    from enum import Enum as _Enum
+    from datetime import datetime as _dt
+
+    @app.template_filter("smart_val")
+    def smart_val_filter(val):
+        if val is None or val == "":
+            return "—"
+        if isinstance(val, _Enum):
+            return str(val.value)
+        if isinstance(val, _dt):
+            return val.strftime("%d/%m/%Y %H:%M")
+        raw = str(val)
+        if raw.startswith("<") and raw.endswith(">"):
+            return getattr(val, "name", getattr(val, "title", "—"))
+        return raw or "—"
+
     # Registrar blueprints básicos (autenticação, web, etc.)
     register_core_blueprints(app)
 

@@ -132,15 +132,30 @@ def _build_filters_block(metadata: Dict) -> str:
     return ",\n".join(lines) if lines else '        FilterDef("search", "Buscar", type="text")'
 
 
-def _build_fields_rows(class_name_lower: str, fields: list[str]) -> str:
-    """Gera linhas <tr> para o detail.html."""
+def _build_fields_rows(class_name_lower: str, fields: list[str],
+                       relationship_fields: list[dict] | None = None,
+                       enum_fields: list[dict] | None = None) -> str:
+    """
+    Gera linhas <tr> para o detail.html.
+    Usa o filtro Jinja |smart_val (registrado em main.py) para:
+    - Enum  → .value  (evita 'BookStatus.ACTIVE')
+    - ORM   → .name / .title  (evita '<Author ...>')
+    - None  → '—'
+    - FK    → tenta <field_sem_id>.name primeiro
+    """
+    fk_names = {r["name"] for r in (relationship_fields or [])}
     rows = []
     for field in fields:
         label = field.replace("_", " ").title()
+        if field in fk_names:
+            name_attr = field[:-3] if field.endswith("_id") else field
+            val_expr  = f"{class_name_lower}.{name_attr}.name if {class_name_lower}.{name_attr} else '—'"
+        else:
+            val_expr  = f"{class_name_lower}.{field}|smart_val"
         rows.append(
-            f"              <td>\n"
+            f"              <tr>\n"
             f"                <th style=\"width:30%\">{label}</th>\n"
-            f"                <td>{{{{ {class_name_lower}.{field} or '—' }}}}</td>\n"
+            f"                <td>{{{{ {val_expr} }}}}</td>\n"
             f"              </tr>"
         )
     return "\n".join(rows)
@@ -380,7 +395,7 @@ def _build_context(
         "default_sort":       default_sort,
         "columns":            _build_columns_block(metadata),
         "filters":            _build_filters_block(metadata),
-        "fields_rows":        _build_fields_rows(class_name_lower, form_fields_list),
+        "fields_rows":        _build_fields_rows(class_name_lower, form_fields_list, relationship_fields, enum_fields),
         "form_fields":        _build_form_fields(form_fields_list, relationship_fields, enum_fields, model_class),
         "relationship_fields": relationship_fields,
         "enum_fields":        enum_fields,

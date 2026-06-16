@@ -207,19 +207,17 @@
         {% for col in sl.columns %}
         {% if col.visible %}
         <td class="sl-cell {% if col.defn.align != 'start' %}text-{{ col.defn.align }}{% endif %}">
-          {# Render customizado via macro nomeado #}
           {% if col.defn.render %}
-            {# O template pai deve passar o macro no contexto se precisar render custom #}
             {{ caller_render(col.defn.render, row) if caller_render is defined else '' }}
           {% else %}
-            {# Render padrão — converte None para traço, datetime para formato BR #}
             {% set val = row[col.defn.key] if row is mapping else row|attr(col.defn.key) %}
-            {% if val is none or val == '' %}
+            {% set display = val|smart_val %}
+            {% if display == '—' %}
               <span class="text-muted">—</span>
-            {% elif val is string and val|length > 60 %}
-              <span title="{{ val }}">{{ val[:58] }}…</span>
+            {% elif display|length > 60 %}
+              <span title="{{ display }}">{{ display[:58] }}…</span>
             {% else %}
-              {{ val }}
+              {{ display }}
             {% endif %}
           {% endif %}
         </td>

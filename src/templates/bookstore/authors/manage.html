@@ -1,15 +1,15 @@
 {% extends "core/base.html" %}
 {% from "_components/smart_list.html" import render as smart_list, scripts as sl_scripts %}
 
-{% block title %}authors{% endblock %}
+{% block title %}Autoress{% endblock %}
 
 {% block content %}
 <div class="pagetitle">
-  <h1>authors</h1>
+  <h1>Autoress</h1>
   <nav>
     <ol class="breadcrumb">
       <li class="breadcrumb-item"><a href="{{ url_for('web.dashboard') }}">Home</a></li>
-      <li class="breadcrumb-item active">authorss</li>
+      <li class="breadcrumb-item active">Autoress</li>
     </ol>
   </nav>
 </div>
@@ -17,9 +17,9 @@
 <section class="section">
   <ul class="nav nav-tabs mb-3">
     {% set tab_map = [
-      ('active', 'bi-book', 'Publicados', counts.active | default(0)),
-      ('draft',  'bi-pencil-square', 'Rascunhos', counts.draft | default(0)),
-      ('trash',  'bi-trash3', 'Lixeira', counts.trash | default(0)),
+      ('active', 'bi-book',          'Publicados', counts.active | default(0)),
+      ('draft',  'bi-pencil-square', 'Rascunhos',  counts.draft  | default(0)),
+      ('trash',  'bi-trash3',        'Lixeira',    counts.trash  | default(0)),
     ] %}
     {% for value, icon, label_tab, count in tab_map %}
     <li class="nav-item">
@@ -86,128 +86,22 @@
 {{ sl_scripts() }}
 <script>
   (function() {
-    const modal = new bootstrap.Modal(document.getElementById('authorModal'));
-    const form = document.getElementById('authorForm');
-    const titleElem = document.getElementById('authorModalTitle');
-    const idElem = document.getElementById('authorId');
-
-    function resetForm() {
-      form.reset();
-      idElem.value = '';
-      titleElem.innerText = 'Novo Autores';
-      // Limpar campos de FK também (já que reset não limpa os hidden e search)
-      document.querySelectorAll('#authorModal .fk-field').forEach(container => {
-        const hidden = container.querySelector('.fk-hidden-id');
-        const search = container.querySelector('.fk-search-input');
-        if (hidden) hidden.value = '';
-        if (search) search.value = '';
-      });
-    }
-
-    async function loadData(id) {
-      try {
-        const response = await fetch('/api/bookstore/authors/' + id);
-        const result = await response.json();
-        if (result.success) {
-          const data = result.data;
-          // Preenche campos comuns
-          for (const [key, value] of Object.entries(data)) {
-            const field = document.getElementById(key);
-            if (field) field.value = value ?? '';
-          }
-          idElem.value = id;
-          titleElem.innerText = 'Editar Autores';
-
-          // Preenche campos FK (a API deve retornar também os nomes descritivos)
-          // Itera sobre os relacionamentos definidos no controller
-          {% for rel in relationship_fields %}
-            const fkField = '{{ rel.name }}';
-            const fkDisplayField = '{{ rel.name }}_name';
-            if (data[fkField] !== undefined) {
-              let displayText = data[fkDisplayField] || data[fkField];
-              window.setForeignKeyValue('authorModal', fkField, data[fkField], displayText);
-            }
-          {% endfor %}
-        } else {
-          alert('Erro ao carregar dados: ' + (result.error || 'Desconhecido'));
-          modal.hide();
-        }
-      } catch (err) {
-        console.error(err);
-        alert('Erro de conexão.');
-        modal.hide();
-      }
-    }
-
-    async function save() {
-      const id = idElem.value;
-      const data = {};
-      // Captura campos comuns (input, select normal)
-      form.querySelectorAll('input:not(.fk-hidden-id):not(.fk-search-input), select:not(.relationship-select)').forEach(field => {
-        let value = field.value;
-        if (field.type === 'number') value = parseInt(value) || null;
-        data[field.name] = value;
-      });
-      // Captura campos FK (hidden)
-      form.querySelectorAll('.fk-hidden-id').forEach(hidden => {
-        if (hidden.name) data[hidden.name] = hidden.value;
-      });
-      // Captura campos Enum (select)
-      form.querySelectorAll('select').forEach(select => {
-        if (select.name) data[select.name] = select.value;
-      });
-
-      const saveBtn = document.getElementById('btnSaveAuthor');
-      saveBtn.disabled = true;
-      saveBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Salvando...';
-      try {
-        let response;
-        if (id) {
-          response = await fetch('/api/bookstore/authors/' + id, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-          });
-        } else {
-          const draftRes = await fetch('/api/bookstore/authors/draft', { method: 'POST' });
-          const draftData = await draftRes.json();
-          if (!draftData.success) throw new Error(draftData.error);
-          const draftId = draftData.data.id;
-          response = await fetch('/api/bookstore/authors/' + draftId + '/publish', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-          });
-        }
-        const result = await response.json();
-        if (result.success) {
-          modal.hide();
-          window.location.reload();
-        } else {
-          alert('Erro: ' + (result.error || 'Falha ao salvar'));
-        }
-      } catch (err) {
-        console.error(err);
-        alert('Erro de conexão.');
-      } finally {
-        saveBtn.disabled = false;
-        saveBtn.innerHTML = 'Salvar';
-      }
-    }
+    const modalEl = document.getElementById('authorModal');
+    const modal   = modalEl ? new bootstrap.Modal(modalEl) : null;
 
     document.getElementById('btnNovoAuthor')?.addEventListener('click', () => {
-      resetForm();
-      modal.show();
+      modal?.show();
     });
-    document.getElementById('btnSaveAuthor')?.addEventListener('click', save);
-    document.body.addEventListener('click', (e) => {
+
+    document.body.addEventListener('click', e => {
       const btn = e.target.closest('.btn-edit');
-      if (btn && btn.dataset.id) {
-        e.preventDefault();
-        resetForm();
-        loadData(btn.dataset.id);
-        modal.show();
-      }
+      if (!btn || !btn.dataset.id) return;
+      e.preventDefault();
+      modalEl.addEventListener('shown.bs.modal', function onShown() {
+        modalEl.removeEventListener('shown.bs.modal', onShown);
+        window['loadAuthorData']?.(btn.dataset.id);
+      }, { once: true });
+      modal?.show();
     });
   })();
 </script>

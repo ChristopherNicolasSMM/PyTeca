@@ -7,7 +7,7 @@ from flask_login import current_user, login_required
 from db.database import db
 from model.core.notification import Notification, NotificationTrash
 
-notifications_bp = Blueprint("notifications", __name__)
+notifications_bp = Blueprint("notifications", __name__, url_prefix="/api")
 
 
 @notifications_bp.route("/notifications", methods=["GET"])
@@ -104,6 +104,36 @@ def mark_notification_read(notification_id):
 
     except Exception as e:
         print(f"Erro ao marcar notificação como lida: {e}")
+        db.session.rollback()
+        return jsonify({"error": "Erro interno do servidor"}), 500
+
+
+@notifications_bp.route("/notifications/<int:notification_id>/unread", methods=["PUT"])
+@login_required
+def mark_notification_unread(notification_id):
+    """Marcar notificação como não lida"""
+    try:
+        notification = Notification.query.filter_by(
+            id=notification_id, user_id=current_user.id
+        ).first()
+
+        if not notification:
+            return jsonify({"error": "Notificação não encontrada"}), 404
+
+        notification.is_read = False
+        db.session.commit()
+
+        return (
+            jsonify(
+                {
+                    "message": "Notificação marcada como não lida",
+                    "notification": notification.to_dict(),
+                }
+            ),
+            200,
+        )
+
+    except Exception as e:
         db.session.rollback()
         return jsonify({"error": "Erro interno do servidor"}), 500
 

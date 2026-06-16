@@ -3,7 +3,7 @@ from __future__ import annotations
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
-from annotations import get_model_metadata                   
+from annotations import get_model_metadata
 from utils.generate_from_model import _get_relationship_fields
 from model.bookstore.author import Author, AuthorStatus
 from model.core.user_layout_pref import UserLayoutPref
@@ -34,7 +34,66 @@ SMART_LIST_CONFIG = SmartListConfig(
     export_filename="authors",
 )
 
-enum_fields = []
+# ── Enum, date e campos obrigatórios ─────────────────────────────────────────
+# Detectados automaticamente via metadados do modelo para uso no template do modal
+
+def _get_enum_fields():
+    """Detecta campos Enum do modelo para gerar <select> no modal."""
+    from sqlalchemy import Enum as SAEnum
+    from sqlalchemy.orm import ColumnProperty
+    from enum import EnumMeta
+    import inspect
+
+    result = []
+    metadata = get_model_metadata(Author)
+    form_fields = metadata.get("ui_form", {}).get("fields", [])
+    model_module = inspect.getmodule(Author)
+
+    for field_name in form_fields:
+        options = None
+        attr = getattr(Author, field_name, None)
+        if attr is not None and hasattr(attr, "type"):
+            col_type = attr.type
+            if isinstance(col_type, SAEnum) and getattr(col_type, "enum_class", None):
+                enum_class = col_type.enum_class
+                options = [(e.value, e.name.replace("_", " ").title()) for e in enum_class]
+        if options is None and Author.__mapper__:
+            for prop in Author.__mapper__.iterate_properties:
+                if isinstance(prop, ColumnProperty) and prop.key == field_name:
+                    for obj_name, obj in vars(model_module).items():
+                        if isinstance(obj, EnumMeta) and field_name.replace("_", "").lower() in obj_name.lower():
+                            options = [(e.value, e.name.replace("_", " ").title()) for e in obj]
+                            break
+        if options:
+            result.append({"name": field_name, "options": options})
+    return result
+
+
+def _get_date_fields():
+    """Detecta campos DateTime/Date do modelo."""
+    from sqlalchemy import DateTime, Date
+    from sqlalchemy.orm import ColumnProperty
+    result = []
+    for prop in Author.__mapper__.iterate_properties:
+        if isinstance(prop, ColumnProperty):
+            col = prop.columns[0]
+            if isinstance(col.type, (DateTime, Date)):
+                result.append(prop.key)
+    return result
+
+
+def _get_required_fields():
+    """Detecta campos marcados com @required."""
+    validations = getattr(Author, "_validations", {})
+    return [
+        f for f, rules in validations.items()
+        if any(r.get("type") == "required" for r in rules)
+    ]
+
+
+ENUM_FIELDS     = _get_enum_fields()
+DATE_FIELDS     = _get_date_fields()
+REQUIRED_FIELDS = _get_required_fields()
 
 # ── Listagem ──────────────────────────────────────────────────────────────────
 
@@ -82,15 +141,10 @@ def list():
         pages=result.pages,
         user_layout=user_layout,
     )
-    
-    metadata = get_model_metadata(Author)
-    form_fields_list = metadata.get("ui_form", {}).get("fields", [])
-    relationship_fields = _get_relationship_fields(Author)
 
-    class_name = "Author"
-    class_name_lower = "author"
-    plural = "authors"
-    output_subdir = "bookstore"
+    metadata = get_model_metadata(Author)
+    form_fields_list  = metadata.get("ui_form", {}).get("fields", [])
+    relationship_fields = _get_relationship_fields(Author)
 
     return render_template(
         "bookstore/authors/manage.html",
@@ -99,11 +153,14 @@ def list():
         current_status=status,
         form_fields_list=form_fields_list,
         relationship_fields=relationship_fields,
-        enum_fields=enum_fields,
-        class_name=class_name,
-        class_name_lower=class_name_lower,
-        plural=plural,
-        output_subdir=output_subdir,
+        enum_fields=ENUM_FIELDS,
+        date_fields=DATE_FIELDS,
+        required_fields=REQUIRED_FIELDS,
+        class_name="Author",
+        class_name_lower="author",
+        label="Autores",
+        plural="authors",
+        output_subdir="bookstore",
     )
 
 
@@ -116,26 +173,24 @@ def detail(item_id: int):
     item = service.get_by_id(item_id)
     if not item:
         abort(404)
-        
+
     metadata = get_model_metadata(Author)
-    form_fields_list = metadata.get("ui_form", {}).get("fields", [])
+    form_fields_list    = metadata.get("ui_form", {}).get("fields", [])
     relationship_fields = _get_relationship_fields(Author)
 
-    class_name = "Author"
-    class_name_lower = "author"
-    plural = "authors"
-    output_subdir = "bookstore"
-
     return render_template(
-        "bookstore/authors/detail.html", 
+        "bookstore/authors/detail.html",
         author=item,
         form_fields_list=form_fields_list,
         relationship_fields=relationship_fields,
-        enum_fields=enum_fields,
-        class_name=class_name,
-        class_name_lower=class_name_lower,
-        plural=plural,
-        output_subdir=output_subdir,
+        enum_fields=ENUM_FIELDS,
+        date_fields=DATE_FIELDS,
+        required_fields=REQUIRED_FIELDS,
+        class_name="Author",
+        class_name_lower="author",
+        label="Autores",
+        plural="authors",
+        output_subdir="bookstore",
     )
 
 

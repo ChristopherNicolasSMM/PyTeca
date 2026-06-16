@@ -74,7 +74,11 @@ class Book(db.Model):
     __table_args__ = (Index("ix_book_status_title", "status", "title"),)
 
     # Relacionamento com empréstimos (opcional, pode ser usado para navegação)
-    loans: Mapped[list["Loan"]] = relationship(back_populates="book")
+    loans: Mapped[list["Loan"]] = relationship(
+        back_populates="book",
+        cascade="all, delete-orphan",  # deleta loans ao excluir o book
+        passive_deletes=True,
+    )
 
     def publish(self) -> None:
         self.status = BookStatus.ACTIVE
@@ -102,9 +106,18 @@ class Book(db.Model):
     def is_trashed(self) -> bool:
         return self.status == BookStatus.TRASH
 
+    #@property
+    #def is_available(self) -> bool:
+    #    return self.is_active and self.available > 0
+    
     @property
     def is_available(self) -> bool:
-        return self.is_active and self.available > 0
+        try:
+            available = int(self.available or 0)
+        except (TypeError, ValueError):
+            available = 0
+        return self.is_active and available > 0    
+    
 
     @property
     def author_name(self) -> str:
@@ -127,7 +140,7 @@ class Book(db.Model):
             "language": self.language,
             "quantity": self.quantity,
             "available": self.available,
-            "status": self.status,
+            "status": self.status.value if hasattr(self.status, "value") else self.status,
             "is_available": self.is_available,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
