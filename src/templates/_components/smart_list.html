@@ -52,7 +52,7 @@
         <select name="{{ rf.defn.name }}"
                 class="form-select sl-filter-select"
                 style="max-width:{{ rf.defn.width if rf.defn.width != 'auto' else '180px' }};"
-                onchange="this.form.submit()">
+                onchange="slFilterSubmit(this.closest('form'))">
           <option value="">{{ rf.defn.label }}</option>
           {% for val, lbl in rf.options %}
           <option value="{{ val }}" {% if rf.value == val %}selected{% endif %}>{{ lbl }}</option>
@@ -66,7 +66,7 @@
                  value="1"
                  id="sl-bool-{{ rf.defn.name }}"
                  {% if rf.value %}checked{% endif %}
-                 onchange="this.form.submit()">
+                 onchange="slFilterSubmit(this.closest('form'))">
           <label class="form-check-label" for="sl-bool-{{ rf.defn.name }}">
             {{ rf.defn.label }}
           </label>
@@ -81,7 +81,7 @@
 
     {# Botão buscar (relevante quando há campos de texto) #}
     {% if sl.filters | selectattr("defn.type", "equalto", "text") | list %}
-    <button type="submit" class="btn btn-outline-primary">
+    <button type="button" class="btn btn-outline-primary" onclick="slFilterSubmit(this.closest('form'))">
       <i class="bi bi-funnel-fill me-1"></i>Filtrar
     </button>
     {% endif %}
@@ -255,8 +255,19 @@
   </table>
 </div>{# /table-responsive #}
 
+{# Toast de feedback de filtro #}
+<div id="sl-toast-{{ sl.config.list_id }}"
+     class="toast align-items-center border-0 position-fixed bottom-0 end-0 m-3"
+     role="alert" aria-atomic="true" style="z-index:9999;">
+  <div class="d-flex">
+    <div class="toast-body" id="sl-toast-msg-{{ sl.config.list_id }}"></div>
+    <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast"></button>
+  </div>
+</div>
+
 {# ── Paginação ─────────────────────────────────────────────────────────────── #}
 {% if sl.pages > 1 %}
+<div id="sl-pagination-{{ sl.config.list_id }}">
 <nav aria-label="Paginação {{ sl.config.list_id }}">
   <ul class="pagination pagination-sm justify-content-center mb-0 flex-wrap">
 
@@ -433,6 +444,74 @@
     .catch(function () { alert("Erro ao resetar layout."); });
   };
 
+
+  /* ── AJAX Filter ─────────────────────────────────────────────────────── */
+  window.slFilterSubmit = function (form) {
+    if (!form) return;
+    var listId = (form.id || "").replace("sl-filter-form-", "");
+    var params  = new URLSearchParams(new FormData(form));
+    params.set("page", "1");
+    // Remove parâmetros vazios
+    for (var [k, v] of [...params.entries()]) {
+      if (v === "") params.delete(k);
+    }
+    var url = window.location.pathname + "?" + params.toString();
+
+    // Loading state
+    var wrap = document.getElementById("sl-table-wrap-" + listId);
+    if (wrap) wrap.style.opacity = "0.5";
+
+    fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } })
+      .then(function (r) { return r.text(); })
+      .then(function (html) {
+        var parser = new DOMParser();
+        var doc    = parser.parseFromString(html, "text/html");
+
+        // Substitui tbody
+        var newWrap = doc.getElementById("sl-table-wrap-" + listId);
+        if (newWrap && wrap) wrap.innerHTML = newWrap.innerHTML;
+
+        // Substitui paginação
+        var pagOld = document.getElementById("sl-pagination-" + listId);
+        var pagNew = doc.getElementById("sl-pagination-" + listId);
+        if (pagOld && pagNew) pagOld.innerHTML = pagNew.innerHTML;
+
+        // Atualiza URL sem reload
+        window.history.pushState({}, "", url);
+
+        // Verifica se resultado é vazio e mostra toast
+        if (wrap && wrap.querySelector("tbody tr td[colspan]")) {
+          slShowToast(listId, "Nenhum registro encontrado para os filtros aplicados.", "warning");
+        }
+
+        if (wrap) wrap.style.opacity = "1";
+      })
+      .catch(function () {
+        if (wrap) wrap.style.opacity = "1";
+        slShowToast(listId, "Erro ao filtrar. Tente novamente.", "danger");
+      });
+  };
+
+  /* ── Toast helper ────────────────────────────────────────────────────── */
+  window.slShowToast = function (listId, msg, type) {
+    var toast    = document.getElementById("sl-toast-" + listId);
+    var toastMsg = document.getElementById("sl-toast-msg-" + listId);
+    if (!toast || !toastMsg) return;
+    toastMsg.textContent = msg;
+    toast.className = "toast align-items-center border-0 position-fixed bottom-0 end-0 m-3 text-bg-" + (type || "info");
+    var bsToast = bootstrap.Toast.getOrCreateInstance(toast, { delay: 3500 });
+    bsToast.show();
+  };
+
+  /* ── Submete com Enter nos campos de texto ───────────────────────────── */
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Enter") return;
+    var input = e.target.closest(".sl-filter-group input");
+    if (!input) return;
+    e.preventDefault();
+    slFilterSubmit(input.closest("form"));
+  });
+
   /* ── Limpar filtro individual ────────────────────────────────────────── */
   document.addEventListener("click", function (e) {
     var btn = e.target.closest(".sl-clear-filter");
@@ -441,7 +520,7 @@
     var form  = btn.closest("form");
     if (!form) return;
     var input = form.querySelector("[name='" + field + "']");
-    if (input) { input.value = ""; form.submit(); }
+    if (input) { input.value = ""; slFilterSubmit(form); }
   });
 
   /* ── Mudança de per_page ─────────────────────────────────────────────── */

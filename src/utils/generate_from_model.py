@@ -25,6 +25,39 @@ from annotations import get_model_metadata
 from utils.generate_model.template_loader import get_loader
 
 
+def _find_project_root(start_path: Path) -> Optional[Path]:
+    """
+    Encontra a raiz do projeto procurando por um diretório 'src' ou
+    arquivos de marcadores como 'main.py', 'app.py' ou '.flaskenv'.
+    """
+    current = start_path.resolve()
+    
+    # Primeiro, tenta encontrar o diretório 'src'
+    while current.parent != current:
+        # Verifica se o diretório atual ou um dos pais contém 'src'
+        test_src = current / 'src'
+        if test_src.is_dir() and (test_src / 'main.py').exists():
+            return current
+        
+        # Também verifica se há um arquivo marcador na raiz
+        for marker in ['main.py', 'app.py', '.flaskenv', 'requirements.txt']:
+            if (current / marker).exists():
+                # Verifica se há um diretório 'src' neste nível
+                if (current / 'src').is_dir():
+                    return current
+        
+        current = current.parent
+    
+    # Fallback: procura de baixo para cima por um diretório que contenha 'src/main.py'
+    current = start_path
+    while current.parent != current:
+        if (current / 'main.py').exists() or (current / 'src' / 'main.py').exists():
+            return current
+        current = current.parent
+    
+    return None
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # CARREGAMENTO DE CONFIGURAÇÃO YAML
 # ══════════════════════════════════════════════════════════════════════════════
@@ -49,54 +82,82 @@ def load_classes_from_file(
     class_name: Optional[str] = None,
 ) -> List[tuple]:
     """
-    Carrega todas as classes de um arquivo Python que são subclasses de db.Model
-    e cujo nome não contenha 'Trash'.
-    Retorna lista de (cls, nome_da_classe).
-    Usa importação real (com nome completo) para resolver dependências.
+    Carrega classes de um arquivo Python que são subclasses de db.Model.
+    Evita recarregar módulos já importados.
     """
     import sys
     import importlib
+    import inspect
 
     full_path = Path(file_path).resolve()
-    project_root = full_path.parent.parent  # assume que 'src' é a raiz do projeto
+    
+    if not full_path.exists():
+        print(f"  ✗ Arquivo não encontrado: {full_path}")
+        return []
 
-    # Adiciona a raiz do projeto ao sys.path para permitir imports absolutos
+    # Encontra a raiz do projeto
+    project_root = _find_project_root(full_path)
+    if not project_root:
+        print(f"  ✗ Não foi possível encontrar a raiz do projeto para: {full_path}")
+        return []
+
+    # Adiciona a raiz ao sys.path se necessário
     if str(project_root) not in sys.path:
         sys.path.insert(0, str(project_root))
 
-    # Calcula o nome do módulo a partir do caminho relativo à raiz
-    rel_path = full_path.relative_to(project_root)
-    module_name = str(rel_path.with_suffix('')).replace(os.sep, '.')
-
-    # Remove do cache se já existir (força recarga)
-    if module_name in sys.modules:
-        del sys.modules[module_name]
-
+    # Calcula o nome do módulo
     try:
-        module = importlib.import_module(module_name)
-    except Exception as e:
-        print(f"Erro ao importar {module_name}: {e}")
-        return []
+        rel_path = full_path.relative_to(project_root)
+        module_name = str(rel_path.with_suffix('')).replace(os.sep, '.')
+    except ValueError:
+        if 'src' in str(full_path):
+            src_idx = str(full_path).find('src')
+            src_path = Path(str(full_path)[:src_idx + 3])
+            if src_path.is_dir():
+                rel_path = full_path.relative_to(src_path)
+                module_name = str(rel_path.with_suffix('')).replace(os.sep, '.')
+            else:
+                return []
+        else:
+            return []
 
+    # ⭐ CORREÇÃO: Remove 'src.' do início do nome do módulo se presente
+    # Porque a aplicação carrega os módulos como 'model.bookstore.author' e não 'src.model.bookstore.author'
+    if module_name.startswith('src.'):
+        module_name = module_name[4:]  # Remove 'src.'
+        print(f"  🔄 Ajustando nome do módulo: src.model.bookstore.author → {module_name}")
+
+    # ⭐ Estratégia: Usa o módulo já importado ou importa apenas uma vez
+    if module_name in sys.modules:
+        print(f"  ℹ️ Usando módulo já carregado: {module_name}")
+        module = sys.modules[module_name]
+    else:
+        try:
+            print(f"  🔍 Carregando módulo: {module_name}")
+            module = importlib.import_module(module_name)
+        except Exception as e:
+            print(f"  ✗ Erro ao importar {module_name}: {e}")
+            return []
+
+    # Coleta todas as classes do módulo que são subclasses de db.Model
     classes = []
-    for name, obj in module.__dict__.items():
-        if not isinstance(obj, type):
+    for name, obj in inspect.getmembers(module, inspect.isclass):
+        # Verifica se é uma classe definida neste módulo
+        if obj.__module__ != module_name:
             continue
-        # Ignora classes importadas de outros módulos
-        if obj.__module__ != module.__name__:
-            continue
+        # Ignora classes com 'Trash' no nome
         if "Trash" in name:
             continue
-        if not (hasattr(obj, "__tablename__") or
-                any(hasattr(b, "__name__") and b.__name__ == "Model"
-                    for b in getattr(obj, "__bases__", []))):
+        # Verifica se é um modelo SQLAlchemy
+        if not hasattr(obj, "__tablename__"):
             continue
+        # Filtra pelo nome da classe se especificado
         if class_name and name != class_name:
             continue
         classes.append((obj, name))
 
+    print(f"  ✅ Encontradas {len(classes)} classes: {[name for _, name in classes]}")
     return classes
-
 
 # ══════════════════════════════════════════════════════════════════════════════
 # HELPERS DE RENDERIZAÇÃO DE BLOCOS (colunas, filtros, campos)
@@ -510,76 +571,27 @@ def _write_file(path: Path, content: str, overwrite: bool = False) -> bool:
 # DETECÇÃO DE RELACIONAMENTOS (FK)
 # ══════════════════════════════════════════════════════════════════════════════
 
-########### LIMPAR DEPOIS - APAGAR COMENTARIOS
-#
-#def _get_relationship_fields(model_class) -> list[dict]:
-#    """
-#    Retorna metadados das colunas que são chaves estrangeiras.
-#    Cada entrada contém: name, foreign_table, nullable.
-#    """
-#    rels = []
-#    if not hasattr(model_class, '__table__'):
-#        return rels
-#    for col in model_class.__table__.columns:
-#        if col.foreign_keys:
-#            fk = list(col.foreign_keys)[0]
-#            rels.append({
-#                'name': col.name,
-#                'foreign_table': fk.column.table.name,
-#                'nullable': col.nullable,
-#            })
-#    return rels
-
-
-##def _get_relationship_fields(model_class) -> list[dict]:
-##    """
-##    Retorna metadados das colunas que são chaves estrangeiras.
-##    Usa sqlalchemy.inspect para garantir detecção correta.
-##    """
-##    from sqlalchemy import inspect
-##    rels = []
-##        
-##    try:
-##        inspector = inspect(model_class)
-##        for column in inspector.columns:
-##            # Verifica se a coluna tem foreign_keys (SQLAlchemy >= 1.4)
-##            if column.foreign_keys:
-##                # Obtém a primeira FK (normalmente há apenas uma)
-##                fk = list(column.foreign_keys)[0]
-##                rels.append({
-##                    'name': column.name,
-##                    'foreign_table': fk.column.table.name,
-##                    'nullable': column.nullable,
-##                })
-##    except Exception as e:
-##        # Fallback: método antigo
-##        if hasattr(model_class, '__table__'):
-##            for col in model_class.__table__.columns:
-##                if col.foreign_keys:
-##                    fk = list(col.foreign_keys)[0]
-##                    rels.append({
-##                        'name': col.name,
-##                        'foreign_table': fk.column.table.name,
-##                        'nullable': col.nullable,
-##                    })
-##    return rels
-
-
 def _get_relationship_fields(model_class) -> list[dict]:
+    """
+    Retorna metadados das colunas que são chaves estrangeiras.
+    Usa sqlalchemy.inspect para garantir detecção correta.
+    """
     from sqlalchemy import inspect
     rels = []
     try:
-        ins = inspect(model_class)
-        for col in ins.columns:
-            if col.foreign_keys:
-                fk = list(col.foreign_keys)[0]
+        inspector = inspect(model_class)
+        for column in inspector.columns:
+            # Verifica se a coluna tem foreign_keys (SQLAlchemy >= 1.4)
+            if column.foreign_keys:
+                # Obtém a primeira FK (normalmente há apenas uma)
+                fk = list(column.foreign_keys)[0]
                 rels.append({
-                    'name': col.name,
+                    'name': column.name,
                     'foreign_table': fk.column.table.name,
-                    'nullable': col.nullable,
+                    'nullable': column.nullable,
                 })
-    except Exception:
-        # fallback
+    except Exception as e:
+        # Fallback: método antigo
         if hasattr(model_class, '__table__'):
             for col in model_class.__table__.columns:
                 if col.foreign_keys:
@@ -695,6 +707,44 @@ def generate_templates(
 # PONTO DE ENTRADA PRINCIPAL
 # ══════════════════════════════════════════════════════════════════════════════
 
+#def _run_generation(
+#    file_path: Path,
+#    class_name_filter: Optional[str],
+#    plural_override: Optional[str],
+#    loader,
+#    overwrite: bool,
+#    add_to_root_menu: bool = False,
+#) -> None:
+#    """Executa geração para um arquivo de model."""
+#    classes = load_classes_from_file(str(file_path), class_name_filter)
+#    if not classes:
+#        print(f"  ✗ Nenhuma classe db.Model encontrada em {file_path}")
+#        return
+#
+#    # Calcula o subdiretório de saída relativo à pasta 'model'
+#    model_root = Path("model")
+#    if file_path.parent == model_root:
+#        output_subdir = Path(".")
+#    else:
+#        output_subdir = file_path.parent.relative_to(model_root)
+#
+#    for cls, cls_name in classes:
+#        print(f"\n→ Gerando para {cls_name} ({file_path.name})")
+#        metadata = get_model_metadata(cls)
+#        metadata["module_name"] = file_path.stem
+#        if plural_override:
+#            metadata["plural"] = plural_override
+#        final_plural = metadata.get("plural", cls_name.lower() + "s")
+#
+#        generate_controller(str(file_path), cls_name, final_plural, metadata, loader,
+#                            overwrite, model_class=cls, output_subdir=output_subdir)
+#        generate_service(str(file_path), cls_name, final_plural, metadata, loader,
+#                         overwrite, model_class=cls, output_subdir=output_subdir)
+#        generate_routes(str(file_path), cls_name, final_plural, metadata, loader,
+#                        overwrite, model_class=cls, output_subdir=output_subdir)
+#        generate_templates(str(file_path), cls_name, final_plural, metadata, loader,
+#                           overwrite, add_to_root_menu, model_class=cls, output_subdir=output_subdir)
+
 def _run_generation(
     file_path: Path,
     class_name_filter: Optional[str],
@@ -704,17 +754,38 @@ def _run_generation(
     add_to_root_menu: bool = False,
 ) -> None:
     """Executa geração para um arquivo de model."""
-    classes = load_classes_from_file(str(file_path), class_name_filter)
-    if not classes:
-        print(f"  ✗ Nenhuma classe db.Model encontrada em {file_path}")
+    # Garante que o caminho é absoluto e existente
+    file_path = file_path.resolve()
+    if not file_path.exists():
+        print(f"  ✗ Arquivo não encontrado: {file_path}")
         return
 
-    # Calcula o subdiretório de saída relativo à pasta 'model'
-    model_root = Path("model")
-    if file_path.parent == model_root:
-        output_subdir = Path(".")
+    print(f"  📄 Processando: {file_path}")
+    
+    # Carrega classes do arquivo
+    classes = load_classes_from_file(str(file_path), class_name_filter)
+    if not classes:
+        return
+
+    # Calcula o subdiretório de saída
+    project_root = _find_project_root(file_path)
+    if project_root:
+        try:
+            rel_to_root = file_path.relative_to(project_root)
+            # Remove 'model' do início do caminho para obter o subdiretório
+            rel_parts = list(rel_to_root.parts)
+            if 'model' in rel_parts:
+                model_idx = rel_parts.index('model')
+                sub_parts = rel_parts[model_idx + 1:-1]  # remove model/ e o nome do arquivo
+                output_subdir = Path(*sub_parts) if sub_parts else Path(".")
+            else:
+                output_subdir = Path(".")
+        except ValueError:
+            output_subdir = Path(".")
     else:
-        output_subdir = file_path.parent.relative_to(model_root)
+        output_subdir = Path(".")
+
+    print(f"  📁 Subdiretório de saída: {output_subdir}")
 
     for cls, cls_name in classes:
         print(f"\n→ Gerando para {cls_name} ({file_path.name})")
@@ -732,7 +803,6 @@ def _run_generation(
                         overwrite, model_class=cls, output_subdir=output_subdir)
         generate_templates(str(file_path), cls_name, final_plural, metadata, loader,
                            overwrite, add_to_root_menu, model_class=cls, output_subdir=output_subdir)
-
 
 def generate_from_config() -> None:
     """Gera CRUDs para todos os modelos listados em config.yaml."""

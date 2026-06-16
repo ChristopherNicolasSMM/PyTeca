@@ -218,7 +218,7 @@ def register_cli_commands(app):
     @click.option("--model",     "-m", default=None,       help="Caminho do model (ex: model/author.py)")
     @click.option("--theme",     "-t", default="standard", help="Tema de templates (padrão: standard)")
     @click.option("--overwrite", "-o", is_flag=True,       help="Sobrescreve arquivos existentes")
-    @click.option("--add-to-root-menu", is_flag=True,       help="Adiciona entrada no menu raiz")
+    @click.option("--add-to-root-menu", is_flag=True,      help="Adiciona entrada no menu raiz")
     @with_appcontext
     def generate_command(model, theme, overwrite, add_to_root_menu):
         """Gera estrutura CRUD a partir de modelos anotados."""
@@ -233,50 +233,66 @@ def register_cli_commands(app):
 if __name__ == "__main__":
     import sys
     import os
-
-    # Se o primeiro argumento for "generate", executa o gerador
-    if len(sys.argv) > 1 and sys.argv[1] == "generate":
-        # Configura o ambiente mínimo
-        os.environ["FLASK_ENV"] = "DEV"
-
-        from flask import Flask
-        from db.database import db
-
-        # Cria um app temporário com banco em memória para evitar conflitos de metadados
-        temp_app = Flask(__name__)
-        temp_app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
-        temp_app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-        db.init_app(temp_app)
-
-        with temp_app.app_context():
-            from  utils.generate_from_model import generate, generate_from_config
-
-            if "--model" in sys.argv:
-                model_index = sys.argv.index("--model") + 1
-                if model_index < len(sys.argv):
-                    model_path = sys.argv[model_index]
-                    generate(model_path)
-                else:
-                    print("Uso: python main.py generate --model <caminho_do_model>")
-            else:
-                generate_from_config()
-        sys.exit(0)
-
-    # --- Execução normal da aplicação ---
-    host = os.getenv("HOST", "0.0.0.0")
-    port = int(os.getenv("PORT", 5000))
-    debug = os.getenv("DEBUG", "True").lower() == "true"
-
-    https_enabled = os.getenv("HTTPS", "true" if debug else "false").lower() == "true"
-    scheme = "https" if https_enabled else "http"
-
+    
     app = create_app()
 
-    app.logger.info(
-        "Iniciando aplicação em %s://%s:%s (debug=%s)", scheme, host, port, debug
-    )
+    if len(sys.argv) > 1:
+        # Qualquer argumento → roda o CLI (comandos: generate, init-admin, test-db, etc.)
+        from flask.cli import ScriptInfo
 
-    if https_enabled:
-        app.run(host=host, port=port, debug=debug, ssl_context="adhoc")
+        script_info = ScriptInfo(create_app=lambda: app)
+        try:
+            app.cli.main(args=sys.argv[1:], obj=script_info, standalone_mode=False)
+        except SystemExit as e:
+            sys.exit(e.code)
+
+
+    #if len(sys.argv) > 1 and sys.argv[1] == "generate":
+        # Configura o ambiente mínimo
+        #os.environ["FLASK_ENV"] = "DEV"
+        #
+        #from flask import Flask
+        #from db.database import db
+        #
+        ## Cria um app temporário com banco em memória para evitar conflitos de metadados
+        #temp_app = Flask(__name__)
+        #temp_app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
+        #temp_app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+        #db.init_app(temp_app)
+        #
+        #with temp_app.app_context():
+        #    from  utils.generate_from_model import generate, generate_from_config
+        #
+        #    if "--model" in sys.argv:
+        #        model_index = sys.argv.index("--model") + 1
+        #        if model_index < len(sys.argv):
+        #            model_path = sys.argv[model_index]
+        #            generate(model_path)
+        #        else:
+        #            print("Uso: python main.py generate --model <caminho_do_model>")
+        #    else:
+        #        generate_from_config()
+        sys.exit(0)
+    
     else:
-        app.run(host=host, port=port, debug=debug)
+        # --- Execução normal da aplicação ---
+        host = os.getenv("HOST", "0.0.0.0")
+        port = int(os.getenv("PORT", 5000))
+        debug = os.getenv("DEBUG", "True").lower() == "true"
+
+        https_enabled = os.getenv("HTTPS", "true" if debug else "false").lower() == "true"
+        scheme = "https" if https_enabled else "http"
+
+        app = create_app()
+
+        app.logger.info(
+            "Iniciando aplicação em %s://%s:%s (debug=%s)", scheme, host, port, debug
+        )
+
+        if https_enabled:
+            app.run(host=host, port=port, debug=debug, ssl_context="adhoc")
+        else:
+            app.run(host=host, port=port, debug=debug)
+            
+        
+    

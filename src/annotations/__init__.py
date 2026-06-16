@@ -138,3 +138,38 @@ def menu_parent(value: str):
         cls._menu_parent = value
         return cls
     return decorator    
+
+# ---- @choices: SELECT DISTINCT automático para filtros ----
+def choices(field: str, label: str | None = None, order: str = "asc"):
+    """
+    Marca um campo do modelo para ter opções dinâmicas via SELECT DISTINCT.
+
+    Uso no model:
+        @choices("genre", label="Gênero")
+        @choices("language", label="Idioma")
+        class Book(db.Model):
+            genre: Mapped[str] = mapped_column(String(60))
+
+    O gerador e o controller usam _choices_fields para construir
+    FilterDef com options=lambda: BookService.distinct_values("genre")
+
+    Parâmetros:
+        field: nome da coluna no modelo
+        label: label exibido no filtro (padrão: field.title())
+        order: "asc" ou "desc" para ordenar as opções
+    """
+    def decorator(cls):
+        if not hasattr(cls, '_choices_fields'):
+            cls._choices_fields = []
+        cls._choices_fields.append({
+            "field": field,
+            "label": label or field.replace("_", " ").title(),
+            "order": order,
+        })
+        return cls
+    return decorator
+
+
+def get_choices_fields(cls) -> list[dict]:
+    """Retorna a lista de campos com @choices definidos."""
+    return getattr(cls, '_choices_fields', [])

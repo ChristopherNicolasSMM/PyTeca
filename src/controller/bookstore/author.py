@@ -3,7 +3,7 @@ from __future__ import annotations
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
-from annotations import get_model_metadata
+from annotations import get_model_metadata, get_choices_fields
 from utils.generate_from_model import _get_relationship_fields
 from model.bookstore.author import Author, AuthorStatus
 from model.core.user_layout_pref import UserLayoutPref
@@ -13,7 +13,7 @@ from utils.smart_list.export import export_csv, export_excel, export_pdf
 
 author_bp = Blueprint("authors", __name__, url_prefix="/authors")
 
-# ── Configuração SmartList ────────────────────────────────────────────────────
+# ── Configuração SmartList (estática — sem queries de banco) ──────────────────
 
 SMART_LIST_CONFIG = SmartListConfig(
     list_id="authors",
@@ -34,8 +34,7 @@ SMART_LIST_CONFIG = SmartListConfig(
     export_filename="authors",
 )
 
-# ── Enum, date e campos obrigatórios ─────────────────────────────────────────
-# Detectados automaticamente via metadados do modelo para uso no template do modal
+# ── Helpers de metadados (executados no import — só leem o mapper, sem DB) ────
 
 def _get_enum_fields():
     """Detecta campos Enum do modelo para gerar <select> no modal."""
@@ -44,9 +43,9 @@ def _get_enum_fields():
     from enum import EnumMeta
     import inspect
 
-    result = []
+    result   = []
     metadata = get_model_metadata(Author)
-    form_fields = metadata.get("ui_form", {}).get("fields", [])
+    form_fields  = metadata.get("ui_form", {}).get("fields", [])
     model_module = inspect.getmodule(Author)
 
     for field_name in form_fields:
@@ -91,9 +90,29 @@ def _get_required_fields():
     ]
 
 
+# Executados no import — seguros pois só leem o mapper SQLAlchemy (sem query)
 ENUM_FIELDS     = _get_enum_fields()
 DATE_FIELDS     = _get_date_fields()
 REQUIRED_FIELDS = _get_required_fields()
+_CHOICES_META   = get_choices_fields(Author)  # lista de {field, label, order}
+
+
+def _get_choices_filters(service: AuthorService) -> list[FilterDef]:
+    """
+    Constrói FilterDefs com SELECT DISTINCT para campos @choices.
+    Chamado DENTRO de list() — já dentro do app context com DB disponível.
+    """
+    filters = []
+    for ch in _CHOICES_META:
+        field = ch["field"]
+        label = ch["label"]
+        try:
+            options = service.distinct_values(field)
+        except Exception:
+            options = []
+        filters.append(FilterDef(name=field, label=label, type="select", options=options))
+    return filters
+
 
 # ── Listagem ──────────────────────────────────────────────────────────────────
 
@@ -115,7 +134,7 @@ def list():
     ))
 
     service = AuthorService()
-    result = service.list(
+    result  = service.list(
         page=int(request.args.get("page", 1)),
         per_page=per_page,
         status=status,
@@ -125,7 +144,7 @@ def list():
     )
 
     if export in ("csv", "excel", "pdf"):
-        all_result = service.list(page=1, per_page=10_000, status=status)
+        all_result  = service.list(page=1, per_page=10_000, status=status)
         visible_cols = (user_layout or {}).get("columns") or None
         if export == "csv":
             return export_csv(SMART_LIST_CONFIG, all_result.items, visible_cols)
@@ -134,7 +153,18 @@ def list():
         if export == "pdf":
             return export_pdf(SMART_LIST_CONFIG, all_result.items, visible_cols, title="Autoress")
 
-    renderer = SmartListRenderer(SMART_LIST_CONFIG)
+    # ── Filtros @choices (SELECT DISTINCT) — lazy, dentro do app context ──────
+    choices_filters = _get_choices_filters(service)
+
+    # Injeta filtros @choices no config para o renderer os incluir
+    if choices_filters:
+        from copy import copy
+        cfg_with_choices = copy(SMART_LIST_CONFIG)
+        cfg_with_choices.filters = SMART_LIST_CONFIG.filters + choices_filters
+    else:
+        cfg_with_choices = SMART_LIST_CONFIG
+
+    renderer = SmartListRenderer(cfg_with_choices)
     sl = renderer.build_context(
         items=result.items,
         total=result.total,
@@ -143,7 +173,7 @@ def list():
     )
 
     metadata = get_model_metadata(Author)
-    form_fields_list  = metadata.get("ui_form", {}).get("fields", [])
+    form_fields_list    = metadata.get("ui_form", {}).get("fields", [])
     relationship_fields = _get_relationship_fields(Author)
 
     return render_template(

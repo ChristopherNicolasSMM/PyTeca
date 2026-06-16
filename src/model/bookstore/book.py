@@ -7,7 +7,7 @@ from sqlalchemy import DateTime, Enum, Index, Integer, String, Text, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from db.database import db
-from annotations import * # label, plural, listview, Column, Filter, form, Group, required, max_length, display_field
+from annotations import * # label, plural, listview, Column, Filter, form, Group, required, max_length, display_field, choices
 
 from model.bookstore.author import Author
 
@@ -47,6 +47,7 @@ class BookStatus(str, PyEnum):
 @display_field("title")
 @required("title", "O título é obrigatório")
 @required("author_id", "O autor é obrigatório")
+@choices("genre", label="Gênero")
 class Book(db.Model):
     __tablename__ = "book"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
