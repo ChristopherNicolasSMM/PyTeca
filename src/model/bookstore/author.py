@@ -1,11 +1,11 @@
-# model/author.py
+# model/bookstore/author.py
 from __future__ import annotations
 from enum import Enum as PyEnum
 
 from annotations import * # label, plural, listview, Column, Filter, form, Group, required, max_length, display_field
 from db.database import db
 
-from sqlalchemy import ForeignKey, DateTime, Integer, String, Text
+from sqlalchemy import Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 
@@ -35,6 +35,7 @@ class AuthorStatus(str, PyEnum):
         Group("bio", "Biografia", ["bio"], collapsible=True),
     ]
 )
+@display_field("name")   # ← fix: agora /api/options/authors retorna o nome correto
 @required("name", "Nome do autor é obrigatório")
 @max_length("name", 100)
 class Author(db.Model):
@@ -44,20 +45,16 @@ class Author(db.Model):
     birth_year = db.Column(db.Integer)
     bio = db.Column(db.Text)
     status = db.Column(db.String(20), default=AuthorStatus.DRAFT, nullable=False)
-    
-    # Relacionamento com livros (opcional, pode ser usado para navegação)
+
     books: Mapped[list["Book"]] = relationship(back_populates="author")
 
     def publish(self) -> None:
-        """Muda o status para ACTIVE."""
         self.status = AuthorStatus.ACTIVE
 
     def send_to_trash(self) -> None:
-        """Muda o status para TRASH."""
         self.status = AuthorStatus.TRASH
 
     def restore(self) -> None:
-        """Restaura da lixeira para ACTIVE."""
         self.status = AuthorStatus.ACTIVE
 
     @property

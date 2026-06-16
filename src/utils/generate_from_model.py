@@ -146,56 +146,97 @@ def _build_fields_rows(class_name_lower: str, fields: list[str]) -> str:
     return "\n".join(rows)
 
 
-def _build_form_fields(fields: list[str], relationship_fields: list[dict] = None, enum_fields: list[dict] = None) -> str:
-    """Gera campos <div class='mb-3'> para o form_modal, com suporte a FK e Enum."""
-    fk_names = {r["name"]: r["foreign_table"] for r in (relationship_fields or [])}
-    enum_map = {e["name"]: e["options"] for e in (enum_fields or [])}
+def _build_form_fields(fields: list[str], relationship_fields: list[dict] = None,
+                       enum_fields: list[dict] = None, model_class=None) -> str:
+    """
+    Gera campos para o form_modal.
+    Detecta automaticamente: FK, Enum, Date e campos obrigatórios (@required).
+    """
+    from sqlalchemy import DateTime, Date
+    from sqlalchemy.orm import ColumnProperty
+
+    fk_names  = {r["name"]: r["foreign_table"] for r in (relationship_fields or [])}
+    enum_map  = {e["name"]: e["options"] for e in (enum_fields or [])}
+
+    date_fields: set[str] = set()
+    if model_class and hasattr(model_class, "__mapper__"):
+        for prop in model_class.__mapper__.iterate_properties:
+            if isinstance(prop, ColumnProperty):
+                col = prop.columns[0]
+                if isinstance(col.type, (DateTime, Date)):
+                    date_fields.add(prop.key)
+
+    required_fields: set[str] = set()
+    if model_class:
+        validations = getattr(model_class, "_validations", {})
+        for field_name, rules in validations.items():
+            if any(r.get("type") == "required" for r in rules):
+                required_fields.add(field_name)
+
     rows = []
     for field in fields:
-        label = field.replace("_", " ").title()
+        label      = field.replace("_", " ").title()
+        req_marker = ' <span class="text-danger">*</span>' if field in required_fields else ""
+        req_class  = " required-field" if field in required_fields else ""
+        err_div    = f'              <div class="invalid-feedback" id="err-{field}"></div>\n'
+
         if field in fk_names:
             foreign_table = fk_names[field]
             rows.append(
                 f'          <div class="row mb-3 fk-field" data-field="{field}" data-foreign-table="{foreign_table}">\n'
-                f'            <label class="col-sm-3 col-form-label">{label}</label>\n'
-                f'            <div class="col-sm-9">\n'
+                f'            <label class="col-sm-3 col-form-label">{label}{req_marker}</label>\n'
+                f'            <div class="col-sm-9" style="position:relative;">\n'
                 f'              <input type="hidden" name="{field}" class="fk-hidden-id">\n'
                 f'              <div class="input-group">\n'
-                f'                <input type="text" class="form-control fk-search-input" placeholder="Digite para buscar..." autocomplete="off">\n'
+                f'                <input type="text" class="form-control fk-search-input{req_class}" data-field-name="{field}" placeholder="Clique ou digite para buscar..." autocomplete="off">\n'
                 f'                <button class="btn btn-outline-secondary fk-clear-btn" type="button" title="Limpar">\n'
                 f'                  <i class="bi bi-x"></i>\n'
                 f'                </button>\n'
                 f'              </div>\n'
-                f'              <div class="invalid-feedback">Selecione um valor válido.</div>\n'
+                f'              <ul class="fk-dropdown list-group position-absolute w-100 shadow" style="z-index:9999;max-height:200px;overflow-y:auto;display:none;top:100%;left:0;"></ul>\n'
+                f'{err_div}'
                 f'            </div>\n'
                 f'          </div>'
             )
         elif field in enum_map:
-            options_html = '\n'.join(
+            options_html = "\n".join(
                 f'                    <option value="{v}">{lbl}</option>'
                 for v, lbl in enum_map[field]
             )
             rows.append(
                 f'          <div class="row mb-3">\n'
-                f'            <label for="{field}" class="col-sm-3 col-form-label">{label}</label>\n'
+                f'            <label for="{field}" class="col-sm-3 col-form-label">{label}{req_marker}</label>\n'
                 f'            <div class="col-sm-9">\n'
-                f'              <select class="form-select" id="{field}" name="{field}">\n'
+                f'              <select class="form-select{req_class}" id="{field}" name="{field}" data-field-name="{field}">\n'
                 f'                <option value="">Selecione...</option>\n'
                 f'{options_html}\n'
                 f'              </select>\n'
+                f'{err_div}'
+                f'            </div>\n'
+                f'          </div>'
+            )
+        elif field in date_fields:
+            rows.append(
+                f'          <div class="row mb-3">\n'
+                f'            <label for="{field}" class="col-sm-3 col-form-label">{label}{req_marker}</label>\n'
+                f'            <div class="col-sm-9">\n'
+                f'              <input type="date" class="form-control{req_class}" id="{field}" name="{field}" data-field-name="{field}">\n'
+                f'{err_div}'
                 f'            </div>\n'
                 f'          </div>'
             )
         else:
             rows.append(
                 f'          <div class="row mb-3">\n'
-                f'            <label for="{field}" class="col-sm-3 col-form-label">{label}</label>\n'
+                f'            <label for="{field}" class="col-sm-3 col-form-label">{label}{req_marker}</label>\n'
                 f'            <div class="col-sm-9">\n'
-                f'              <input type="text" class="form-control" id="{field}" name="{field}">\n'
+                f'              <input type="text" class="form-control{req_class}" id="{field}" name="{field}" data-field-name="{field}">\n'
+                f'{err_div}'
                 f'            </div>\n'
                 f'          </div>'
             )
     return "\n".join(rows)
+
 
 def _build_context(
     class_name: str,
@@ -217,16 +258,36 @@ def _build_context(
         relationship_fields = _get_relationship_fields(model_class)
 
     # detectar campos Enum
+    # Suporta tanto SAEnum(MyEnum) quanto String com default PyEnum (padrão do PyTeca)
     enum_fields = []
     if model_class:
+        from sqlalchemy.orm import ColumnProperty
+        from sqlalchemy import Enum as SAEnum
+        from enum import EnumMeta
         for field_name in form_fields_list:
-            if hasattr(model_class, field_name):
-                column = getattr(model_class, field_name)
-                if hasattr(column, 'type') and hasattr(column.type, 'enum_class'):
-                    enum_class = column.type.enum_class
-                    if enum_class:
-                        options = [(e.value, e.name.replace('_', ' ').title()) for e in enum_class]
-                        enum_fields.append({"name": field_name, "options": options})
+            options = None
+            # Abordagem 1: coluna SA Enum nativa (enum_class)
+            attr = getattr(model_class, field_name, None)
+            if attr is not None and hasattr(attr, 'type'):
+                col_type = attr.type
+                if isinstance(col_type, SAEnum) and getattr(col_type, 'enum_class', None):
+                    enum_class = col_type.enum_class
+                    options = [(e.value, e.name.replace('_', ' ').title()) for e in enum_class]
+            # Abordagem 2: coluna String com default PyEnum (padrao PyTeca)
+            # Detecta inspecionando os defaults e o nome da coluna
+            if options is None and model_class.__mapper__:
+                for prop in model_class.__mapper__.iterate_properties:
+                    if isinstance(prop, ColumnProperty) and prop.key == field_name:
+                        col = prop.columns[0]
+                        # Procura PyEnum no módulo do modelo
+                        import inspect, sys
+                        model_module = inspect.getmodule(model_class)
+                        for obj_name, obj in vars(model_module).items():
+                            if isinstance(obj, EnumMeta) and field_name.replace('_', '').lower() in obj_name.lower():
+                                options = [(e.value, e.name.replace('_', ' ').title()) for e in obj]
+                                break
+            if options:
+                enum_fields.append({"name": field_name, "options": options})
 
     # ============================================================
     # Campos pesquisáveis (searchable_fields) e mapeamento de FKs
@@ -320,9 +381,11 @@ def _build_context(
         "columns":            _build_columns_block(metadata),
         "filters":            _build_filters_block(metadata),
         "fields_rows":        _build_fields_rows(class_name_lower, form_fields_list),
-        "form_fields":        _build_form_fields(form_fields_list, relationship_fields, enum_fields),
+        "form_fields":        _build_form_fields(form_fields_list, relationship_fields, enum_fields, model_class),
         "relationship_fields": relationship_fields,
         "enum_fields":        enum_fields,
+        "required_fields":    [f for f, rules in getattr(model_class, '_validations', {}).items() if any(r.get('type') == 'required' for r in rules)] if model_class else [],
+        "date_fields":        [prop.key for prop in (model_class.__mapper__.iterate_properties if model_class and hasattr(model_class, '__mapper__') else []) if hasattr(prop, 'columns') and hasattr(prop.columns[0].type, '__class__') and prop.columns[0].type.__class__.__name__ in ('DateTime', 'Date')],
         "searchable_fields":  searchable_fields,
         "fk_display_map":     fk_display_map,
         "search_block":       search_block,      

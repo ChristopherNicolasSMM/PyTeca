@@ -11,16 +11,25 @@ from utils.smart_list.config import SmartListConfig
 
 
 def _get_cell_value(row: Any, key: str) -> str:
-    """Extrai valor de um row (dict, objeto ORM ou dataclass)."""
+    """Extrai valor de um row (dict, objeto ORM ou dataclass).
+    Para relacionamentos ORM, tenta <key>_name antes de cair no str().
+    """
     if isinstance(row, dict):
         val = row.get(key, "")
     else:
-        val = getattr(row, key, "")
+        # Tenta <key>_name primeiro (ex: author → author_name)
+        val = getattr(row, f"{key}_name", None)
+        if val is None:
+            val = getattr(row, key, "")
     if val is None:
         return ""
     if isinstance(val, datetime):
         return val.strftime("%d/%m/%Y %H:%M")
-    return str(val)
+    # Se ainda for um objeto ORM (não primitivo), tenta .name ou str sem <>
+    raw = str(val)
+    if raw.startswith("<") and raw.endswith(">"):
+        return getattr(val, "name", getattr(val, "title", raw))
+    return raw
 
 
 def export_csv(
@@ -33,6 +42,8 @@ def export_csv(
     headers = {c.key: c.label for c in config.columns}
 
     output = io.StringIO()
+    # UTF-8 BOM garante que o Excel abre corretamente sem problemas de encoding
+    output.write('\ufeff')
     writer = csv.writer(output)
 
     # Cabeçalho

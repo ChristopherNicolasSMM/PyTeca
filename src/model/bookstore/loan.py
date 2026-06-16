@@ -71,6 +71,15 @@ class Loan(db.Model):
     def is_overdue(self) -> bool:
         return self.status == LoanStatus.OVERDUE
 
+    # Propriedades planas para uso na SmartList (ColumnDef não resolve chaves com ponto)
+    @property
+    def user_username(self) -> str:
+        return self.user.username if self.user else "—"
+
+    @property
+    def book_title(self) -> str:
+        return self.book.title if self.book else "—"
+
     def mark_returned(self) -> None:
         self.status = LoanStatus.RETURNED
         self.return_date = datetime.now(timezone.utc)

@@ -8,21 +8,472 @@
   <nav>
     <ol class="breadcrumb">
       <li class="breadcrumb-item"><a href="{{ url_for('web.dashboard') }}">Home</a></li>
+      <li class="breadcrumb-item">Administração</li>
       <li class="breadcrumb-item active">Tarefas</li>
     </ol>
   </nav>
 </div>
 
 <section class="section">
-  <div class="row">
-    <div class="col-lg-12">
-      <div class="card">
+
+  <!-- Cards de métricas -->
+  <div class="row g-3 mb-3" id="statsCards">
+    <div class="col-6 col-md-3">
+      <div class="card text-center h-100">
         <div class="card-body">
-          <h5 class="card-title">Funcionalidade em desenvolvimento</h5>
-          <p>Em breve você poderá agendar tarefas, aprovar execuções e monitorar filas de mensagens.</p>
+          <i class="bi bi-lightning-charge fs-2 text-primary"></i>
+          <h3 class="mt-1 mb-0" id="cardActive">—</h3>
+          <small class="text-muted">Tarefas ativas</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card text-center h-100">
+        <div class="card-body">
+          <i class="bi bi-hourglass-split fs-2 text-warning"></i>
+          <h3 class="mt-1 mb-0" id="cardPendAprov">—</h3>
+          <small class="text-muted">Aguardando aprovação</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card text-center h-100">
+        <div class="card-body">
+          <i class="bi bi-x-circle fs-2 text-danger"></i>
+          <h3 class="mt-1 mb-0" id="cardFail24h">—</h3>
+          <small class="text-muted">Falhas (24h)</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card text-center h-100">
+        <div class="card-body">
+          <i class="bi bi-envelope-exclamation fs-2 text-info"></i>
+          <h3 class="mt-1 mb-0" id="cardQueue">—</h3>
+          <small class="text-muted">Fila pendente</small>
         </div>
       </div>
     </div>
   </div>
+
+  <!-- Gráfico de execuções 7 dias -->
+  <div class="card mb-3">
+    <div class="card-body">
+      <h5 class="card-title">Execuções nos últimos 7 dias</h5>
+      <div id="chartExecucoes"></div>
+    </div>
+  </div>
+
+  <!-- Abas: Tarefas / Fila / Logs -->
+  <ul class="nav nav-tabs mb-3" id="taskTabs">
+    <li class="nav-item">
+      <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-tasks">
+        <i class="bi bi-list-check me-1"></i>Tarefas
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-queue">
+        <i class="bi bi-envelope me-1"></i>Fila de Mensagens
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-logs">
+        <i class="bi bi-journal-text me-1"></i>Logs
+      </button>
+    </li>
+  </ul>
+
+  <div class="tab-content">
+
+    <!-- ─── ABA: TAREFAS ─────────────────────────────────────────────────── -->
+    <div class="tab-pane fade show active" id="tab-tasks">
+      <div class="card">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="card-title mb-0">Tarefas Agendadas</h5>
+            <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#taskModal" id="btnNovaTask">
+              <i class="bi bi-plus-lg me-1"></i>Nova Tarefa
+            </button>
+          </div>
+
+          <div class="table-responsive">
+            <table class="table table-hover align-middle">
+              <thead>
+                <tr>
+                  <th>Nome</th><th>Tipo</th><th>Agendamento</th>
+                  <th>Status</th><th>Última exec.</th><th>Próxima exec.</th>
+                  <th class="text-end">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="tasksBody">
+                <tr><td colspan="7" class="text-center py-4 text-muted">Carregando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div id="tasksPagination" class="d-flex justify-content-center mt-2"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── ABA: FILA ────────────────────────────────────────────────────── -->
+    <div class="tab-pane fade" id="tab-queue">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title">Fila de Mensagens</h5>
+
+          <!-- Filtro por status -->
+          <div class="mb-3 d-flex gap-2">
+            {% for st, label in [('', 'Todas'), ('pending','Pendentes'), ('failed','Com Falha'), ('done','Processadas')] %}
+            <button class="btn btn-sm btn-outline-secondary queue-filter {% if loop.first %}active{% endif %}"
+                    data-status="{{ st }}">{{ label }}</button>
+            {% endfor %}
+          </div>
+
+          <div class="table-responsive">
+            <table class="table table-hover align-middle">
+              <thead>
+                <tr>
+                  <th>ID</th><th>Canal</th><th>Status</th>
+                  <th>Tentativas</th><th>Agendado para</th><th>Erro</th>
+                  <th class="text-end">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="queueBody">
+                <tr><td colspan="7" class="text-center py-4 text-muted">Carregando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div id="queuePagination" class="d-flex justify-content-center mt-2"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── ABA: LOGS ────────────────────────────────────────────────────── -->
+    <div class="tab-pane fade" id="tab-logs">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title">Histórico de Execuções</h5>
+          <div class="table-responsive">
+            <table class="table table-hover align-middle">
+              <thead>
+                <tr>
+                  <th>Tarefa</th><th>Status</th><th>Início</th>
+                  <th>Duração</th><th>Resultado / Erro</th>
+                </tr>
+              </thead>
+              <tbody id="logsBody">
+                <tr><td colspan="5" class="text-center py-4 text-muted">Carregando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div id="logsPagination" class="d-flex justify-content-center mt-2"></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /tab-content -->
 </section>
+
+<!-- ─── MODAL: Criar/Editar Tarefa ────────────────────────────────────────── -->
+<div class="modal fade" id="taskModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="taskModalTitle">Nova Tarefa</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="taskId">
+        <div class="mb-3">
+          <label class="form-label">Nome <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" id="taskName">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Tipo <span class="text-danger">*</span></label>
+          <select class="form-select" id="taskType">
+            <option value="python_call">Python (função registrada)</option>
+            <option value="http_request">HTTP GET</option>
+            <option value="sql">SQL</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Alvo <span class="text-danger">*</span>
+            <small class="text-muted">(nome da função, URL ou SQL)</small>
+          </label>
+          <input type="text" class="form-control" id="taskTarget"
+                 placeholder="Ex: backup_db / https://... / SELECT 1">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Agendamento <span class="text-danger">*</span>
+            <small class="text-muted">(cron ou intervalo em minutos)</small>
+          </label>
+          <input type="text" class="form-control" id="taskSchedule"
+                 placeholder="Ex: 0 2 * * * (cron) ou 60 (minutos)">
+        </div>
+        <div class="form-check mb-3">
+          <input class="form-check-input" type="checkbox" id="taskApproval">
+          <label class="form-check-label">Requer aprovação antes de executar</label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-primary" id="btnSaveTask">Salvar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  'use strict';
+
+  const API = '/api/admin/tasks';
+
+  // ── Utilitários ──────────────────────────────────────────────────────────
+  function fmt(iso) {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    return d.toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric',
+                                        hour:'2-digit', minute:'2-digit' });
+  }
+
+  function statusBadge(st) {
+    const map = {
+      active: 'bg-success', paused: 'bg-secondary', pending_approval: 'bg-warning text-dark',
+      completed: 'bg-info', rejected: 'bg-danger',
+      pending: 'bg-warning text-dark', processing: 'bg-info',
+      done: 'bg-success', failed: 'bg-danger', cancelled: 'bg-secondary',
+      success: 'bg-success', failure: 'bg-danger', running: 'bg-info',
+    };
+    return `<span class="badge ${map[st] || 'bg-secondary'}">${st}</span>`;
+  }
+
+  // ── Dashboard ────────────────────────────────────────────────────────────
+  async function loadStats() {
+    const res  = await fetch(`${API}/stats`);
+    const data = await res.json();
+    if (!data.success) return;
+    const s = data.data;
+    document.getElementById('cardActive').textContent    = s.active_tasks   ?? '—';
+    document.getElementById('cardPendAprov').textContent = s.pending_approval ?? '—';
+    document.getElementById('cardFail24h').textContent   = s.failures_24h   ?? '—';
+    document.getElementById('cardQueue').textContent     = s.queue_pending  ?? '—';
+
+    // Gráfico
+    const chart = s.daily_chart || [];
+    const opts  = {
+      series: [
+        { name: 'Total', data: chart.map(r => r.total) },
+        { name: 'Falhas', data: chart.map(r => r.failures) },
+      ],
+      chart: { type: 'bar', height: 220, toolbar: { show: false } },
+      colors: ['#0d6efd', '#dc3545'],
+      xaxis: { categories: chart.map(r => r.day) },
+      plotOptions: { bar: { columnWidth: '50%', borderRadius: 4 } },
+      legend: { position: 'top' },
+      dataLabels: { enabled: false },
+    };
+    document.getElementById('chartExecucoes').innerHTML = '';
+    new ApexCharts(document.getElementById('chartExecucoes'), opts).render();
+  }
+
+  // ── Tarefas ──────────────────────────────────────────────────────────────
+  let tasksPage = 1;
+
+  async function loadTasks(page = 1) {
+    tasksPage = page;
+    const res  = await fetch(`${API}/?page=${page}&per_page=15`);
+    const data = await res.json();
+    if (!data.success) return;
+    const { items, pages } = data.data;
+
+    document.getElementById('tasksBody').innerHTML = items.length
+      ? items.map(t => `
+        <tr>
+          <td><strong>${t.name}</strong></td>
+          <td><code>${t.task_type}</code></td>
+          <td><code>${t.schedule}</code></td>
+          <td>${statusBadge(t.status)}${t.requires_approval && !t.approved ? ' <span class="badge bg-warning text-dark">Ap. pendente</span>' : ''}</td>
+          <td>${fmt(t.last_run)}</td>
+          <td>${fmt(t.next_run)}</td>
+          <td class="text-end">
+            <button class="btn btn-sm btn-outline-success" title="Executar agora" onclick="runTask(${t.id})">
+              <i class="bi bi-play-fill"></i>
+            </button>
+            ${t.status === 'active'
+              ? `<button class="btn btn-sm btn-outline-secondary ms-1" title="Pausar" onclick="pauseTask(${t.id})"><i class="bi bi-pause-fill"></i></button>`
+              : `<button class="btn btn-sm btn-outline-success ms-1" title="Ativar" onclick="activateTask(${t.id})"><i class="bi bi-play-circle"></i></button>`}
+            ${t.requires_approval && !t.approved
+              ? `<button class="btn btn-sm btn-outline-warning ms-1" title="Aprovar" onclick="approveTask(${t.id})"><i class="bi bi-check-lg"></i></button>`
+              : ''}
+            <button class="btn btn-sm btn-outline-primary ms-1" title="Editar" onclick="editTask(${JSON.stringify(t).replace(/"/g,'&quot;')})">
+              <i class="bi bi-pencil"></i>
+            </button>
+            <button class="btn btn-sm btn-outline-danger ms-1" title="Excluir" onclick="deleteTask(${t.id})">
+              <i class="bi bi-trash3"></i>
+            </button>
+          </td>
+        </tr>`).join('')
+      : '<tr><td colspan="7" class="text-center py-4 text-muted">Nenhuma tarefa cadastrada.</td></tr>';
+
+    renderPagination('tasksPagination', page, pages, loadTasks);
+  }
+
+  window.runTask = async (id) => {
+    if (!confirm('Executar esta tarefa agora?')) return;
+    const res  = await fetch(`${API}/${id}/run`, { method: 'POST' });
+    const data = await res.json();
+    alert(data.success ? '✅ Executado: ' + (data.data?.result || 'ok') : '❌ ' + data.error);
+    loadTasks(tasksPage);
+    loadStats();
+  };
+
+  window.pauseTask    = async (id) => { await fetch(`${API}/${id}/pause`,    { method: 'POST' }); loadTasks(tasksPage); };
+  window.activateTask = async (id) => { await fetch(`${API}/${id}/activate`, { method: 'POST' }); loadTasks(tasksPage); };
+  window.approveTask  = async (id) => { await fetch(`${API}/${id}/approve`,  { method: 'POST' }); loadTasks(tasksPage); };
+
+  window.deleteTask = async (id) => {
+    if (!confirm('Excluir esta tarefa?')) return;
+    await fetch(`${API}/${id}`, { method: 'DELETE' });
+    loadTasks(tasksPage);
+  };
+
+  window.editTask = (t) => {
+    document.getElementById('taskId').value       = t.id;
+    document.getElementById('taskName').value     = t.name;
+    document.getElementById('taskType').value     = t.task_type;
+    document.getElementById('taskTarget').value   = t.target;
+    document.getElementById('taskSchedule').value = t.schedule;
+    document.getElementById('taskApproval').checked = t.requires_approval;
+    document.getElementById('taskModalTitle').textContent = 'Editar Tarefa';
+    new bootstrap.Modal(document.getElementById('taskModal')).show();
+  };
+
+  document.getElementById('btnNovaTask').addEventListener('click', () => {
+    ['taskId','taskName','taskTarget','taskSchedule'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('taskType').value = 'python_call';
+    document.getElementById('taskApproval').checked = false;
+    document.getElementById('taskModalTitle').textContent = 'Nova Tarefa';
+  });
+
+  document.getElementById('btnSaveTask').addEventListener('click', async () => {
+    const id   = document.getElementById('taskId').value;
+    const data = {
+      name:              document.getElementById('taskName').value.trim(),
+      task_type:         document.getElementById('taskType').value,
+      target:            document.getElementById('taskTarget').value.trim(),
+      schedule:          document.getElementById('taskSchedule').value.trim(),
+      requires_approval: document.getElementById('taskApproval').checked,
+    };
+    const url    = id ? `${API}/${id}` : `${API}/`;
+    const method = id ? 'PUT' : 'POST';
+    const res    = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+    const result = await res.json();
+    if (result.success) {
+      bootstrap.Modal.getInstance(document.getElementById('taskModal'))?.hide();
+      loadTasks(tasksPage);
+    } else {
+      alert('Erro: ' + result.error);
+    }
+  });
+
+  // ── Fila ─────────────────────────────────────────────────────────────────
+  let queuePage   = 1;
+  let queueStatus = '';
+
+  async function loadQueue(page = 1) {
+    queuePage = page;
+    const res  = await fetch(`${API}/queue?page=${page}&per_page=15&status=${queueStatus}`);
+    const data = await res.json();
+    if (!data.success) return;
+    const { items, pages } = data.data;
+
+    document.getElementById('queueBody').innerHTML = items.length
+      ? items.map(m => `
+        <tr>
+          <td>${m.id}</td>
+          <td><span class="badge bg-secondary">${m.channel}</span></td>
+          <td>${statusBadge(m.status)}</td>
+          <td>${m.retries}/${m.max_retries}</td>
+          <td>${fmt(m.scheduled_for)}</td>
+          <td><small class="text-danger">${m.error_msg || '—'}</small></td>
+          <td class="text-end">
+            ${m.status === 'failed'
+              ? `<button class="btn btn-sm btn-outline-warning" onclick="reprocessMsg(${m.id})"><i class="bi bi-arrow-clockwise"></i></button>`
+              : ''}
+            ${m.status === 'pending'
+              ? `<button class="btn btn-sm btn-outline-danger ms-1" onclick="cancelMsg(${m.id})"><i class="bi bi-x-lg"></i></button>`
+              : ''}
+          </td>
+        </tr>`).join('')
+      : '<tr><td colspan="7" class="text-center py-4 text-muted">Nenhuma mensagem.</td></tr>';
+
+    renderPagination('queuePagination', page, pages, loadQueue);
+  }
+
+  window.reprocessMsg = async (id) => { await fetch(`${API}/queue/${id}/reprocess`, { method: 'POST' }); loadQueue(queuePage); };
+  window.cancelMsg    = async (id) => { await fetch(`${API}/queue/${id}/cancel`,    { method: 'POST' }); loadQueue(queuePage); };
+
+  document.querySelectorAll('.queue-filter').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.queue-filter').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      queueStatus = btn.dataset.status;
+      loadQueue(1);
+    });
+  });
+
+  // ── Logs ─────────────────────────────────────────────────────────────────
+  let logsPage = 1;
+
+  async function loadLogs(page = 1) {
+    logsPage = page;
+    const res  = await fetch(`${API}/logs?page=${page}&per_page=20`);
+    const data = await res.json();
+    if (!data.success) return;
+    const { items, pages } = data.data;
+
+    document.getElementById('logsBody').innerHTML = items.length
+      ? items.map(l => `
+        <tr>
+          <td>${l.task_name}</td>
+          <td>${statusBadge(l.status)}</td>
+          <td>${fmt(l.started_at)}</td>
+          <td>${l.duration_ms != null ? l.duration_ms + ' ms' : '—'}</td>
+          <td><small class="${l.status === 'failure' ? 'text-danger' : 'text-muted'}">${l.error || l.result || '—'}</small></td>
+        </tr>`).join('')
+      : '<tr><td colspan="5" class="text-center py-4 text-muted">Sem logs.</td></tr>';
+
+    renderPagination('logsPagination', page, pages, loadLogs);
+  }
+
+  // ── Paginação simples ─────────────────────────────────────────────────────
+  function renderPagination(containerId, current, total, callback) {
+    const el = document.getElementById(containerId);
+    if (total <= 1) { el.innerHTML = ''; return; }
+    let html = '<nav><ul class="pagination pagination-sm mb-0">';
+    for (let p = 1; p <= total; p++) {
+      html += `<li class="page-item ${p === current ? 'active' : ''}">
+        <a class="page-link" href="#" onclick="event.preventDefault(); (${callback.name})(${p})">${p}</a>
+      </li>`;
+    }
+    html += '</ul></nav>';
+    el.innerHTML = html;
+  }
+
+  // ── Inicialização ─────────────────────────────────────────────────────────
+  loadStats();
+  loadTasks();
+
+  document.getElementById('tab-queue').closest('.tab-pane')
+    ?.addEventListener('shown.bs.tab', () => loadQueue());
+  document.querySelectorAll('[data-bs-target="#tab-queue"]').forEach(btn =>
+    btn.addEventListener('click', () => loadQueue()));
+  document.querySelectorAll('[data-bs-target="#tab-logs"]').forEach(btn =>
+    btn.addEventListener('click', () => loadLogs()));
+})();
+</script>
 {% endblock %}

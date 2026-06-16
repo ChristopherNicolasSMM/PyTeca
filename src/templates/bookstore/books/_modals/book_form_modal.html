@@ -7,201 +7,331 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
-        <form id="bookForm">
+
+        <div class="alert alert-danger d-none" id="bookValidationAlert" role="alert">
+          <i class="bi bi-exclamation-triangle me-1"></i>
+          <span id="bookValidationMsg"></span>
+        </div>
+
+        <form id="bookForm" novalidate>
           <input type="hidden" id="bookId">
                     <div class="row mb-3">
-            <label for="title" class="col-sm-3 col-form-label">Title</label>
+            <label for="title" class="col-sm-3 col-form-label">Title <span class="text-danger">*</span></label>
             <div class="col-sm-9">
-              <input type="text" class="form-control" id="title" name="title">
+              <input type="text" class="form-control required-field" id="title" name="title" data-field-name="title">
+              <div class="invalid-feedback" id="err-title"></div>
             </div>
           </div>
           <div class="row mb-3 fk-field" data-field="author_id" data-foreign-table="authors">
-            <label class="col-sm-3 col-form-label">Author Id</label>
-            <div class="col-sm-9">
+            <label class="col-sm-3 col-form-label">Author Id <span class="text-danger">*</span></label>
+            <div class="col-sm-9" style="position:relative;">
               <input type="hidden" name="author_id" class="fk-hidden-id">
               <div class="input-group">
-                <input type="text" class="form-control fk-search-input" placeholder="Digite para buscar..." autocomplete="off">
+                <input type="text" class="form-control fk-search-input required-field" data-field-name="author_id" placeholder="Clique ou digite para buscar..." autocomplete="off">
                 <button class="btn btn-outline-secondary fk-clear-btn" type="button" title="Limpar">
                   <i class="bi bi-x"></i>
                 </button>
               </div>
-              <div class="invalid-feedback">Selecione um valor válido.</div>
+              <ul class="fk-dropdown list-group position-absolute w-100 shadow" style="z-index:9999;max-height:200px;overflow-y:auto;display:none;top:100%;left:0;"></ul>
+              <div class="invalid-feedback" id="err-author_id"></div>
             </div>
           </div>
           <div class="row mb-3">
             <label for="isbn" class="col-sm-3 col-form-label">Isbn</label>
             <div class="col-sm-9">
-              <input type="text" class="form-control" id="isbn" name="isbn">
+              <input type="text" class="form-control" id="isbn" name="isbn" data-field-name="isbn">
+              <div class="invalid-feedback" id="err-isbn"></div>
             </div>
           </div>
           <div class="row mb-3">
             <label for="publisher" class="col-sm-3 col-form-label">Publisher</label>
             <div class="col-sm-9">
-              <input type="text" class="form-control" id="publisher" name="publisher">
+              <input type="text" class="form-control" id="publisher" name="publisher" data-field-name="publisher">
+              <div class="invalid-feedback" id="err-publisher"></div>
             </div>
           </div>
           <div class="row mb-3">
             <label for="year" class="col-sm-3 col-form-label">Year</label>
             <div class="col-sm-9">
-              <input type="text" class="form-control" id="year" name="year">
+              <input type="text" class="form-control" id="year" name="year" data-field-name="year">
+              <div class="invalid-feedback" id="err-year"></div>
             </div>
           </div>
           <div class="row mb-3">
             <label for="edition" class="col-sm-3 col-form-label">Edition</label>
             <div class="col-sm-9">
-              <input type="text" class="form-control" id="edition" name="edition">
+              <input type="text" class="form-control" id="edition" name="edition" data-field-name="edition">
+              <div class="invalid-feedback" id="err-edition"></div>
             </div>
           </div>
           <div class="row mb-3">
             <label for="genre" class="col-sm-3 col-form-label">Genre</label>
             <div class="col-sm-9">
-              <input type="text" class="form-control" id="genre" name="genre">
+              <input type="text" class="form-control" id="genre" name="genre" data-field-name="genre">
+              <div class="invalid-feedback" id="err-genre"></div>
             </div>
           </div>
           <div class="row mb-3">
             <label for="description" class="col-sm-3 col-form-label">Description</label>
             <div class="col-sm-9">
-              <input type="text" class="form-control" id="description" name="description">
+              <input type="text" class="form-control" id="description" name="description" data-field-name="description">
+              <div class="invalid-feedback" id="err-description"></div>
             </div>
           </div>
           <div class="row mb-3">
             <label for="cover_url" class="col-sm-3 col-form-label">Cover Url</label>
             <div class="col-sm-9">
-              <input type="text" class="form-control" id="cover_url" name="cover_url">
+              <input type="text" class="form-control" id="cover_url" name="cover_url" data-field-name="cover_url">
+              <div class="invalid-feedback" id="err-cover_url"></div>
             </div>
           </div>
           <div class="row mb-3">
             <label for="language" class="col-sm-3 col-form-label">Language</label>
             <div class="col-sm-9">
-              <input type="text" class="form-control" id="language" name="language">
+              <input type="text" class="form-control" id="language" name="language" data-field-name="language">
+              <div class="invalid-feedback" id="err-language"></div>
             </div>
           </div>
           <div class="row mb-3">
             <label for="quantity" class="col-sm-3 col-form-label">Quantity</label>
             <div class="col-sm-9">
-              <input type="text" class="form-control" id="quantity" name="quantity">
+              <input type="text" class="form-control" id="quantity" name="quantity" data-field-name="quantity">
+              <div class="invalid-feedback" id="err-quantity"></div>
             </div>
           </div>
           <div class="row mb-3">
             <label for="available" class="col-sm-3 col-form-label">Available</label>
             <div class="col-sm-9">
-              <input type="text" class="form-control" id="available" name="available">
+              <input type="text" class="form-control" id="available" name="available" data-field-name="available">
+              <div class="invalid-feedback" id="err-available"></div>
             </div>
           </div>
         </form>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-        <button type="button" class="btn btn-primary" id="btnSaveBook">Salvar</button>
+        <button type="button" class="btn btn-primary" id="btnSaveBook">
+          <i class="bi bi-save me-1"></i>Salvar
+        </button>
       </div>
     </div>
   </div>
 </div>
 
 <script>
-  (function() {
-    const initializedFields = new WeakSet();
+(function () {
+  'use strict';
 
-    function setupForeignKeyField(container) {
-      if (initializedFields.has(container)) return; // evita listeners duplicados
-      initializedFields.add(container);
+  const MODAL_ID        = 'bookModal';
+  const REQUIRED_FIELDS = {{ required_fields | default([]) | tojson }};
+  const initializedFk   = new WeakSet();
 
-      const fieldName    = container.dataset.field;
-      const foreignTable = container.dataset.foreignTable;
-      const hiddenInput  = container.querySelector('.fk-hidden-id');
-      const searchInput  = container.querySelector('.fk-search-input');
-      const clearBtn     = container.querySelector('.fk-clear-btn');
+  // ── FK: dropdown ao focar e ao digitar ────────────────────────────────────
+  function setupFkField(container) {
+    if (initializedFk.has(container)) return;
+    initializedFk.add(container);
 
-      // Cria dropdown de resultados
-      const dropdown = document.createElement('ul');
-      dropdown.className = 'fk-dropdown list-group position-absolute w-100 shadow';
-      dropdown.style.cssText = 'z-index:9999;max-height:200px;overflow-y:auto;display:none;';
-      container.querySelector('.input-group').style.position = 'relative';
-      container.querySelector('.input-group').appendChild(dropdown);
+    const foreignTable = container.dataset.foreignTable;
+    const hidden       = container.querySelector('.fk-hidden-id');
+    const search       = container.querySelector('.fk-search-input');
+    const clearBtn     = container.querySelector('.fk-clear-btn');
+    const dropdown     = container.querySelector('.fk-dropdown');
 
-      function showDropdown(results) {
-        dropdown.innerHTML = '';
-        if (!results.length) {
-          dropdown.style.display = 'none';
-          return;
-        }
+    function renderDropdown(results) {
+      dropdown.innerHTML = '';
+      if (!results.length) {
+        const li = document.createElement('li');
+        li.className   = 'list-group-item text-muted small';
+        li.textContent = 'Nenhum resultado.';
+        dropdown.appendChild(li);
+      } else {
         results.forEach(opt => {
           const li = document.createElement('li');
           li.className = 'list-group-item list-group-item-action';
           li.style.cursor = 'pointer';
           li.textContent = opt.text;
-          li.addEventListener('mousedown', (e) => {
-            e.preventDefault(); // evita blur antes do click
-            hiddenInput.value = opt.id;
-            searchInput.value = opt.text;
+          li.addEventListener('mousedown', e => {
+            e.preventDefault();
+            hidden.value = opt.id;
+            search.value = opt.text;
             dropdown.style.display = 'none';
+            clearErr(container.dataset.field);
           });
           dropdown.appendChild(li);
         });
-        dropdown.style.display = 'block';
+      }
+      dropdown.style.display = 'block';
+    }
+
+    async function fetchOpts(q) {
+      try {
+        const qs  = q ? `?search=${encodeURIComponent(q)}` : '';
+        const res = await fetch(`/api/options/${foreignTable}${qs}`);
+        renderDropdown((await res.json()).results || []);
+      } catch (e) { console.error('FK fetch:', e); }
+    }
+
+    search.addEventListener('focus', () => fetchOpts(search.value.trim()));
+    search.addEventListener('blur',  () => setTimeout(() => { dropdown.style.display = 'none'; }, 180));
+    let debounce;
+    search.addEventListener('input', e => {
+      hidden.value = '';
+      clearTimeout(debounce);
+      debounce = setTimeout(() => fetchOpts(e.target.value.trim()), 280);
+    });
+    clearBtn.addEventListener('click', () => {
+      hidden.value = ''; search.value = '';
+      dropdown.style.display = 'none'; search.focus();
+    });
+  }
+
+  window.setForeignKeyValue = function (modalId, fieldName, id, text) {
+    const modal = document.getElementById(modalId);
+    if (!modal) return;
+    const c = modal.querySelector(`.fk-field[data-field="${fieldName}"]`);
+    if (!c) return;
+    const h = c.querySelector('.fk-hidden-id');
+    const s = c.querySelector('.fk-search-input');
+    if (h) h.value = id   || '';
+    if (s) s.value = text || '';
+  };
+
+  // ── ISO → YYYY-MM-DD ──────────────────────────────────────────────────────
+  function isoToDate(iso) { return iso ? iso.substring(0, 10) : ''; }
+
+  // ── Validação ─────────────────────────────────────────────────────────────
+  function clearErr(field) {
+    const el  = document.getElementById(field) || document.querySelector(`[name="${field}"]`);
+    const err = document.getElementById(`err-${field}`);
+    if (el)  el.classList.remove('is-invalid');
+    if (err) { err.textContent = ''; err.style.display = 'none'; }
+  }
+
+  function clearAllErrors() {
+    document.getElementById('bookValidationAlert').classList.add('d-none');
+    REQUIRED_FIELDS.forEach(clearErr);
+  }
+
+  function validateForm(data) {
+    const errors = [];
+    REQUIRED_FIELDS.forEach(field => {
+      if (!(data[field] ?? '').toString().trim()) {
+        const label = field.replace(/_/g, ' ');
+        const msg   = `${label.charAt(0).toUpperCase() + label.slice(1)} é obrigatório.`;
+        const el    = document.getElementById(field) || document.querySelector(`[name="${field}"]`);
+        const err   = document.getElementById(`err-${field}`);
+        if (el)  el.classList.add('is-invalid');
+        if (err) { err.textContent = msg; err.style.display = 'block'; }
+        errors.push(msg);
+      }
+    });
+    return errors;
+  }
+
+  // ── Coleta dados ──────────────────────────────────────────────────────────
+  function collectData() {
+    const form = document.getElementById('bookForm');
+    const data = {};
+    form.querySelectorAll(
+      'input:not(.fk-hidden-id):not(.fk-search-input)[name], textarea[name], select[name]'
+    ).forEach(el => {
+      let val = el.value;
+      if (el.type === 'number') val = val !== '' ? parseInt(val) || null : null;
+      if (el.name) data[el.name] = val;
+    });
+    form.querySelectorAll('.fk-hidden-id[name]').forEach(el => {
+      data[el.name] = el.value || null;
+    });
+    return data;
+  }
+
+  // ── Salvar ────────────────────────────────────────────────────────────────
+  document.getElementById('btnSaveBook').addEventListener('click', async () => {
+    clearAllErrors();
+    const id     = document.getElementById('bookId').value;
+    const data   = collectData();
+    const errors = validateForm(data);
+
+    if (errors.length) {
+      const a = document.getElementById('bookValidationAlert');
+      document.getElementById('bookValidationMsg').textContent = errors.join(' | ');
+      a.classList.remove('d-none');
+      return;
+    }
+
+    const btn = document.getElementById('btnSaveBook');
+    btn.disabled  = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Salvando...';
+
+    try {
+      const url    = id ? `/api/bookstore/books/${id}` : '/api/bookstore/books/';
+      const method = id ? 'PUT' : 'POST';
+      const res    = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      const result = await res.json();
+      if (result.success) {
+        bootstrap.Modal.getInstance(document.getElementById(MODAL_ID))?.hide();
+        window.location.reload();
+      } else {
+        const a = document.getElementById('bookValidationAlert');
+        document.getElementById('bookValidationMsg').textContent = result.error || 'Falha ao salvar.';
+        a.classList.remove('d-none');
+      }
+    } catch {
+      const a = document.getElementById('bookValidationAlert');
+      document.getElementById('bookValidationMsg').textContent = 'Erro de conexão.';
+      a.classList.remove('d-none');
+    } finally {
+      btn.disabled  = false;
+      btn.innerHTML = '<i class="bi bi-save me-1"></i>Salvar';
+    }
+  });
+
+  // ── Carrega dados para edição ─────────────────────────────────────────────
+  window['loadBookData'] = async function (id) {
+    try {
+      const result = await (await fetch(`/api/bookstore/books/${id}`)).json();
+      if (!result.success) { alert('Erro ao carregar: ' + result.error); return; }
+      const data   = result.data;
+
+      document.getElementById('bookId').value = id;
+      document.getElementById('bookModalTitle').textContent = 'Editar Livros';
+
+      for (const [key, value] of Object.entries(data)) {
+        const el = document.getElementById(key);
+        if (!el) continue;
+        el.value = el.type === 'date' ? isoToDate(value) : (value ?? '');
       }
 
-      clearBtn.addEventListener('click', () => {
-        searchInput.value  = '';
-        hiddenInput.value  = '';
-        dropdown.style.display = 'none';
-        searchInput.focus();
-      });
+      {% for rel in relationship_fields %}
+      if (data['{{ rel.name }}'] !== undefined) {
+        window.setForeignKeyValue(MODAL_ID, '{{ rel.name }}',
+          data['{{ rel.name }}'],
+          data['{{ rel.name }}_name'] || data['{{ rel.name }}']
+        );
+      }
+      {% endfor %}
+    } catch { alert('Erro de conexão.'); }
+  };
 
-      searchInput.addEventListener('blur', () => {
-        // Fecha dropdown ao perder foco (após mousedown já executou)
-        setTimeout(() => { dropdown.style.display = 'none'; }, 150);
-      });
-
-      let debounceTimer;
-      let currentController = null;
-
-      searchInput.addEventListener('input', (e) => {
-        hiddenInput.value = ''; // limpa seleção anterior ao redigitar
-        clearTimeout(debounceTimer);
-        const query = e.target.value.trim();
-        if (query.length < 2) { dropdown.style.display = 'none'; return; }
-        debounceTimer = setTimeout(async () => {
-          if (currentController) currentController.abort();
-          currentController = new AbortController();
-          try {
-            const url = `/api/options/${foreignTable}?search=${encodeURIComponent(query)}`;
-            const response = await fetch(url, { signal: currentController.signal });
-            const data = await response.json();
-            showDropdown(data.results || []);
-          } catch (err) {
-            if (err.name !== 'AbortError') console.error('Erro FK fetch:', err);
-          }
-        }, 300);
-      });
-    }
-
-    // Função global para preencher campo FK ao editar registro existente
-    window.setForeignKeyValue = function(modalId, fieldName, id, text) {
-      const modal = document.getElementById(modalId);
-      if (!modal) return;
-      const container = modal.querySelector(`.fk-field[data-field="${fieldName}"]`);
-      if (!container) return;
-      const hidden = container.querySelector('.fk-hidden-id');
-      const search = container.querySelector('.fk-search-input');
-      if (hidden) hidden.value = id   || '';
-      if (search) search.value = text || '';
-    };
-
-    const modalElement = document.getElementById('bookModal');
-    if (modalElement) {
-      modalElement.addEventListener('shown.bs.modal', function() {
-        modalElement.querySelectorAll('.fk-field').forEach(setupForeignKeyField);
-      });
-      // Limpa campos ao fechar
-      modalElement.addEventListener('hidden.bs.modal', function() {
-        modalElement.querySelectorAll('.fk-hidden-id, .fk-search-input').forEach(el => {
-          el.value = '';
-        });
-        modalElement.querySelectorAll('.fk-dropdown').forEach(el => {
-          el.style.display = 'none';
-        });
-      });
-    }
-  })();
+  // ── Setup do modal ────────────────────────────────────────────────────────
+  const modalEl = document.getElementById(MODAL_ID);
+  if (modalEl) {
+    modalEl.addEventListener('shown.bs.modal', () => {
+      modalEl.querySelectorAll('.fk-field').forEach(setupFkField);
+    });
+    modalEl.addEventListener('hidden.bs.modal', () => {
+      document.getElementById('bookForm').reset();
+      document.getElementById('bookId').value = '';
+      document.getElementById('bookModalTitle').textContent = 'Novo Livros';
+      document.getElementById('bookValidationAlert').classList.add('d-none');
+      modalEl.querySelectorAll('.fk-hidden-id, .fk-search-input').forEach(el => el.value = '');
+      modalEl.querySelectorAll('.fk-dropdown').forEach(el => el.style.display = 'none');
+      modalEl.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+    });
+  }
+})();
 </script>

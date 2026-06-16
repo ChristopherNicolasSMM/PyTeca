@@ -2,30 +2,806 @@
 
 {% block title %}Query & API Playground{% endblock %}
 
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/playground.css') }}">
+{% endblock %}
+
 {% block content %}
 <div class="pagetitle">
   <h1>Query & API Playground</h1>
   <nav>
     <ol class="breadcrumb">
       <li class="breadcrumb-item"><a href="{{ url_for('web.dashboard') }}">Home</a></li>
+      <li class="breadcrumb-item">Administração</li>
       <li class="breadcrumb-item active">Playground</li>
     </ol>
   </nav>
 </div>
 
 <section class="section">
-  <div class="row">
-    <div class="col-lg-12">
-      <div class="card">
-        <div class="card-body">
-          <h5 class="card-title">Funcionalidade em desenvolvimento</h5>
-          <p>Em breve você poderá executar consultas SQL e testar chamadas de API diretamente da interface.</p>
-          <div class="alert alert-info">
-            <i class="bi bi-info-circle"></i> O playground permitirá gerar modelos a partir de respostas JSON.
+
+  <ul class="nav nav-tabs mb-3" id="playgroundTabs">
+    <li class="nav-item">
+      <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-sql">
+        <i class="bi bi-database me-1"></i>SQL
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-api">
+        <i class="bi bi-send me-1"></i>API
+      </button>
+    </li>
+  </ul>
+
+  <div class="tab-content">
+
+    <!-- ══════════════════════════════════════════════════════════════
+         ABA SQL
+    ═══════════════════════════════════════════════════════════════ -->
+    <div class="tab-pane fade show active" id="tab-sql">
+      <div class="row g-3">
+
+        <div class="col-12">
+          <div class="card">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="card-title mb-0"><i class="bi bi-code-square me-1"></i>SQL — apenas SELECT</h5>
+                <div class="d-flex gap-2">
+                  <button class="btn btn-sm btn-outline-secondary" id="sqlClear">
+                    <i class="bi bi-eraser me-1"></i>Limpar
+                  </button>
+                  <button class="btn btn-sm btn-outline-secondary" id="sqlHistoryBtn">
+                    <i class="bi bi-clock-history me-1"></i>Histórico
+                  </button>
+                  <button class="btn btn-sm btn-primary" id="sqlRun">
+                    <i class="bi bi-play-fill me-1"></i>Executar <kbd class="ms-1" style="font-size:.65rem;">Ctrl+↵</kbd>
+                  </button>
+                </div>
+              </div>
+              <div class="ace-editor-wrap">
+                <div id="sqlEditor" style="height:180px;font-size:14px;"></div>
+              </div>
+              <div class="form-text text-muted mt-1">
+                <i class="bi bi-shield-lock me-1"></i>
+                Apenas <strong>SELECT</strong> permitido. DDL e DML são bloqueados.
+              </div>
+            </div>
           </div>
         </div>
+
+        <div class="col-12" id="sqlResultArea" style="display:none;">
+          <div class="card">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="card-title mb-0">
+                  Resultado
+                  <span class="badge bg-secondary ms-1" id="sqlRowCount"></span>
+                  <span class="badge bg-warning text-dark ms-1" id="sqlTruncBadge" style="display:none;">Limitado a 500 linhas</span>
+                </h5>
+                <button class="btn btn-sm btn-outline-success" id="sqlExportCsv" style="display:none;">
+                  <i class="bi bi-file-earmark-spreadsheet me-1"></i>CSV
+                </button>
+              </div>
+              <div class="table-responsive" style="max-height:380px;overflow-y:auto;">
+                <table class="table table-sm table-hover table-bordered align-middle">
+                  <thead class="table-dark sticky-top" id="sqlThead"></thead>
+                  <tbody id="sqlTbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12" id="sqlErrorArea" style="display:none;">
+          <div class="alert alert-danger mb-0">
+            <i class="bi bi-exclamation-triangle me-1"></i>
+            <strong>Erro:</strong> <span id="sqlErrorMsg"></span>
+          </div>
+        </div>
+
+        <div class="col-12" id="sqlHistoryArea" style="display:none;">
+          <div class="card border-secondary">
+            <div class="card-body py-2">
+              <h6 class="card-title mb-2"><i class="bi bi-clock-history me-1"></i>Histórico</h6>
+              <ul class="list-group list-group-flush" id="sqlHistoryList"></ul>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
-  </div>
+
+    <!-- ══════════════════════════════════════════════════════════════
+         ABA API — Postman-like
+    ═══════════════════════════════════════════════════════════════ -->
+    <div class="tab-pane fade" id="tab-api">
+      <div class="row g-3">
+
+        <!-- Request card -->
+        <div class="col-12">
+          <div class="card p-0 overflow-hidden">
+
+            <!-- Name bar -->
+            <div class="pg-toolbar border-bottom px-3 py-2">
+              <input type="text" id="apiName" class="form-control form-control-sm border-0 bg-transparent shadow-none p-0"
+                     style="font-size:.85rem;max-width:260px;" placeholder="Nome da requisição (opcional)">
+              <div class="ms-auto d-flex gap-2">
+                <button class="btn btn-sm btn-outline-secondary" id="apiHistoryBtn">
+                  <i class="bi bi-clock-history me-1"></i>Histórico
+                </button>
+                <button class="btn btn-sm btn-outline-secondary" id="apiSaveBtn">
+                  <i class="bi bi-floppy me-1"></i>Salvar
+                </button>
+              </div>
+            </div>
+
+            <!-- URL bar -->
+            <div class="px-3 py-2 border-bottom">
+              <div class="input-group">
+                <select class="form-select fw-bold" id="apiMethod" style="max-width:110px;font-size:.88rem;">
+                  <option>GET</option><option>POST</option><option>PUT</option>
+                  <option>PATCH</option><option>DELETE</option><option>HEAD</option><option>OPTIONS</option>
+                </select>
+                <input type="text" class="form-control font-monospace" id="apiUrl"
+                       placeholder="https://google.com ou CURL command" style="font-size:.88rem;">
+                <button class="btn btn-primary px-4" id="apiSend">
+                  <i class="bi bi-send me-1"></i>Send
+                </button>
+              </div>
+            </div>
+
+            <!-- Request tabs: Params / Body / Auth / Headers / Raw -->
+            <div class="px-3 pt-2">
+              <ul class="nav nav-tabs border-0" id="reqTabs">
+                <li class="nav-item">
+                  <button class="nav-link active px-3 py-2" data-bs-toggle="tab" data-bs-target="#req-params">
+                    Params <span class="badge bg-secondary ms-1" id="paramsBadge" style="display:none;"></span>
+                  </button>
+                </li>
+                <li class="nav-item">
+                  <button class="nav-link px-3 py-2" data-bs-toggle="tab" data-bs-target="#req-body">
+                    Body
+                    <span class="badge bg-primary ms-1" id="bodyBadge" style="display:none;">•</span>
+                  </button>
+                </li>
+                <li class="nav-item">
+                  <button class="nav-link px-3 py-2" data-bs-toggle="tab" data-bs-target="#req-auth">Auth</button>
+                </li>
+                <li class="nav-item">
+                  <button class="nav-link px-3 py-2" data-bs-toggle="tab" data-bs-target="#req-headers">
+                    Headers <span class="badge bg-secondary ms-1" id="headersBadge">4</span>
+                  </button>
+                </li>
+                <li class="nav-item">
+                  <button class="nav-link px-3 py-2" data-bs-toggle="tab" data-bs-target="#req-raw">Raw</button>
+                </li>
+              </ul>
+            </div>
+
+            <div class="tab-content px-3 pb-3">
+
+              <!-- Params -->
+              <div class="tab-pane fade show active pt-3" id="req-params">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <small class="fw-semibold text-muted">Query Params</small>
+                  <button class="btn btn-xs btn-outline-secondary btn-sm" id="addParamRow">
+                    <i class="bi bi-plus-lg me-1"></i>Add
+                  </button>
+                </div>
+                <table class="pg-kv-table" id="paramsTable">
+                  <thead><tr><th style="width:32px;"><input type="checkbox" id="checkAllParams" checked></th><th>Key</th><th>Value</th><th class="pg-kv-del"></th></tr></thead>
+                  <tbody id="paramsTbody"></tbody>
+                </table>
+              </div>
+
+              <!-- Body -->
+              <div class="tab-pane fade pt-3" id="req-body">
+                <div class="d-flex gap-3 align-items-center mb-2 flex-wrap">
+                  <small class="fw-semibold text-muted">Body type:</small>
+                  {% for btype in ['none', 'json', 'form-data', 'x-www-form-urlencoded', 'raw'] %}
+                  <div class="form-check form-check-inline mb-0">
+                    <input class="form-check-input" type="radio" name="bodyType" id="bt-{{ btype }}" value="{{ btype }}" {% if btype == 'json' %}checked{% endif %}>
+                    <label class="form-check-label small" for="bt-{{ btype }}">{{ btype }}</label>
+                  </div>
+                  {% endfor %}
+                </div>
+                <div id="bodyEditorWrap" class="ace-editor-wrap">
+                  <div id="bodyEditor" style="height:160px;font-size:13px;"></div>
+                </div>
+              </div>
+
+              <!-- Auth -->
+              <div class="tab-pane fade pt-3" id="req-auth">
+                <div class="d-flex align-items-center gap-3 flex-wrap mb-3">
+                  <small class="fw-semibold text-muted">Auth type:</small>
+                  <select class="form-select form-select-sm" id="authType" style="max-width:200px;">
+                    <option value="none">No Auth</option>
+                    <option value="bearer">Bearer Token</option>
+                    <option value="basic">Basic Auth</option>
+                    <option value="apikey">API Key</option>
+                  </select>
+                </div>
+                <!-- Bearer -->
+                <div id="authBearer" style="display:none;" class="pg-auth-scheme">
+                  <label class="form-label small mb-0 fw-semibold">Token:</label>
+                  <input type="text" class="pg-auth-token-input" id="bearerToken" placeholder="eyJhbGci...">
+                </div>
+                <!-- Basic -->
+                <div id="authBasic" style="display:none;" class="d-flex gap-2 flex-wrap">
+                  <input type="text"     class="pg-auth-token-input" id="basicUser" placeholder="Username" style="max-width:220px;">
+                  <input type="password" class="pg-auth-token-input" id="basicPass" placeholder="Password" style="max-width:220px;">
+                </div>
+                <!-- API Key -->
+                <div id="authApiKey" style="display:none;" class="d-flex gap-2 flex-wrap align-items-center">
+                  <input type="text" class="pg-auth-token-input" id="apiKeyName"  placeholder="Header name (e.g. X-API-Key)" style="max-width:220px;">
+                  <input type="text" class="pg-auth-token-input" id="apiKeyValue" placeholder="Key value"                    style="max-width:220px;">
+                  <select class="form-select form-select-sm" id="apiKeyIn" style="max-width:120px;">
+                    <option value="header">Header</option>
+                    <option value="query">Query param</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Headers -->
+              <div class="tab-pane fade pt-3" id="req-headers">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <small class="fw-semibold text-muted">Request Headers</small>
+                  <button class="btn btn-sm btn-outline-secondary" id="addHeaderRow">
+                    <i class="bi bi-plus-lg me-1"></i>Add
+                  </button>
+                </div>
+                <table class="pg-kv-table" id="headersTable">
+                  <thead><tr><th style="width:32px;"><input type="checkbox" id="checkAllHeaders" checked></th><th>Key</th><th>Value</th><th class="pg-kv-del"></th></tr></thead>
+                  <tbody id="headersTbody"></tbody>
+                </table>
+              </div>
+
+              <!-- Raw (CURL paste) -->
+              <div class="tab-pane fade pt-3" id="req-raw">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <small class="fw-semibold text-muted">Cole um CURL command — será parseado automaticamente</small>
+                  <button class="btn btn-sm btn-outline-primary" id="parseCurl">
+                    <i class="bi bi-magic me-1"></i>Parsear
+                  </button>
+                </div>
+                <div class="ace-editor-wrap">
+                  <div id="curlEditor" style="height:120px;font-size:13px;"></div>
+                </div>
+              </div>
+
+            </div><!-- /tab-content -->
+          </div><!-- /card -->
+        </div>
+
+        <!-- Response panel -->
+        <div class="col-12" id="apiResultArea" style="display:none;">
+          <div class="pg-response-panel">
+
+            <!-- Response header bar -->
+            <div class="pg-response-header">
+              <span class="fw-semibold" style="font-size:.88rem;">Response</span>
+              <span class="http-status-badge" id="apiStatusBadge"></span>
+              <span class="text-muted small" id="apiElapsed"></span>
+              <span class="text-muted small" id="apiSize"></span>
+
+              <div class="ms-auto d-flex align-items-center gap-2 flex-wrap">
+                <!-- Format tabs -->
+                <div class="pg-format-tabs" id="formatTabs">
+                  <button class="active" data-fmt="json">JSON</button>
+                  <button data-fmt="xml">XML</button>
+                  <button data-fmt="html">HTML</button>
+                  <button data-fmt="raw">Raw</button>
+                </div>
+                <!-- Indent -->
+                <div class="pg-indent-ctrl">
+                  <span>Indent:</span>
+                  <select id="indentSize">
+                    <option value="2">2</option>
+                    <option value="4" selected>4</option>
+                    <option value="tab">Tab</option>
+                    <option value="0">Min</option>
+                  </select>
+                </div>
+                <!-- Copy -->
+                <button class="btn btn-sm btn-outline-secondary" id="apiCopyBtn" title="Copiar resposta">
+                  <i class="bi bi-clipboard"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- Ace editor readonly para a resposta -->
+            <div id="apiResponseEditor" style="height:340px;font-size:13px;"></div>
+
+          </div>
+        </div>
+
+        <!-- Response headers accordion -->
+        <div class="col-12" id="apiRespHeadersArea" style="display:none;">
+          <div class="accordion" id="respHeadersAccordion">
+            <div class="accordion-item">
+              <h2 class="accordion-header">
+                <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#respHeadersBody">
+                  <i class="bi bi-list-ul me-2"></i>Response Headers
+                  <span class="badge bg-secondary ms-2" id="respHeadersCount"></span>
+                </button>
+              </h2>
+              <div id="respHeadersBody" class="accordion-collapse collapse">
+                <div class="accordion-body p-0">
+                  <table class="pg-kv-table w-100">
+                    <thead><tr><th>Key</th><th>Value</th></tr></thead>
+                    <tbody id="respHeadersTbody"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Error -->
+        <div class="col-12" id="apiErrorArea" style="display:none;">
+          <div class="alert alert-danger mb-0">
+            <i class="bi bi-exclamation-triangle me-1"></i>
+            <strong>Erro:</strong> <span id="apiErrorMsg"></span>
+          </div>
+        </div>
+
+        <!-- History -->
+        <div class="col-12" id="apiHistoryArea" style="display:none;">
+          <div class="card border-secondary">
+            <div class="card-body py-2">
+              <h6 class="card-title mb-2"><i class="bi bi-clock-history me-1"></i>Histórico de chamadas</h6>
+              <ul class="list-group list-group-flush" id="apiHistoryList"></ul>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /tab-api -->
+
+  </div><!-- /tab-content -->
 </section>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.2/ace.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.2/mode-sql.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.2/mode-json.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.2/mode-xml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.2/mode-html.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.2/mode-sh.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.2/theme-tomorrow.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.2/theme-tomorrow_night.min.js"></script>
+
+<script>
+(function () {
+  'use strict';
+
+  // ── Tema Ace sincronizado com data-theme ──────────────────────────────────
+  function aceTheme() {
+    return document.documentElement.dataset.theme === 'dark'
+      ? 'ace/theme/tomorrow_night'
+      : 'ace/theme/tomorrow';
+  }
+  function applyThemeToAll() {
+    [sqlEditor, bodyEditor, curlEditor, responseEditor].forEach(e => e?.setTheme(aceTheme()));
+  }
+  const observer = new MutationObserver(applyThemeToAll);
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+  // ── Ace: SQL ──────────────────────────────────────────────────────────────
+  const sqlEditor = ace.edit('sqlEditor');
+  sqlEditor.setTheme(aceTheme());
+  sqlEditor.session.setMode('ace/mode/sql');
+  sqlEditor.setValue('SELECT * FROM users LIMIT 10;', -1);
+  sqlEditor.setOptions({ fontSize: '14px', showPrintMargin: false });
+  sqlEditor.commands.addCommand({
+    name: 'run', bindKey: { win: 'Ctrl-Enter', mac: 'Command-Enter' },
+    exec: () => document.getElementById('sqlRun').click(),
+  });
+
+  // ── Ace: Body ─────────────────────────────────────────────────────────────
+  const bodyEditor = ace.edit('bodyEditor');
+  bodyEditor.setTheme(aceTheme());
+  bodyEditor.session.setMode('ace/mode/json');
+  bodyEditor.setValue('{}', -1);
+  bodyEditor.setOptions({ fontSize: '13px', showPrintMargin: false });
+  bodyEditor.session.on('change', () => {
+    const v = bodyEditor.getValue().trim();
+    document.getElementById('bodyBadge').style.display = (v && v !== '{}' && v !== '') ? 'inline' : 'none';
+  });
+
+  // ── Ace: cURL ─────────────────────────────────────────────────────────────
+  const curlEditor = ace.edit('curlEditor');
+  curlEditor.setTheme(aceTheme());
+  curlEditor.session.setMode('ace/mode/sh');
+  curlEditor.setValue('', -1);
+  curlEditor.setOptions({ fontSize: '13px', showPrintMargin: false });
+
+  // ── Ace: Response ─────────────────────────────────────────────────────────
+  const responseEditor = ace.edit('apiResponseEditor');
+  responseEditor.setTheme(aceTheme());
+  responseEditor.session.setMode('ace/mode/json');
+  responseEditor.setReadOnly(true);
+  responseEditor.setOptions({ fontSize: '13px', showPrintMargin: false });
+
+  // ── KV Table helper ───────────────────────────────────────────────────────
+  function addKvRow(tbodyId, key = '', value = '', checked = true) {
+    const tbody = document.getElementById(tbodyId);
+    const tr    = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input type="checkbox" ${checked ? 'checked' : ''}></td>
+      <td><input type="text" placeholder="key"   value="${key}"></td>
+      <td><input type="text" placeholder="value" value="${value}"></td>
+      <td class="pg-kv-del"><button type="button"><i class="bi bi-x-lg"></i></button></td>`;
+    tr.querySelector('.pg-kv-del button').addEventListener('click', () => tr.remove());
+    tbody.appendChild(tr);
+  }
+
+  function getKvRows(tbodyId) {
+    const result = {};
+    document.getElementById(tbodyId).querySelectorAll('tr').forEach(tr => {
+      const [chk, kIn, vIn] = tr.querySelectorAll('input');
+      if (chk?.checked && kIn?.value.trim()) result[kIn.value.trim()] = vIn?.value ?? '';
+    });
+    return result;
+  }
+
+  function countKvRows(tbodyId) {
+    return document.getElementById(tbodyId).querySelectorAll('tr input[type=checkbox]:checked').length;
+  }
+
+  // Seed default headers
+  [['Content-Type','application/json'],['Accept','*/*'],['Cache-Control','no-cache'],['User-Agent','PyTeca/1.0']]
+    .forEach(([k, v]) => addKvRow('headersTbody', k, v));
+
+  // Seed 3 empty param rows (like Postman)
+  for (let i = 0; i < 3; i++) addKvRow('paramsTbody', '', '', false);
+
+  document.getElementById('addParamRow').addEventListener('click',  () => addKvRow('paramsTbody'));
+  document.getElementById('addHeaderRow').addEventListener('click', () => addKvRow('headersTbody'));
+
+  // Update badges
+  function updateBadges() {
+    const pc = countKvRows('paramsTbody');
+    const hc = countKvRows('headersTbody');
+    const pb = document.getElementById('paramsBadge');
+    pb.textContent = pc;
+    pb.style.display = pc ? 'inline' : 'none';
+    document.getElementById('headersBadge').textContent = hc;
+  }
+  document.getElementById('paramsTbody').addEventListener('input',   updateBadges);
+  document.getElementById('headersTbody').addEventListener('input',  updateBadges);
+  document.getElementById('paramsTbody').addEventListener('change',  updateBadges);
+  document.getElementById('headersTbody').addEventListener('change', updateBadges);
+
+  // ── Auth ──────────────────────────────────────────────────────────────────
+  document.getElementById('authType').addEventListener('change', function () {
+    ['authBearer','authBasic','authApiKey'].forEach(id => document.getElementById(id).style.display = 'none');
+    const map = { bearer:'authBearer', basic:'authBasic', apikey:'authApiKey' };
+    if (map[this.value]) document.getElementById(map[this.value]).style.display = 'flex';
+  });
+
+  function buildAuthHeaders() {
+    const type = document.getElementById('authType').value;
+    const headers = {};
+    if (type === 'bearer') {
+      const token = document.getElementById('bearerToken').value.trim();
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+    } else if (type === 'basic') {
+      const u = document.getElementById('basicUser').value;
+      const p = document.getElementById('basicPass').value;
+      if (u) headers['Authorization'] = 'Basic ' + btoa(`${u}:${p}`);
+    } else if (type === 'apikey') {
+      const n = document.getElementById('apiKeyName').value.trim();
+      const v = document.getElementById('apiKeyValue').value.trim();
+      const i = document.getElementById('apiKeyIn').value;
+      if (n && v && i === 'header') headers[n] = v;
+    }
+    return headers;
+  }
+
+  function buildAuthQuery() {
+    const type = document.getElementById('authType').value;
+    if (type === 'apikey' && document.getElementById('apiKeyIn').value === 'query') {
+      const n = document.getElementById('apiKeyName').value.trim();
+      const v = document.getElementById('apiKeyValue').value.trim();
+      if (n && v) return { [n]: v };
+    }
+    return {};
+  }
+
+  // ── cURL Parser ───────────────────────────────────────────────────────────
+  document.getElementById('parseCurl').addEventListener('click', () => {
+    const curl = curlEditor.getValue().trim();
+    if (!curl) return;
+    try {
+      const urlMatch  = curl.match(/curl\s+(?:-[A-Z]+\s+\S+\s+)*['"]?(https?:\/\/[^\s'"]+)/i);
+      const methMatch = curl.match(/-X\s+([A-Z]+)/i);
+      const headers   = [...curl.matchAll(/-H\s+['"]([^'"]+)['"]/gi)].map(m => m[1]);
+      const dataMatch = curl.match(/(?:--data(?:-raw)?|-d)\s+['"]([^'"]*)['"]/i);
+
+      if (urlMatch) document.getElementById('apiUrl').value    = urlMatch[1];
+      if (methMatch) document.getElementById('apiMethod').value = methMatch[1].toUpperCase();
+
+      // Clear and repopulate headers
+      document.getElementById('headersTbody').innerHTML = '';
+      headers.forEach(h => {
+        const [k, ...rest] = h.split(':');
+        addKvRow('headersTbody', k.trim(), rest.join(':').trim());
+      });
+
+      if (dataMatch) {
+        bodyEditor.setValue(dataMatch[1], -1);
+        document.querySelector('[data-bs-target="#req-body"]')?.click();
+      }
+      document.querySelector('[data-bs-target="#req-params"]')?.click();
+      alert('CURL parseado com sucesso!');
+    } catch (e) { alert('Erro ao parsear CURL: ' + e.message); }
+  });
+
+  // ── Format / Indent controls ──────────────────────────────────────────────
+  let rawResponseBody = null;
+  let currentFmt     = 'json';
+
+  function renderResponse(body, fmt) {
+    const indent = document.getElementById('indentSize').value;
+    const spaces = indent === 'tab' ? '\t' : (indent === '0' ? 0 : parseInt(indent));
+
+    responseEditor.session.setMode(`ace/mode/${fmt === 'raw' ? 'text' : fmt}`);
+
+    if (fmt === 'json') {
+      try {
+        const obj = typeof body === 'string' ? JSON.parse(body) : body;
+        responseEditor.setValue(JSON.stringify(obj, null, spaces), -1);
+      } catch { responseEditor.setValue(typeof body === 'string' ? body : JSON.stringify(body), -1); }
+    } else if (fmt === 'xml') {
+      // Try to extract XML from response string
+      const str = typeof body === 'string' ? body : JSON.stringify(body, null, spaces);
+      responseEditor.setValue(str, -1);
+    } else {
+      const str = typeof body === 'string' ? body : JSON.stringify(body, null, spaces);
+      responseEditor.setValue(str, -1);
+    }
+    responseEditor.clearSelection();
+  }
+
+  document.getElementById('formatTabs').addEventListener('click', e => {
+    const btn = e.target.closest('[data-fmt]');
+    if (!btn || rawResponseBody === null) return;
+    document.querySelectorAll('#formatTabs button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentFmt = btn.dataset.fmt;
+    renderResponse(rawResponseBody, currentFmt);
+  });
+
+  document.getElementById('indentSize').addEventListener('change', () => {
+    if (rawResponseBody !== null) renderResponse(rawResponseBody, currentFmt);
+  });
+
+  document.getElementById('apiCopyBtn').addEventListener('click', () => {
+    navigator.clipboard.writeText(responseEditor.getValue())
+      .then(() => {
+        const btn = document.getElementById('apiCopyBtn');
+        btn.innerHTML = '<i class="bi bi-check-lg"></i>';
+        setTimeout(() => { btn.innerHTML = '<i class="bi bi-clipboard"></i>'; }, 1200);
+      });
+  });
+
+  // ── Send request ──────────────────────────────────────────────────────────
+  document.getElementById('apiSend').addEventListener('click', async () => {
+    const method  = document.getElementById('apiMethod').value;
+    let   url     = document.getElementById('apiUrl').value.trim();
+    const timeout = 10;
+
+    if (!url) { alert('Informe uma URL.'); return; }
+
+    // Params → query string
+    const params  = { ...getKvRows('paramsTbody'), ...buildAuthQuery() };
+    if (Object.keys(params).length) {
+      const sep = url.includes('?') ? '&' : '?';
+      url += sep + new URLSearchParams(params).toString();
+    }
+
+    // Headers
+    const headers = { ...getKvRows('headersTbody'), ...buildAuthHeaders() };
+
+    // Body
+    let body = null;
+    const bodyType = document.querySelector('[name="bodyType"]:checked')?.value;
+    if (bodyType !== 'none' && ['POST','PUT','PATCH'].includes(method)) {
+      body = bodyEditor.getValue().trim() || null;
+    }
+
+    // Hide previous result
+    ['apiResultArea','apiRespHeadersArea','apiErrorArea'].forEach(id => {
+      document.getElementById(id).style.display = 'none';
+    });
+
+    const btn = document.getElementById('apiSend');
+    btn.disabled  = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>';
+
+    try {
+      const res    = await fetch('/api/builder/playground/proxy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ method, url, headers, body, timeout }),
+      });
+      const data   = await res.json();
+
+      if (data.success) {
+        document.getElementById('apiResultArea').style.display  = 'block';
+        document.getElementById('apiRespHeadersArea').style.display = 'block';
+
+        // Status badge
+        const code  = data.status_code;
+        const badge = document.getElementById('apiStatusBadge');
+        badge.textContent = `${code} ${httpStatusText(code)}`;
+        badge.className   = `http-status-badge ${code < 300 ? 'ok' : code < 500 ? 'warn' : 'error'}`;
+        document.getElementById('apiElapsed').textContent = `${data.elapsed_ms} ms`;
+        const bodyStr = typeof data.body === 'string' ? data.body : JSON.stringify(data.body);
+        document.getElementById('apiSize').textContent   = formatBytes(new Blob([bodyStr]).size);
+
+        // Detect format
+        const ct = (data.headers?.['Content-Type'] || data.headers?.['content-type'] || '').toLowerCase();
+        if (ct.includes('xml'))  currentFmt = 'xml';
+        else if (ct.includes('html')) currentFmt = 'html';
+        else currentFmt = 'json';
+        document.querySelectorAll('#formatTabs button').forEach(b => {
+          b.classList.toggle('active', b.dataset.fmt === currentFmt);
+        });
+
+        rawResponseBody = data.body;
+        renderResponse(rawResponseBody, currentFmt);
+
+        // Response headers table
+        const rht = document.getElementById('respHeadersTbody');
+        rht.innerHTML = '';
+        const rh = data.headers || {};
+        Object.entries(rh).forEach(([k, v]) => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td class="py-1 px-3">${k}</td><td class="py-1 px-3 font-monospace" style="font-size:.8rem;">${v}</td>`;
+          rht.appendChild(tr);
+        });
+        document.getElementById('respHeadersCount').textContent = Object.keys(rh).length;
+
+      } else {
+        document.getElementById('apiErrorArea').style.display = 'block';
+        document.getElementById('apiErrorMsg').textContent    = data.error;
+      }
+    } catch (e) {
+      document.getElementById('apiErrorArea').style.display = 'block';
+      document.getElementById('apiErrorMsg').textContent    = 'Erro de conexão: ' + e.message;
+    } finally {
+      btn.disabled  = false;
+      btn.innerHTML = '<i class="bi bi-send me-1"></i>Send';
+    }
+  });
+
+  // ── Save request ──────────────────────────────────────────────────────────
+  document.getElementById('apiSaveBtn').addEventListener('click', () => {
+    alert('Funcionalidade de salvar será implementada na próxima versão.');
+  });
+
+  // ── Histórico API ─────────────────────────────────────────────────────────
+  document.getElementById('apiHistoryBtn').addEventListener('click', async () => {
+    const area = document.getElementById('apiHistoryArea');
+    if (area.style.display !== 'none') { area.style.display = 'none'; return; }
+    const data = await (await fetch('/api/builder/playground/history')).json();
+    const list = document.getElementById('apiHistoryList');
+    list.innerHTML = '';
+    (data.history || []).forEach(h => {
+      const li = document.createElement('li');
+      li.className = 'list-group-item py-2';
+      const [method, ...urlParts] = (h.request || '').split(' ');
+      li.innerHTML = `
+        <div class="d-flex gap-2 align-items-center">
+          <span class="badge bg-secondary">${method || '?'}</span>
+          <code class="text-truncate flex-fill" style="max-width:70%;font-size:.8rem;">${urlParts.join(' ')}</code>
+          <span class="badge ${h.status === 'success' ? 'bg-success' : 'bg-danger'} ms-auto">${h.status}</span>
+        </div>
+        <small class="text-muted">${h.executed_at || ''}</small>`;
+      li.style.cursor = 'pointer';
+      li.addEventListener('click', () => {
+        const [m, ...u] = (h.request || '').split(' ');
+        document.getElementById('apiMethod').value = m || 'GET';
+        document.getElementById('apiUrl').value    = u.join(' ');
+        area.style.display = 'none';
+      });
+      list.appendChild(li);
+    });
+    area.style.display = 'block';
+  });
+
+  // ── SQL ───────────────────────────────────────────────────────────────────
+  let sqlColumns = [], sqlRows = [];
+
+  document.getElementById('sqlRun').addEventListener('click', async () => {
+    const sql = sqlEditor.getValue().trim();
+    if (!sql) return;
+    const btn = document.getElementById('sqlRun');
+    btn.disabled  = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Executando...';
+    ['sqlResultArea','sqlErrorArea'].forEach(id => document.getElementById(id).style.display = 'none');
+    try {
+      const data = await (await fetch('/api/builder/query/sql', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sql }),
+      })).json();
+      if (data.success) {
+        sqlColumns = data.columns; sqlRows = data.rows;
+        document.getElementById('sqlRowCount').textContent = `${data.rows.length} linha(s)`;
+        document.getElementById('sqlTruncBadge').style.display  = data.truncated ? 'inline' : 'none';
+        document.getElementById('sqlExportCsv').style.display   = data.rows.length ? 'inline-block' : 'none';
+        document.getElementById('sqlThead').innerHTML = '<tr>' + data.columns.map(c => `<th>${c}</th>`).join('') + '</tr>';
+        document.getElementById('sqlTbody').innerHTML = data.rows.map(row =>
+          '<tr>' + row.map(v => `<td>${v === null ? '<em class="text-muted">NULL</em>' : v}</td>`).join('') + '</tr>'
+        ).join('');
+        document.getElementById('sqlResultArea').style.display = 'block';
+      } else {
+        document.getElementById('sqlErrorMsg').textContent = data.error;
+        document.getElementById('sqlErrorArea').style.display  = 'block';
+      }
+    } catch (e) {
+      document.getElementById('sqlErrorMsg').textContent = 'Erro de conexão: ' + e.message;
+      document.getElementById('sqlErrorArea').style.display  = 'block';
+    } finally {
+      btn.disabled  = false;
+      btn.innerHTML = '<i class="bi bi-play-fill me-1"></i>Executar <kbd class="ms-1" style="font-size:.65rem;">Ctrl+↵</kbd>';
+    }
+  });
+
+  document.getElementById('sqlClear').addEventListener('click', () => {
+    sqlEditor.setValue('', -1);
+    ['sqlResultArea','sqlErrorArea'].forEach(id => document.getElementById(id).style.display = 'none');
+  });
+
+  document.getElementById('sqlExportCsv').addEventListener('click', () => {
+    const lines = [sqlColumns.join(',')];
+    sqlRows.forEach(row => lines.push(row.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')));
+    const a = Object.assign(document.createElement('a'), {
+      href: URL.createObjectURL(new Blob([lines.join('\r\n')], { type: 'text/csv' })),
+      download: 'query_result.csv',
+    });
+    a.click();
+  });
+
+  document.getElementById('sqlHistoryBtn').addEventListener('click', async () => {
+    const area = document.getElementById('sqlHistoryArea');
+    if (area.style.display !== 'none') { area.style.display = 'none'; return; }
+    const data = await (await fetch('/api/builder/query/sql/history')).json();
+    const list = document.getElementById('sqlHistoryList');
+    list.innerHTML = '';
+    (data.history || []).forEach(h => {
+      const li = document.createElement('li');
+      li.className = 'list-group-item list-group-item-action py-2';
+      li.innerHTML = `
+        <div class="d-flex justify-content-between">
+          <code class="text-truncate" style="max-width:78%;font-size:.8rem;">${h.sql}</code>
+          <span class="badge ${h.status === 'success' ? 'bg-success' : 'bg-danger'}">${h.status}</span>
+        </div>
+        <small class="text-muted">${h.executed_at || ''} — ${h.rows ?? '?'} linhas</small>`;
+      li.addEventListener('click', () => {
+        sqlEditor.setValue(h.sql, -1);
+        area.style.display = 'none';
+      });
+      list.appendChild(li);
+    });
+    area.style.display = 'block';
+  });
+
+  // ── Utilitários ───────────────────────────────────────────────────────────
+  function httpStatusText(code) {
+    const map = {200:'OK',201:'Created',204:'No Content',400:'Bad Request',401:'Unauthorized',
+                 403:'Forbidden',404:'Not Found',422:'Unprocessable',500:'Server Error',502:'Bad Gateway'};
+    return map[code] || '';
+  }
+
+  function formatBytes(bytes) {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1048576) return `${(bytes/1024).toFixed(1)} KB`;
+    return `${(bytes/1048576).toFixed(1)} MB`;
+  }
+})();
+</script>
 {% endblock %}

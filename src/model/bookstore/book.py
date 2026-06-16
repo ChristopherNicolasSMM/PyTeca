@@ -106,11 +106,17 @@ class Book(db.Model):
     def is_available(self) -> bool:
         return self.is_active and self.available > 0
 
+    @property
+    def author_name(self) -> str:
+        """Retorna apenas o nome do autor (usado pela SmartList na coluna 'author')."""
+        return self.author.name if self.author else "—"
+
     def to_dict(self) -> dict:
         return {
             "id": self.id,
             "title": self.title,
             "author_id": self.author_id,
+            "author_id_name": self.author.name if self.author else "",
             "isbn": self.isbn,
             "publisher": self.publisher,
             "year": self.year,

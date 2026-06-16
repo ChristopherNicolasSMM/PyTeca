@@ -1,0 +1,184 @@
+/* ============================================================
+   smart_list.css — Correções de CSS para SmartList
+   Corrige variáveis CSS ausentes e garante legibilidade
+   do cabeçalho em light e dark.
+   ============================================================ */
+
+/* ── Define variáveis ausentes no style_dark.css ─────────────
+   --bs-dark-bg-2, --bs-dark-text e --bs-dark-border são
+   referenciadas mas nunca declaradas no themes.css original.
+   ─────────────────────────────────────────────────────────── */
+:root {
+  --bs-dark-bg-2:    #f0f4ff;
+  --bs-dark-text:    #012970;
+  --bs-dark-border:  #e8eef7;
+}
+
+html[data-theme="dark"] {
+  --bs-dark-bg-2:    #1a2540;
+  --bs-dark-text:    #e2e8f0;
+  --bs-dark-border:  #334155;
+}
+
+/* ── SmartList: cabeçalho light ──────────────────────────────
+   thead sem classe extra → usa variáveis do tema light.
+   ─────────────────────────────────────────────────────────── */
+.sl-table thead tr {
+  background-color: var(--table-header-bg, #f0f4ff);
+}
+
+.sl-table thead th {
+  color: var(--text-primary, #012970);
+  font-weight: 600;
+  font-size: .82rem;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+  border-bottom: 2px solid var(--border-color, #e8eef7);
+  white-space: nowrap;
+  padding: .65rem .75rem;
+}
+
+/* Links de ordenação no cabeçalho (light) */
+.sl-table thead th a {
+  color: var(--text-primary, #012970) !important;
+}
+.sl-table thead th a:hover {
+  color: var(--color-primary, #4154f1) !important;
+}
+.sl-table thead th a.text-primary {
+  color: var(--color-primary, #4154f1) !important;
+}
+
+/* ── SmartList: cabeçalho dark ───────────────────────────────
+   Sobrescreve os seletores genéricos do style_dark.css que
+   usavam --bs-dark-bg-2 sem definição, causando herança errada.
+   ─────────────────────────────────────────────────────────── */
+html[data-theme="dark"] .sl-table thead tr {
+  background-color: var(--bs-dark-bg-2) !important;
+}
+
+html[data-theme="dark"] .sl-table thead th {
+  background-color: var(--bs-dark-bg-2) !important;
+  color: var(--bs-dark-text) !important;
+  border-color: var(--bs-dark-border) !important;
+}
+
+/* Links de ordenação no cabeçalho (dark) */
+html[data-theme="dark"] .sl-table thead th a,
+html[data-theme="dark"] .sl-table thead th a.text-body {
+  color: var(--bs-dark-text) !important;
+}
+html[data-theme="dark"] .sl-table thead th a:hover {
+  color: var(--color-primary) !important;
+}
+html[data-theme="dark"] .sl-table thead th a.text-primary,
+html[data-theme="dark"] .sl-table thead th a.fw-semibold {
+  color: var(--color-primary) !important;
+}
+
+/* Ícones de sort (dark) */
+html[data-theme="dark"] .sl-table thead th .bi {
+  color: inherit;
+}
+html[data-theme="dark"] .sl-table thead th .opacity-50 {
+  color: rgba(226,232,240,.4) !important;
+}
+
+/* ── SmartList: células e hover ──────────────────────────────*/
+.sl-table tbody tr td {
+  color: var(--text-secondary, #444444);
+  border-color: var(--border-light, #f0f4ff);
+  padding: .55rem .75rem;
+  vertical-align: middle;
+}
+
+html[data-theme="dark"] .sl-table tbody tr td {
+  color: var(--bs-dark-text) !important;
+  border-color: var(--bs-dark-border) !important;
+}
+
+html[data-theme="dark"] .sl-table tbody tr:hover > td {
+  background-color: rgba(255,255,255,.04) !important;
+}
+
+/* ── SmartList: toolbar ──────────────────────────────────────*/
+html[data-theme="dark"] .sl-toolbar {
+  background: var(--dark-surface, #111a2e);
+  border-color: var(--bs-dark-border);
+}
+
+html[data-theme="dark"] .sl-toolbar .form-control,
+html[data-theme="dark"] .sl-toolbar .form-select {
+  background-color: var(--dark-surface-2, #16213a);
+  color: var(--bs-dark-text);
+  border-color: var(--bs-dark-border);
+}
+
+/* ── Badges de status na lista ───────────────────────────────*/
+.badge-status-active  { background: rgba(81,207,102,.15); color: #2f9e44; }
+.badge-status-draft   { background: rgba(255,193,7,.15);  color: #b45309; }
+.badge-status-trash   { background: rgba(220,53,69,.15);  color: #c92a2a; }
+.badge-status-returned{ background: rgba(0,188,212,.15);  color: #0077a8; }
+
+html[data-theme="dark"] .badge-status-active  { background: rgba(74,222,128,.12); color: #4ade80; }
+html[data-theme="dark"] .badge-status-draft   { background: rgba(250,204,21,.12); color: #facc15; }
+html[data-theme="dark"] .badge-status-trash   { background: rgba(248,113,113,.12);color: #f87171; }
+html[data-theme="dark"] .badge-status-returned{ background: rgba(34,211,238,.12); color: #22d3ee; }
+
+/* ── Card dark ───────────────────────────────────────────────*/
+html[data-theme="dark"] .card {
+  background-color: var(--dark-surface, #111a2e) !important;
+  border-color: var(--bs-dark-border) !important;
+}
+html[data-theme="dark"] .card-body {
+  color: var(--bs-dark-text) !important;
+}
+html[data-theme="dark"] .card-title {
+  color: var(--dark-heading, #f8fafc) !important;
+}
+
+/* ── Nav tabs dark ───────────────────────────────────────────*/
+html[data-theme="dark"] .nav-tabs {
+  border-color: var(--bs-dark-border);
+}
+html[data-theme="dark"] .nav-tabs .nav-link {
+  color: rgba(226,232,240,.65);
+}
+html[data-theme="dark"] .nav-tabs .nav-link:hover {
+  color: var(--bs-dark-text);
+  border-color: var(--bs-dark-border) transparent var(--bs-dark-border);
+}
+html[data-theme="dark"] .nav-tabs .nav-link.active {
+  background-color: var(--dark-surface, #111a2e);
+  color: var(--color-primary);
+  border-color: var(--bs-dark-border) var(--bs-dark-border) var(--dark-surface, #111a2e);
+}
+
+/* ── Paginação dark ──────────────────────────────────────────*/
+html[data-theme="dark"] .page-link {
+  background-color: var(--dark-surface-2, #16213a);
+  border-color: var(--bs-dark-border);
+  color: var(--bs-dark-text);
+}
+html[data-theme="dark"] .page-link:hover {
+  background-color: rgba(255,255,255,.06);
+}
+html[data-theme="dark"] .page-item.active .page-link {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
+}
+html[data-theme="dark"] .page-item.disabled .page-link {
+  background-color: var(--dark-surface, #111a2e);
+  color: rgba(226,232,240,.3);
+}
+
+/* ── Buttons outline dark ────────────────────────────────────*/
+html[data-theme="dark"] .btn-outline-secondary {
+  color: var(--bs-dark-text);
+  border-color: var(--bs-dark-border);
+}
+html[data-theme="dark"] .btn-outline-secondary:hover {
+  background-color: rgba(255,255,255,.07);
+  color: var(--bs-dark-text);
+}

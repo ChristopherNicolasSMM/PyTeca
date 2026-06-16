@@ -86,128 +86,22 @@
 {{ sl_scripts() }}
 <script>
   (function() {
-    const modal = new bootstrap.Modal(document.getElementById('bookModal'));
-    const form = document.getElementById('bookForm');
-    const titleElem = document.getElementById('bookModalTitle');
-    const idElem = document.getElementById('bookId');
-
-    function resetForm() {
-      form.reset();
-      idElem.value = '';
-      titleElem.innerText = 'Novo Livros';
-      // Limpar campos de FK também (já que reset não limpa os hidden e search)
-      document.querySelectorAll('#bookModal .fk-field').forEach(container => {
-        const hidden = container.querySelector('.fk-hidden-id');
-        const search = container.querySelector('.fk-search-input');
-        if (hidden) hidden.value = '';
-        if (search) search.value = '';
-      });
-    }
-
-    async function loadData(id) {
-      try {
-        const response = await fetch('/api/bookstore/books/' + id);
-        const result = await response.json();
-        if (result.success) {
-          const data = result.data;
-          // Preenche campos comuns
-          for (const [key, value] of Object.entries(data)) {
-            const field = document.getElementById(key);
-            if (field) field.value = value ?? '';
-          }
-          idElem.value = id;
-          titleElem.innerText = 'Editar Livros';
-
-          // Preenche campos FK (a API deve retornar também os nomes descritivos)
-          // Itera sobre os relacionamentos definidos no controller
-          {% for rel in relationship_fields %}
-            const fkField = '{{ rel.name }}';
-            const fkDisplayField = '{{ rel.name }}_name';
-            if (data[fkField] !== undefined) {
-              let displayText = data[fkDisplayField] || data[fkField];
-              window.setForeignKeyValue('bookModal', fkField, data[fkField], displayText);
-            }
-          {% endfor %}
-        } else {
-          alert('Erro ao carregar dados: ' + (result.error || 'Desconhecido'));
-          modal.hide();
-        }
-      } catch (err) {
-        console.error(err);
-        alert('Erro de conexão.');
-        modal.hide();
-      }
-    }
-
-    async function save() {
-      const id = idElem.value;
-      const data = {};
-      // Captura campos comuns (input, select normal)
-      form.querySelectorAll('input:not(.fk-hidden-id):not(.fk-search-input), select:not(.relationship-select)').forEach(field => {
-        let value = field.value;
-        if (field.type === 'number') value = parseInt(value) || null;
-        data[field.name] = value;
-      });
-      // Captura campos FK (hidden)
-      form.querySelectorAll('.fk-hidden-id').forEach(hidden => {
-        if (hidden.name) data[hidden.name] = hidden.value;
-      });
-      // Captura campos Enum (select)
-      form.querySelectorAll('select').forEach(select => {
-        if (select.name) data[select.name] = select.value;
-      });
-
-      const saveBtn = document.getElementById('btnSaveBook');
-      saveBtn.disabled = true;
-      saveBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Salvando...';
-      try {
-        let response;
-        if (id) {
-          response = await fetch('/api/bookstore/books/' + id, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-          });
-        } else {
-          const draftRes = await fetch('/api/bookstore/books/draft', { method: 'POST' });
-          const draftData = await draftRes.json();
-          if (!draftData.success) throw new Error(draftData.error);
-          const draftId = draftData.data.id;
-          response = await fetch('/api/bookstore/books/' + draftId + '/publish', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-          });
-        }
-        const result = await response.json();
-        if (result.success) {
-          modal.hide();
-          window.location.reload();
-        } else {
-          alert('Erro: ' + (result.error || 'Falha ao salvar'));
-        }
-      } catch (err) {
-        console.error(err);
-        alert('Erro de conexão.');
-      } finally {
-        saveBtn.disabled = false;
-        saveBtn.innerHTML = 'Salvar';
-      }
-    }
+    const modalEl = document.getElementById('bookModal');
+    const modal   = modalEl ? new bootstrap.Modal(modalEl) : null;
 
     document.getElementById('btnNovoBook')?.addEventListener('click', () => {
-      resetForm();
-      modal.show();
+      modal?.show();
     });
-    document.getElementById('btnSaveBook')?.addEventListener('click', save);
-    document.body.addEventListener('click', (e) => {
+
+    document.body.addEventListener('click', e => {
       const btn = e.target.closest('.btn-edit');
-      if (btn && btn.dataset.id) {
-        e.preventDefault();
-        resetForm();
-        loadData(btn.dataset.id);
-        modal.show();
-      }
+      if (!btn || !btn.dataset.id) return;
+      e.preventDefault();
+      modalEl.addEventListener('shown.bs.modal', function onShown() {
+        modalEl.removeEventListener('shown.bs.modal', onShown);
+        window['loadBookData']?.(btn.dataset.id);
+      }, { once: true });
+      modal?.show();
     });
   })();
 </script>

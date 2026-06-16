@@ -5,23 +5,17 @@ items:
 ###################################################################################################
 # Itens do menu "Biblioteca" (pai "Biblioteca")
 ###################################################################################################
-  # Pai "Biblioteca" com modo híbrido ativado
   - name: "Biblioteca"
-    endpoint: "#"   # endpoint real (pai clicável)
+    endpoint: "#"
     icon: "bi-book"
-    #clickable_parent: true
-    
-
 
 ###################################################################################################
-# Itens do menu "Administração" (subitens do pai "Administração")   
-###################################################################################################  
+# Itens do menu "Administração" (subitens do pai "Administração")
+###################################################################################################
   - name: "Administração"
-    endpoint: "#"                       # link morto
+    endpoint: "#"
     icon: "bi-shield"
-    #clickable_parent: true             # ← ativa modo híbrido (pai clicável + toggle separado)    
-                                        #   Se omitido ou false, pai fica não clicável (apenas toggle)
-    
+
   - name: "Configurações"
     endpoint: "admin_config.index"
     icon: "bi-gear"
@@ -42,10 +36,11 @@ items:
     icon: "bi-terminal"
     parent: "Administração"
 
-  - name: "Usuários"
-    endpoint: "admin.users"
-    icon: "bi-people"
-    parent: "Administração"
+  # Usuários: endpoint será habilitado na Fase 5 (RBAC visual)
+  # - name: "Usuários"
+  #   endpoint: "admin.users"
+  #   icon: "bi-people"
+  #   parent: "Administração"
 
 ###################################################################################################
 # Itens do menu "Relatórios" (subitens do pai "Relatórios")
