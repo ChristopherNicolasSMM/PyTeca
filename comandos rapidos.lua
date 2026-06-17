@@ -18,4 +18,3 @@ http://localhost:5000/api/options/authors?search=
 
 C:\Users\christopher.mauricio\AppData\Roaming\Claude\skills\user\
 
-
