@@ -395,56 +395,67 @@ class TaskService:
 
             scheduler = BackgroundScheduler(timezone="UTC")
 
-            # Job 1: processa fila de mensagens a cada 15 segundos
+            # Os jobs recebem a app já criada via closure — NUNCA chamam
+            # create_app() de novo (isso recriaria blueprints, DB engine, etc.
+            # a cada execução do job, o que é um bug grave de duplicação).
             scheduler.add_job(
-                func=cls._job_process_queue,
+                func=lambda: cls._job_process_queue(app),
                 trigger=IntervalTrigger(seconds=15),
                 id="process_queue",
                 replace_existing=True,
+                max_instances=1,
+                coalesce=True,
             )
 
-            # Job 2: verifica tarefas vencidas a cada minuto
             scheduler.add_job(
-                func=cls._job_run_due_tasks,
+                func=lambda: cls._job_run_due_tasks(app),
                 trigger=IntervalTrigger(minutes=1),
                 id="run_due_tasks",
                 replace_existing=True,
+                max_instances=1,
+                coalesce=True,
             )
 
             scheduler.start()
             app._scheduler = scheduler
-            logger.info("APScheduler iniciado com sucesso.")
+            logger.info("APScheduler iniciado com sucesso (process_queue=15s, run_due_tasks=60s).")
 
         except ImportError:
             logger.warning(
                 "APScheduler não instalado. Agendamento automático desabilitado. "
                 "Execute: pip install apscheduler"
             )
+        except Exception as e:
+            logger.error("Falha ao iniciar APScheduler: %s", e)
 
     @classmethod
-    def _job_process_queue(cls) -> None:
-        from main import create_app
-        app = create_app()
+    def _job_process_queue(cls, app) -> None:
+        """Job periódico: processa a fila de mensagens. Usa a app já existente."""
         with app.app_context():
-            n = cls.process_queue()
-            if n:
-                logger.info("Fila: %d mensagens processadas.", n)
+            try:
+                n = cls.process_queue()
+                if n:
+                    logger.info("Fila: %d mensagens processadas.", n)
+            except Exception as e:
+                logger.error("Erro no job process_queue: %s", e)
 
     @classmethod
-    def _job_run_due_tasks(cls) -> None:
-        from main import create_app
-        app = create_app()
+    def _job_run_due_tasks(cls, app) -> None:
+        """Job periódico: executa tarefas agendadas vencidas. Usa a app já existente."""
         with app.app_context():
-            now = datetime.now(timezone.utc)
-            due = (
-                ScheduledTask.query
-                .filter(ScheduledTask.status == "active")
-                .filter(ScheduledTask.approved == True)
-                .filter(ScheduledTask.next_run <= now)
-                .all()
-            )
-            for task in due:
-                cls._execute_task(task)
+            try:
+                now = datetime.now(timezone.utc)
+                due = (
+                    ScheduledTask.query
+                    .filter(ScheduledTask.status == "active")
+                    .filter(ScheduledTask.approved == True)
+                    .filter(ScheduledTask.next_run <= now)
+                    .all()
+                )
+                for task in due:
+                    cls._execute_task(task)
+            except Exception as e:
+                logger.error("Erro no job run_due_tasks: %s", e)
 
     @classmethod
     def _sync_scheduler(cls, task: ScheduledTask) -> None:

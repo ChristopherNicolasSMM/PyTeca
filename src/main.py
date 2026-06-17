@@ -96,7 +96,24 @@ def create_app():
     # Registrar comandos CLI (apenas os essenciais)
     register_cli_commands(app)
 
+    # ── APScheduler — fila de mensagens + tarefas agendadas ────────────────────
+    # Não inicia em modo de reload do Flask (evita scheduler duplicado quando
+    # debug=True/use_reloader=True gera um processo filho).
+    if os.environ.get("WERKZEUG_RUN_MAIN") != "true" and not app.config["DEBUG"]:
+        _start_scheduler(app)
+    elif os.environ.get("WERKZEUG_RUN_MAIN") == "true":
+        # Processo filho do reloader — é o que de fato atende requisições
+        _start_scheduler(app)
+
     return app
+
+
+def _start_scheduler(app) -> None:
+    """Inicializa o APScheduler uma única vez, associado a esta instância de app."""
+    if getattr(app, "_scheduler", None) is not None:
+        return
+    from services.core.admin.task_service import TaskService
+    TaskService.init_scheduler(app)
 
 
 

@@ -14,122 +14,399 @@
 </div>
 
 <section class="section">
-  <div class="row">
-    <div class="col-lg-12">
+  <div class="row g-3">
+
+    <!-- ══════════════════════════════════════════════════════════════
+         Formulário de criação
+    ═══════════════════════════════════════════════════════════════ -->
+    <div class="col-lg-7">
       <div class="card">
         <div class="card-body">
           <h5 class="card-title">Novo Modelo</h5>
-          <form id="modelForm">
+
+          <div class="alert alert-danger d-none" id="formErrors"></div>
+
+          <form id="modelForm" onsubmit="return false;">
+
             <div class="row mb-3">
-              <label class="col-sm-2 col-form-label">Nome do Modelo</label>
-              <div class="col-sm-10">
-                <input type="text" class="form-control" name="name" required placeholder="Ex: Produto">
-              </div>
-            </div>
-            <div class="row mb-3">
-              <label class="col-sm-2 col-form-label">Módulo</label>
-              <div class="col-sm-10">
-                <input type="text" class="form-control" name="module" value="core">
-              </div>
-            </div>
-            <div class="row mb-3">
-              <label class="col-sm-2 col-form-label">Nome da Tabela</label>
-              <div class="col-sm-10">
-                <input type="text" class="form-control" name="table_name" required placeholder="ex: produtos">
+              <label class="col-sm-3 col-form-label">Nome do Modelo</label>
+              <div class="col-sm-9">
+                <input type="text" class="form-control" name="name" id="fName" placeholder="Ex: Produto">
+                <div class="form-text">PascalCase, sem espaços. Ex: Produto, CategoriaItem.</div>
               </div>
             </div>
 
-            <h6>Campos</h6>
-            <div id="fields-container">
-              <div class="field-row row mb-2">
-                <div class="col-sm-3"><input type="text" class="form-control" placeholder="Nome do campo" name="field_name[]"></div>
-                <div class="col-sm-3">
-                  <select class="form-select" name="field_type[]">
-                    <option value="string">String</option>
-                    <option value="integer">Integer</option>
-                    <option value="boolean">Boolean</option>
-                    <option value="datetime">DateTime</option>
-                    <option value="text">Text</option>
-                  </select>
-                </div>
-                <div class="col-sm-2"><input type="text" class="form-control" placeholder="Default" name="field_default[]"></div>
-                <div class="col-sm-2 form-check">
-                  <input type="checkbox" class="form-check-input" name="field_nullable[]" value="false"> <label class="form-check-label">Obrigatório</label>
-                </div>
-                <div class="col-sm-2"><button type="button" class="btn btn-danger btn-sm remove-field">Remover</button></div>
+            <div class="row mb-3">
+              <label class="col-sm-3 col-form-label">Módulo</label>
+              <div class="col-sm-9">
+                <input type="text" class="form-control" name="module" id="fModule" value="core">
+                <div class="form-text">Subpasta dentro de model/ (ex: bookstore, core).</div>
               </div>
             </div>
-            <button type="button" class="btn btn-secondary btn-sm mb-3" id="addFieldBtn">+ Adicionar Campo</button>
 
-            <div class="text-center">
-              <button type="submit" class="btn btn-primary">Criar Modelo e Gerar CRUD</button>
+            <div class="row mb-3">
+              <label class="col-sm-3 col-form-label">Nome da Tabela</label>
+              <div class="col-sm-9">
+                <input type="text" class="form-control" name="table_name" id="fTable" placeholder="ex: produtos">
+                <div class="form-text">snake_case, plural. Ex: produtos, categorias_item.</div>
+              </div>
+            </div>
+
+            <hr>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h6 class="mb-0">Campos</h6>
+              <button type="button" class="btn btn-sm btn-outline-primary" id="addFieldBtn">
+                <i class="bi bi-plus-lg me-1"></i>Adicionar Campo
+              </button>
+            </div>
+
+            <div id="fields-container"></div>
+
+            <hr>
+            <h6>Anotações</h6>
+
+            <div class="row mb-2">
+              <label class="col-sm-3 col-form-label">Campo de exibição</label>
+              <div class="col-sm-9">
+                <select class="form-select form-select-sm" id="fDisplayField"></select>
+                <div class="form-text">Campo usado quando este model aparece como FK em outro (dropdown).</div>
+              </div>
+            </div>
+
+            <div class="row mb-3">
+              <label class="col-sm-3 col-form-label">Campos com filtro dinâmico</label>
+              <div class="col-sm-9">
+                <select class="form-select form-select-sm" id="fChoicesFields" multiple size="3"></select>
+                <div class="form-text">
+                  Gera filtro <code>SELECT DISTINCT</code> automaticamente (ex.: gênero, categoria).
+                  Ctrl+clique para selecionar vários.
+                </div>
+              </div>
+            </div>
+
+            <div class="d-flex gap-2">
+              <button type="button" class="btn btn-outline-secondary" id="btnPreview">
+                <i class="bi bi-eye me-1"></i>Pré-visualizar código
+              </button>
+              <button type="button" class="btn btn-primary" id="btnCreate">
+                <i class="bi bi-magic me-1"></i>Criar Modelo e Gerar CRUD
+              </button>
             </div>
           </form>
-          <div id="previewArea" style="display:none; margin-top:20px;">
-            <h5>Pré-visualização do Código</h5>
-            <pre id="codePreview" class="bg-light p-3"></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════
+         Preview de código
+    ═══════════════════════════════════════════════════════════════ -->
+    <div class="col-lg-5">
+      <div class="card h-100">
+        <div class="card-body d-flex flex-column">
+          <h5 class="card-title">
+            <i class="bi bi-code-square me-1"></i>Pré-visualização
+          </h5>
+          <div id="previewEmpty" class="text-muted text-center my-auto">
+            <i class="bi bi-file-earmark-code" style="font-size:2.5rem;opacity:.3;"></i>
+            <p class="mt-2 mb-0">Clique em "Pré-visualizar código" para ver o model.py gerado.</p>
+          </div>
+          <div id="previewWrap" class="d-none flex-grow-1">
+            <div class="ace-editor-wrap" style="height:520px;">
+              <div id="previewEditor" style="height:520px;font-size:13px;"></div>
+            </div>
           </div>
         </div>
       </div>
     </div>
+
+    <!-- ══════════════════════════════════════════════════════════════
+         Models já criados via builder
+    ═══════════════════════════════════════════════════════════════ -->
+    <div class="col-12">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title">Modelos Criados via Builder</h5>
+          <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle">
+              <thead>
+                <tr>
+                  <th>Nome</th>
+                  <th>Módulo</th>
+                  <th>Tabela</th>
+                  <th>Arquivo Gerado</th>
+                  <th>Criado em</th>
+                  <th class="text-end">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="modelsListBody">
+                <tr><td colspan="6" class="text-center text-muted py-3">Carregando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </section>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.2/ace.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.2/mode-python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.2/theme-tomorrow.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.2/theme-tomorrow_night.min.js"></script>
 
 <script>
-  document.getElementById('addFieldBtn').addEventListener('click', function() {
-    const container = document.getElementById('fields-container');
-    const newRow = container.children[0].cloneNode(true);
-    newRow.querySelectorAll('input, select').forEach(el => el.value = '');
-    container.appendChild(newRow);
-  });
-  document.addEventListener('click', function(e) {
-    if (e.target.classList.contains('remove-field')) {
-      e.target.closest('.field-row').remove();
-    }
-  });
+(function () {
+  'use strict';
 
-  document.getElementById('modelForm').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    const formData = new FormData(this);
-    const data = {
-      name: formData.get('name'),
-      module: formData.get('module'),
-      table_name: formData.get('table_name'),
-      fields: [],
-      annotations: {}
-    };
-    const fieldNames = formData.getAll('field_name[]');
-    const fieldTypes = formData.getAll('field_type[]');
-    const fieldDefaults = formData.getAll('field_default[]');
-    const fieldNullable = formData.getAll('field_nullable[]');
-    for (let i = 0; i < fieldNames.length; i++) {
-      if (fieldNames[i]) {
-        data.fields.push({
-          name: fieldNames[i],
-          type: fieldTypes[i],
-          default: fieldDefaults[i] || null,
-          nullable: fieldNullable[i] !== 'false'
-        });
-      }
-    }
+  const API = '/api/core/builder/model';
+  let fieldRowCount = 0;
 
-    const response = await fetch('/api/core/builder/model/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-    const result = await response.json();
-    if (result.success) {
-      const genResponse = await fetch(`/api/core/builder/model/${result.id}/generate`, { method: 'POST' });
-      const genResult = await genResponse.json();
-      if (genResult.success) {
-        alert('Modelo e CRUD gerados com sucesso! O servidor pode precisar reiniciar para refletir as novas rotas.');
+  // ── Ace para preview ────────────────────────────────────────────────────
+  const previewEditor = ace.edit('previewEditor');
+  previewEditor.session.setMode('ace/mode/python');
+  previewEditor.setReadOnly(true);
+  previewEditor.setOptions({ fontSize: '13px', showPrintMargin: false });
+  function syncAceTheme() {
+    previewEditor.setTheme(
+      document.documentElement.dataset.theme === 'dark' ? 'ace/theme/tomorrow_night' : 'ace/theme/tomorrow'
+    );
+  }
+  syncAceTheme();
+  new MutationObserver(syncAceTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+  // ── Linha de campo ───────────────────────────────────────────────────────
+  function addFieldRow(initial) {
+    initial = initial || {};
+    const id  = ++fieldRowCount;
+    const row = document.createElement('div');
+    row.className = 'field-row border rounded p-2 mb-2';
+    row.dataset.rowId = id;
+    row.innerHTML = `
+      <div class="row g-2 align-items-end">
+        <div class="col-sm-3">
+          <label class="form-label small mb-1">Nome</label>
+          <input type="text" class="form-control form-control-sm field-name" placeholder="ex: nome, preco" value="${initial.name || ''}">
+        </div>
+        <div class="col-sm-3">
+          <label class="form-label small mb-1">Tipo</label>
+          <select class="form-select form-select-sm field-type">
+            <option value="string">Texto curto</option>
+            <option value="text">Texto longo</option>
+            <option value="integer">Número inteiro</option>
+            <option value="float">Número decimal</option>
+            <option value="boolean">Sim/Não</option>
+            <option value="datetime">Data e hora</option>
+            <option value="foreign_key">Referência (FK)</option>
+          </select>
+        </div>
+        <div class="col-sm-3 field-default-wrap">
+          <label class="form-label small mb-1">Valor padrão</label>
+          <input type="text" class="form-control form-control-sm field-default" placeholder="opcional">
+        </div>
+        <div class="col-sm-2 fk-table-wrap d-none">
+          <label class="form-label small mb-1">Tabela referenciada</label>
+          <input type="text" class="form-control form-control-sm field-fk-table" placeholder="ex: authors">
+        </div>
+        <div class="col-sm-1 d-flex flex-column align-items-center">
+          <label class="form-label small mb-1">Obrig.</label>
+          <input type="checkbox" class="form-check-input field-required">
+        </div>
+      </div>
+      <div class="row g-2 mt-1">
+        <div class="col-sm-3 offset-sm-9 text-end">
+          <button type="button" class="btn btn-sm btn-outline-danger btn-remove-field">
+            <i class="bi bi-trash3"></i> Remover
+          </button>
+        </div>
+      </div>
+    `;
+    document.getElementById('fields-container').appendChild(row);
+
+    const typeSelect   = row.querySelector('.field-type');
+    const fkWrap        = row.querySelector('.fk-table-wrap');
+    const defaultWrap    = row.querySelector('.field-default-wrap');
+
+    function syncFkVisibility() {
+      const isFk = typeSelect.value === 'foreign_key';
+      fkWrap.classList.toggle('d-none', !isFk);
+      defaultWrap.classList.toggle('d-none', isFk);
+    }
+    typeSelect.addEventListener('change', () => { syncFkVisibility(); refreshDependentSelects(); });
+    row.querySelector('.field-name').addEventListener('input', refreshDependentSelects);
+    row.querySelector('.btn-remove-field').addEventListener('click', () => { row.remove(); refreshDependentSelects(); });
+
+    if (initial.type) typeSelect.value = initial.type;
+    syncFkVisibility();
+    refreshDependentSelects();
+  }
+
+  document.getElementById('addFieldBtn').addEventListener('click', () => addFieldRow());
+
+  // ── Atualiza selects de display_field / choices com base nos campos atuais ─
+  function refreshDependentSelects() {
+    const names = collectFields()
+      .map(f => f.name)
+      .filter(Boolean);
+
+    const dField = document.getElementById('fDisplayField');
+    const prevD  = dField.value;
+    dField.innerHTML = '<option value="">(nenhum)</option>' +
+      names.map(n => `<option value="${n}">${n}</option>`).join('');
+    if (names.includes(prevD)) dField.value = prevD;
+
+    const cField = document.getElementById('fChoicesFields');
+    const prevSelected = Array.from(cField.selectedOptions).map(o => o.value);
+    cField.innerHTML = names.map(n => `<option value="${n}">${n}</option>`).join('');
+    Array.from(cField.options).forEach(o => { o.selected = prevSelected.includes(o.value); });
+  }
+
+  // ── Coleta dados do formulário ───────────────────────────────────────────
+  function collectFields() {
+    return Array.from(document.querySelectorAll('.field-row')).map(row => {
+      const type = row.querySelector('.field-type').value;
+      const data = {
+        name: row.querySelector('.field-name').value.trim(),
+        type,
+        nullable: !row.querySelector('.field-required').checked,
+      };
+      if (type === 'foreign_key') {
+        data.fk_table = row.querySelector('.field-fk-table').value.trim();
       } else {
-        alert('Erro na geração do CRUD: ' + genResult.error);
+        const def = row.querySelector('.field-default').value.trim();
+        if (def) data.default = def;
       }
-    } else {
-      alert('Erro ao criar modelo: ' + (result.error || 'desconhecido'));
+      return data;
+    });
+  }
+
+  function collectPayload() {
+    const choicesFields = Array.from(document.getElementById('fChoicesFields').selectedOptions).map(o => o.value);
+    return {
+      name: document.getElementById('fName').value.trim(),
+      module: document.getElementById('fModule').value.trim() || 'core',
+      table_name: document.getElementById('fTable').value.trim(),
+      fields: collectFields(),
+      annotations: {
+        display_field: document.getElementById('fDisplayField').value || undefined,
+        choices: choicesFields.map(f => ({ field: f, label: f.replace(/_/g, ' ') })),
+      },
+    };
+  }
+
+  function showErrors(errors) {
+    const box = document.getElementById('formErrors');
+    if (!errors || !errors.length) { box.classList.add('d-none'); return; }
+    box.innerHTML = '<strong>Corrija antes de continuar:</strong><ul class="mb-0 mt-1">' +
+      errors.map(e => `<li>${e}</li>`).join('') + '</ul>';
+    box.classList.remove('d-none');
+  }
+
+  // ── Preview ───────────────────────────────────────────────────────────────
+  document.getElementById('btnPreview').addEventListener('click', async () => {
+    const payload = collectPayload();
+    const btn = document.getElementById('btnPreview');
+    btn.disabled = true;
+    try {
+      const res  = await fetch(`${API}/preview`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        showErrors(data.errors || [data.error]);
+        return;
+      }
+      showErrors([]);
+      document.getElementById('previewEmpty').classList.add('d-none');
+      document.getElementById('previewWrap').classList.remove('d-none');
+      previewEditor.setValue(data.code, -1);
+    } finally {
+      btn.disabled = false;
     }
   });
+
+  // ── Criar ────────────────────────────────────────────────────────────────
+  document.getElementById('btnCreate').addEventListener('click', async () => {
+    const payload = collectPayload();
+    const btn = document.getElementById('btnCreate');
+    btn.disabled  = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Gerando...';
+
+    try {
+      const createRes  = await fetch(`${API}/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const createData = await createRes.json();
+      if (!createData.success) {
+        showErrors(createData.errors || [createData.error]);
+        return;
+      }
+      showErrors([]);
+
+      const genRes  = await fetch(`${API}/${createData.id}/generate`, { method: 'POST' });
+      const genData = await genRes.json();
+      if (genData.success) {
+        alert(genData.message || 'Modelo e CRUD gerados com sucesso! Reinicie o servidor para ver as novas rotas.');
+        loadModelsList();
+        document.getElementById('modelForm').reset();
+        document.getElementById('fields-container').innerHTML = '';
+        addFieldRow();
+      } else {
+        showErrors([genData.error || 'Falha desconhecida na geração do CRUD.']);
+      }
+    } catch (e) {
+      showErrors(['Erro de conexão: ' + e.message]);
+    } finally {
+      btn.disabled  = false;
+      btn.innerHTML = '<i class="bi bi-magic me-1"></i>Criar Modelo e Gerar CRUD';
+    }
+  });
+
+  // ── Lista de models existentes ──────────────────────────────────────────
+  async function loadModelsList() {
+    const tbody = document.getElementById('modelsListBody');
+    try {
+      const res  = await fetch(`${API}/`);
+      const data = await res.json();
+      const models = data.models || [];
+      if (!models.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">Nenhum modelo criado via builder ainda.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = models.map(m => `
+        <tr>
+          <td>${m.name}</td>
+          <td><span class="badge bg-secondary">${m.module}</span></td>
+          <td><code>${m.table_name}</code></td>
+          <td><small class="text-muted">${m.generated_file || '—'}</small></td>
+          <td><small>${m.created_at ? new Date(m.created_at).toLocaleString('pt-BR') : '—'}</small></td>
+          <td class="text-end">
+            <button class="btn btn-sm btn-outline-danger" onclick="window.removeModelDef(${m.id})" title="Remover definição">
+              <i class="bi bi-trash3"></i>
+            </button>
+          </td>
+        </tr>
+      `).join('');
+    } catch {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger py-3">Erro ao carregar modelos.</td></tr>';
+    }
+  }
+
+  window.removeModelDef = async function (id) {
+    if (!confirm('Remover esta definição? O arquivo já gerado no disco NÃO será apagado.')) return;
+    await fetch(`${API}/${id}`, { method: 'DELETE' });
+    loadModelsList();
+  };
+
+  // ── Init ─────────────────────────────────────────────────────────────────
+  addFieldRow({ name: 'nome', type: 'string' });
+  loadModelsList();
+})();
 </script>
 {% endblock %}
