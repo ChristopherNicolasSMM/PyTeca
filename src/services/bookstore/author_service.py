@@ -41,6 +41,29 @@ except Exception:
     _SORTABLE = {"id"}
 
 
+def _trash_value() -> str:
+    """
+    Valor de status usado para 'lixeira'. Usa o membro TRASH do Enum quando existe;
+    senão usa a string "trash" diretamente. Isso evita AttributeError em Enums que
+    não definem TRASH (ex.: LoanStatus usa CANCELLED, não TRASH).
+    """
+    member = getattr(AuthorStatus, "TRASH", None)
+    return member.value if member is not None else "trash"
+
+
+def _is_trash(obj) -> bool:
+    """Verifica se o objeto está na lixeira, independente do Enum ter TRASH ou não."""
+    val = obj.status
+    current = val.value if hasattr(val, "value") else val
+    return current == _trash_value()
+
+
+def _set_trash(obj) -> None:
+    """Define status como lixeira de forma segura (Enum se existir, senão string)."""
+    member = getattr(AuthorStatus, "TRASH", None)
+    obj.status = member if member is not None else _trash_value()
+
+
 def _parse_date(value: Any) -> datetime | None:
     """Converte string de data para datetime. Aceita ISO, BR e datetime nativo."""
     if value is None or value == "":
@@ -219,7 +242,7 @@ class AuthorService:
         obj = self.get_by_id(id)
         if not obj:
             return ServiceResult(success=False, error="Registro não encontrado.", code=404)
-        if obj.status == AuthorStatus.TRASH:
+        if _is_trash(obj):
             return ServiceResult(success=False, error="Não é possível editar um registro na lixeira.", code=400)
         self._apply_fields(obj, data)
         try:
@@ -234,19 +257,24 @@ class AuthorService:
         obj = self.get_by_id(id)
         if not obj:
             return ServiceResult(success=False, error="Não encontrado.", code=404)
-        if obj.status == AuthorStatus.TRASH:
+        if _is_trash(obj):
             return ServiceResult(success=False, error="Já está na lixeira.", code=400)
-        obj.status = AuthorStatus.TRASH
+        _set_trash(obj)
         obj.trashed_at = datetime.now(timezone.utc)
         obj.updated_at = datetime.now(timezone.utc)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            logger.warning("Erro ao mover Author id=%s para lixeira: %s", id, e)
+            return ServiceResult(success=False, error=_friendly_db_error(e), code=422)
         return ServiceResult(success=True, data=obj)
 
     def restore(self, id: int) -> ServiceResult:
         obj = self.get_by_id(id)
         if not obj:
             return ServiceResult(success=False, error="Não encontrado.", code=404)
-        if obj.status != AuthorStatus.TRASH:
+        if not _is_trash(obj):
             return ServiceResult(success=False, error="Não está na lixeira.", code=400)
         obj.status = AuthorStatus.ACTIVE
         obj.trashed_at = None
@@ -258,7 +286,7 @@ class AuthorService:
         obj = self.get_by_id(id)
         if not obj:
             return ServiceResult(success=False, error="Não encontrado.", code=404)
-        if obj.status != AuthorStatus.TRASH:
+        if not _is_trash(obj):
             return ServiceResult(
                 success=False,
                 error="Apenas registros na lixeira podem ser excluídos permanentemente.",
@@ -282,6 +310,29 @@ class AuthorService:
         db.session.delete(obj)
         db.session.commit()
         return ServiceResult(success=True, data={"id": id})
+
+    # ── Filtros dinâmicos (@choices) ─────────────────────────────────────────
+
+    def distinct_values(self, field: str) -> list[tuple[str, str]]:
+        """
+        Retorna valores distintos (não nulos, não vazios) de uma coluna,
+        para popular um <select> de filtro. Usado por campos com @choices.
+        """
+        if not hasattr(Author, field):
+            return []
+        col = getattr(Author, field)
+        try:
+            rows = (
+                db.session.query(col)
+                .filter(col.isnot(None), col != "")
+                .distinct()
+                .order_by(col.asc())
+                .all()
+            )
+        except Exception as e:
+            logger.warning("distinct_values falhou para '%s': %s", field, e)
+            return []
+        return [(str(r[0]), str(r[0])) for r in rows]
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 

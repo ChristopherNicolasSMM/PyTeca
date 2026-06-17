@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "*.py.j2": "python",
+        "*.html.j2": "jinja-html"
+    }
+}

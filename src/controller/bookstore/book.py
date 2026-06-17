@@ -3,7 +3,7 @@ from __future__ import annotations
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
-from annotations import get_model_metadata
+from annotations import get_model_metadata, get_choices_fields
 from utils.generate_from_model import _get_relationship_fields
 from model.bookstore.book import Book, BookStatus
 from model.core.user_layout_pref import UserLayoutPref
@@ -13,7 +13,11 @@ from utils.smart_list.export import export_csv, export_excel, export_pdf
 
 book_bp = Blueprint("books", __name__, url_prefix="/books")
 
-# ── Configuração SmartList ────────────────────────────────────────────────────
+# ── Configuração SmartList (estática — sem queries de banco) ──────────────────
+# Filtros @choices NÃO aparecem aqui: são adicionados dinamicamente em list()
+# porque dependem de uma query SELECT DISTINCT (precisa de app context + DB).
+# O gerador já remove da lista abaixo qualquer Filter cujo campo tenha @choices,
+# então não há duplicação entre filtro estático e filtro dinâmico.
 
 SMART_LIST_CONFIG = SmartListConfig(
     list_id="books",
@@ -21,14 +25,13 @@ SMART_LIST_CONFIG = SmartListConfig(
     columns=[
         ColumnDef("id", "ID", sortable=True, width="60px", align="start"),
         ColumnDef("title", "Título", sortable=True, width=None, align="start"),
-        ColumnDef("author", "Autor", sortable=True, width=None, align="start"),
+        ColumnDef("author_name", "Autor", sortable=False, width=None, align="start"),
         ColumnDef("year", "Ano", sortable=False, width="80px", align="center"),
         ColumnDef("available", "Disponível", sortable=False, width="90px", align="center"),
         ColumnDef("status", "Status", sortable=False, width="100px", align="center")
     ],
     filters=[
-        FilterDef("search", "search", type="text", placeholder="Título ou autor..."),
-        FilterDef("genre", "genre", type="text", placeholder="Gênero")
+        FilterDef("search", "search", type="text", placeholder="Título ou autor...")
     ],
     default_sort="title",
     default_dir="asc",
@@ -38,8 +41,7 @@ SMART_LIST_CONFIG = SmartListConfig(
     export_filename="books",
 )
 
-# ── Enum, date e campos obrigatórios ─────────────────────────────────────────
-# Detectados automaticamente via metadados do modelo para uso no template do modal
+# ── Helpers de metadados (executados no import — só leem o mapper, sem DB) ────
 
 def _get_enum_fields():
     """Detecta campos Enum do modelo para gerar <select> no modal."""
@@ -48,9 +50,9 @@ def _get_enum_fields():
     from enum import EnumMeta
     import inspect
 
-    result = []
+    result   = []
     metadata = get_model_metadata(Book)
-    form_fields = metadata.get("ui_form", {}).get("fields", [])
+    form_fields  = metadata.get("ui_form", {}).get("fields", [])
     model_module = inspect.getmodule(Book)
 
     for field_name in form_fields:
@@ -95,9 +97,30 @@ def _get_required_fields():
     ]
 
 
+# Executados no import — seguros pois só leem o mapper SQLAlchemy (sem query)
 ENUM_FIELDS     = _get_enum_fields()
 DATE_FIELDS     = _get_date_fields()
 REQUIRED_FIELDS = _get_required_fields()
+CHOICES_META    = get_choices_fields(Book)  # [{field, label, order}, ...]
+
+
+def _build_choices_filters(service: "BookService") -> list[FilterDef]:
+    """
+    Constrói FilterDefs com SELECT DISTINCT para campos @choices.
+    Recebe o `service` já instanciado pelo chamador (list()) — nunca
+    instancia nada aqui, para evitar bugs de ordem/escopo.
+    """
+    result = []
+    for ch in CHOICES_META:
+        field = ch["field"]
+        label = ch["label"]
+        try:
+            options = service.distinct_values(field)
+        except Exception:
+            options = []
+        result.append(FilterDef(name=field, label=label, type="select", options=options))
+    return result
+
 
 # ── Listagem ──────────────────────────────────────────────────────────────────
 
@@ -118,35 +141,26 @@ def list():
         (user_layout or {}).get("per_page", SMART_LIST_CONFIG.default_page_size),
     ))
 
-    # Filtros @choices — campos com select distinct (genre, language, etc.)
-    _choices_fields = ["genre"]  # atualizar se adicionar @choices no model
-    extra_filters = {
-        f: request.args.get(f, "").strip() or None
-        for f in _choices_fields
-        if request.args.get(f, "").strip()
-    }
-
-    # @choices substitui filtros estáticos com mesmo nome no SmartListConfig
-    from utils.smart_list import FilterDef
-    from copy import copy
-    choices_filters = []
+    # 1) Service primeiro — tudo que depende dele vem depois, nunca antes.
     service = BookService()
-    for field in _choices_fields:
-        try:
-            opts = service.distinct_values(field)
-        except Exception:
-            opts = []
-        choices_filters.append(FilterDef(
-            name=field,
-            label=field.replace("_", " ").title(),
-            type="select",
-            options=opts
-        ))
 
-    cfg = copy(SMART_LIST_CONFIG)
-    choices_names = {f.name for f in choices_filters}
-    cfg.filters   = [f for f in SMART_LIST_CONFIG.filters if f.name not in choices_names] + choices_filters
+    # 2) Filtros @choices (SELECT DISTINCT) — precisa do service e do app context.
+    choices_filters = _build_choices_filters(service)
+    if choices_filters:
+        from copy import copy
+        cfg = copy(SMART_LIST_CONFIG)
+        cfg.filters = SMART_LIST_CONFIG.filters + choices_filters
+    else:
+        cfg = SMART_LIST_CONFIG
 
+    # 3) Valores de filtro @choices vindos da query string (ex.: ?genre=Suspense)
+    extra_filters = {
+        ch["field"]: request.args.get(ch["field"], "").strip() or None
+        for ch in CHOICES_META
+    }
+    extra_filters = {k: v for k, v in extra_filters.items() if v}
+
+    # 4) Busca os dados
     result = service.list(
         page=int(request.args.get("page", 1)),
         per_page=per_page,
@@ -158,14 +172,14 @@ def list():
     )
 
     if export in ("csv", "excel", "pdf"):
-        all_result = service.list(page=1, per_page=10_000, status=status, extra_filters=extra_filters)
+        all_result   = service.list(page=1, per_page=10_000, status=status, extra_filters=extra_filters)
         visible_cols = (user_layout or {}).get("columns") or None
         if export == "csv":
             return export_csv(cfg, all_result.items, visible_cols)
         if export == "excel":
             return export_excel(cfg, all_result.items, visible_cols)
         if export == "pdf":
-            return export_pdf(cfg, all_result.items, visible_cols, title="Livros")
+            return export_pdf(cfg, all_result.items, visible_cols, title="Livross")
 
     renderer = SmartListRenderer(cfg)
     sl = renderer.build_context(
@@ -176,7 +190,7 @@ def list():
     )
 
     metadata = get_model_metadata(Book)
-    form_fields_list  = metadata.get("ui_form", {}).get("fields", [])
+    form_fields_list    = metadata.get("ui_form", {}).get("fields", [])
     relationship_fields = _get_relationship_fields(Book)
 
     return render_template(

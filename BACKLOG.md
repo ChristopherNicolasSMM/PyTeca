@@ -1,262 +1,358 @@
-# Especificação: Gerador de CRUD Automático via Anotações no Modelo
+## 🚀 Backlog Atualizado: Pyteca como Plataforma RAD para Construção Rápida de Sistemas
 
-## 1. Visão Geral
+O **Pyteca** evoluiu de um sistema de gerenciamento de biblioteca para uma **plataforma RAD (Rapid Application Development)** que permite criar sistemas completos (CRUD, APIs, dashboards, tarefas agendadas, integrações) a partir de modelos anotados ou via interface visual. Tudo integrado com Flask, SQLAlchemy, Bootstrap, e uma arquitetura que prioriza **reuso**, **consistência** e **extensibilidade**.
 
-**Objetivo**  
-Permitir que, a partir de um modelo SQLAlchemy com anotações especiais (metadados), todo o código necessário para um CRUD completo seja gerado automaticamente:  
-- Rotas web (listagem, criação, edição, detalhe, soft‑delete, restauração, exclusão permanente)  
-- Rotas de API (JSON)  
-- Serviço de negócio (validações básicas, paginação, busca, ordenação)  
-- Templates HTML dinâmicos (listagem, formulário, detalhe)  
-- Registro automático de blueprints na aplicação  
+A seguir, o **backlog unificado** e atualizado, contemplando:
+- O **Gerador de CRUD Automático via Anotações** (já implementado parcialmente)
+- O **Model Builder Visual** (interface para criar modelos dinamicamente)
+- O **Query & API Playground** (ferramenta para testar SQL e chamadas HTTP, com geração de modelos a partir de respostas JSON)
+- O **Monitor de Tarefas e Mensageria** (scheduler, filas, dashboards)
+- O **Sistema de Configurações** (centralizado por abas)
 
-**Benefícios**  
-- Redução drástica de código repetitivo.  
-- Consistência entre todos os CRUDs da aplicação.  
-- Facilidade para criar novos módulos (basta anotar o modelo).  
-- Manutenção centralizada das funcionalidades comuns.  
+---
 
-## 2. Conceito de “Anotação” Utilizado
+## 1. Visão Geral da Plataforma
 
-Em vez de usar anotações de função (PEP 3107), o sistema usará **decoradores de classe** e **atributos de classe** para anexar metadados ao modelo.  
-Essa abordagem permite definir configurações como:
+**Propósito**  
+Pyteca não é apenas um produto – é uma **base sólida** para construir qualquer sistema corporativo ou web com rapidez, usando uma abordagem de **baixo código** (low‑code) mas mantendo total flexibilidade via código Python.  
 
-- Quais campos aparecem na listagem (tabela HTML)
-- Quais campos são pesquisáveis
-- Quais campos são usados em filtros laterais
-- Quais campos vão no formulário de criação/edição
-- Se o modelo usa soft‑delete (campo de status)
-- Prefijo da URL, permissões, etc.
+**Pilares**  
+1. **Geração automática de CRUDs** a partir de modelos SQLAlchemy anotados (decorators).  
+2. **Interface visual para criação de modelos** (Model Builder) – ideal para times não‑técnicos ou prototipagem rápida.  
+3. **Playground de SQL e APIs** – teste consultas e integrações, e gere modelos a partir de respostas JSON.  
+4. **Agendamento de tarefas e filas** – para automação, backups, notificações em lote.  
+5. **Central de configurações** – parâmetros do sistema organizados por abas, editáveis via UI.  
 
-## 3. Artefatos do Sistema
+**Público‑alvo**  
+- Desenvolvedores que querem acelerar a criação de CRUDs.  
+- Administradores de sistema que precisam monitorar tarefas e filas.  
+- Integradores que consomem APIs externas e desejam mapear respostas para modelos locais.  
 
-### 3.1 Módulo `crud_base`
+---
 
-Responsável por conter as classes e funções centrais:
+## 2. Gerador de CRUD Automático via Anotações (Estado Atual + Evoluções)
 
-- `CrudConfig` – estrutura de configuração (dataclass/objeto).  
-- Decorador `@crud_model` – aplicado ao modelo para guardar a configuração.  
-- Classe `CRUDService` – implementa lógica de negócio genérica.  
-- Funções geradoras de blueprints:  
-  - `generate_web_blueprint` – rotas HTML (para o navegador)  
-  - `generate_api_blueprint` – rotas JSON (para frontend ou terceiros)  
-- Funções auxiliares para renderização de templates dinâmicos.
+### 2.1 O que já existe
 
-### 3.2 Modelos Anotados
+No código atual, temos:
 
-Exemplo de modelo anotado (descrição):
+- `annotations.py`: decorators `@label`, `@plural`, `@listview`, `@form`, `@required`, `@max_length`, etc.  
+- `model/bookstore/*.py`: modelos anotados (Author, Book, Loan).  
+- `utils/generate_from_model.py`: comando `flask generate --model` que lê um arquivo de modelo, extrai metadados via `get_model_metadata()` e gera:
+  - Controller (`controller/.../model.py`)
+  - Service (`services/.../model_service.py`)
+  - API routes (`api/routes/.../model_routes.py`)
+  - Templates (`templates/.../manage.html`, `detail.html`, `_modals/form_modal.html`)
+  - Registro automático no menu (via `menu_builder.py` e YAML complementar).
 
+- `utils/smart_list/`: componente reutilizável para listagens paginadas, ordenação, filtros, exportação (CSV, Excel, PDF), e salvamento de layout por usuário.
+
+- `utils/generate_model/template_loader.py`: carrega templates `.j2` de um tema (padrão `standard`) e renderiza com substituição simples.
+
+**Portanto, o gerador já está funcional e atende a maior parte da especificação original.**
+
+### 2.2 Próximas evoluções (a curto prazo)
+
+| Funcionalidade | Descrição | Prioridade |
+|----------------|-----------|------------|
+| **Suporte a relacionamentos** | No gerador, identificar campos `ForeignKey` e gerar selects dinâmicos (usando `api/options/<tabela>`). Já parcialmente implementado nos modais (`relationship_fields`). | Alta |
+| **Upload de arquivos** | Se um campo for anotado como `file_field`, o gerador deve criar input type="file" e salvar o arquivo (ex: capa do livro). | Média |
+| **Validações customizadas** | Permitir que o modelo defina um método `validate()` que o service chamará antes de salvar. | Média |
+| **Geração automática de testes** | Criar arquivos de teste (pytest) para o CRUD gerado. | Baixa |
+| **Exportação dos dados da listagem** | Já existe via SmartList; integrar ao gerador para que o botão “Exportar” apareça automaticamente. | Baixa |
+
+---
+
+## 3. Model Builder Visual (Criação de Modelos pela Interface)
+
+### 3.1 Conceito
+
+Permite que um usuário com permissão de administrador **crie novos modelos diretamente pelo navegador**, sem escrever código Python. O sistema armazena a definição no banco (`model_definition`) e gera o arquivo `.py` do modelo, aplica anotações e executa `db.create_all()`.
+
+### 3.2 Interface
+
+- Página `/admin/model-builder` com duas abas:
+  1. **Lista de modelos** (SmartList com colunas: nome, tabela, módulo, status, ações).
+  2. **Formulário de criação/edição**:
+     - Nome do modelo (ex: `Product`), nome da tabela (`products`), módulo (`sales`).
+     - Editor de campos (grid):
+       - Nome do campo, tipo (String, Integer, Boolean, Date, DateTime, Text, ForeignKey).
+       - Opções: nullable, unique, default, relação (se FK: tabela referenciada).
+     - Editor de anotações:
+       - `@label`, `@plural`, `@listview` (seleção de colunas, ordenação, filtros), `@form` (grupos de campos), `@required`, etc.
+     - Pré‑visualização do código gerado (usando Ace Editor).
+  3. Botão **“Gerar Modelo”** → dispara o serviço que escreve o arquivo e recarrega os blueprints (ou emite comando para recarga).
+
+### 3.3 Backend
+
+- **Tabela `model_definition`** (já modelada anteriormente).
+- **Serviço `ModelGenerator`**:
+  - Lê a definição do banco.
+  - Renderiza um template Jinja2 (baseado no mesmo `standard/` do gerador CLI) com os metadados.
+  - Salva o arquivo em `model/<module>/<nome_lower>.py`.
+  - Opcionalmente, dispara `flask generate --model` (ou chama as funções de geração de CRUD diretamente) para criar controller, service, routes e templates.
+  - Executa `db.create_all()` (em desenvolvimento) ou gera migration (Alembic) em produção.
+
+### 3.4 Integração com API Playground
+
+- Após uma requisição de API no playground, o usuário pode clicar em **“Criar Model a partir da resposta”**.
+- O sistema analisa o JSON, sugere campos (ex: `{"id": 1, "name": "John"}` → campos `id` (Integer), `name` (String)).
+- Abre o modal do Model Builder pré‑preenchido.
+- O usuário ajusta e confirma → modelo gerado.
+
+---
+
+## 4. Query & API Playground
+
+### 4.1 Página `/admin/playground` (duas sub‑abas)
+
+#### 🔹 SQL Playground
+- Editor SQL (com syntax highlight) – apenas comandos `SELECT`.
+- Botão **Executar** → chama endpoint `/api/builder/query/sql` que:
+  - Verifica se a query é `SELECT` (bloqueia qualquer outra operação).
+  - Executa via `db.session.execute(text(sql))`.
+  - Retorna até 1000 linhas em JSON.
+- Resultado exibido em tabela (com opção de copiar/exportar CSV).
+- **Salvar query** – armazena em `saved_queries` (opcional).
+
+#### 🔹 API Playground
+- Interface semelhante ao Postman:
+  - Método (GET, POST, PUT, DELETE), URL, Headers (JSON), Body (texto ou JSON).
+  - Botão **Enviar** → chama endpoint `/api/builder/query/proxy` que faz a requisição usando `requests` (respeitando whitelist de domínios).
+- Resposta exibida formatada (JSON highlight).
+- Botão **“Gerar Model a partir desta resposta”** (conforme item 3.4).
+- **Histórico** – salva as últimas requisições (opcional).
+
+### 4.2 Segurança
+
+- SQL: apenas `SELECT`. Usar um usuário de banco com permissões `SELECT` apenas.
+- Proxy HTTP: whitelist de domínios configurável via `system_config` (ex: `API_WHITELIST = "api.github.com, api.exemplo.com"`). Bloquear IPs privados por padrão.
+- Logs completos em `query_log` e `api_log`.
+
+---
+
+## 5. Monitor de Tarefas e Mensageria
+
+### 5.1 Página `/admin/tasks`
+
+#### 🔹 Dashboard de Tarefas
+- Cards:
+  - Total de tarefas ativas.
+  - Tarefas pendentes de aprovação.
+  - Tarefas com falha nas últimas 24h.
+  - Mensagens na fila.
+- Gráficos (ApexCharts):
+  - Evolução de execuções por dia (linhas).
+  - Distribuição por status (barras).
+  - Top 5 tarefas mais lentas (barras horizontais).
+- Tabela de **últimas execuções** (TaskLog) com colunas: tarefa, início, fim, duração, status, resultado.
+
+#### 🔹 Lista de Tarefas Agendadas (ScheduledTask)
+- SmartList com ações: editar, pausar, ativar, executar agora, aprovar (se pendente).
+- Formulário de criação/edição:
+  - Nome, tipo (`python_call`, `http_request`, `sql`).
+  - `target`: caminho da função (ex: `services.tasks.backup_db`), URL, ou SQL.
+  - Agendamento (cron string ou intervalo em minutos).
+  - Flag `requires_approval`.
+- Botão **“Executar Agora”** – executa imediatamente (útil para testes).
+
+#### 🔹 Fila de Mensagens (MessageQueue)
+- Lista de mensagens pendentes, em processamento, com erro.
+- Possibilidade de reprocessar mensagens com erro.
+- Ações: cancelar, priorizar.
+
+### 5.2 Worker e Scheduler
+
+- **APScheduler** inicializado com a aplicação (job store no banco).
+- Um job recorrente (a cada 10 segundos) processa `MessageQueue` (envia e-mails, notificações, webhooks).
+- Outro job (a cada minuto) verifica `ScheduledTask` com `next_run <= now()` e status `active`, e dispara execução (respeitando aprovação).
+- **TaskLog** registra cada execução (início, fim, sucesso, erro).
+
+### 5.3 Exemplo de Tarefa Interna
+
+Registrar funções elegíveis em um dicionário central (`TASK_REGISTRY`) para segurança:
+
+```python
+TASK_REGISTRY = {
+    "backup_db": backup_database_function,
+    "send_daily_report": send_report,
+}
 ```
-Book (modelo SQLAlchemy)
-  - atributos: id, title, author, isbn, status, etc.
-  - anotação: @crud_model com configuração
-    list_display = ["title", "author", "year", "available"]
-    search_fields = ["title", "author"]
-    filter_fields = ["genre", "status"]
-    form_fields = ["title", "author", "isbn", "year", "genre", "description", "quantity"]
-    soft_delete = True
-    templates_base = "books"
-    url_prefix = "/books"
+
+Ao criar uma tarefa do tipo `python_call`, o `target` deve ser uma chave desse registro.
+
+---
+
+## 6. Central de Configurações (`/admin/config`)
+
+### 6.1 Interface
+
+- Abas (definidas pelo campo `group` na tabela `system_config`):
+  - **Geral** (nome do sistema, fuso horário, timeout)
+  - **E-mail** (servidor SMTP, remetente)
+  - **API Whitelist** (domínios permitidos para o playground)
+  - **Segurança** (max login attempts, tempo de sessão)
+  - **Personalização** (tema, logo, rodapé)
+
+- Cada grupo exibe os campos correspondentes, com tipos apropriados (string, bool, número, textarea para JSON).
+- Ações: **Salvar**, **Resetar para padrão**, **Exportar/Importar** (JSON).
+
+### 6.2 Acesso programático
+
+Serviço `ConfigService` fornece métodos:
+
+```python
+get_config(key: str, default=None)
+set_config(key: str, value: Any, type: str = "string")
 ```
 
-## 4. Fluxo de Funcionamento
+As configurações são cacheadas (ex: por 5 minutos) para evitar acesso ao banco a cada requisição.
 
-### 4.1 Diagrama de Componentes
+---
+
+## 7. Diagramas de Arquitetura e Fluxos (enriquecidos)
+
+### 7.1 Visão Geral da Plataforma
 
 ```mermaid
-graph TD
-    A[Modelo SQLAlchemy + anotação] -->|decorator| B[CrudConfig anexado à classe]
-    B --> C[CRUDService genérica]
-    C --> D[Geração de Blueprint WEB]
-    C --> E[Geração de Blueprint API]
-    D --> F[Registro em create_app]
-    E --> F
-    F --> G[Aplicação Flask]
-    B -.-> H[Templates dinâmicos]
-    H --> F
+graph TB
+    subgraph "Camada de Apresentação (Templates + JS)"
+        A[base.html]
+        B[manage.html]
+        C[model_builder.html]
+        D[playground.html]
+        E[tasks.html]
+        F[config.html]
+    end
+
+    subgraph "Blueprints (Controllers)"
+        G[controller/bookstore/*]
+        H[controller/admin/*]
+        I[api/routes/core/builder/*]
+    end
+
+    subgraph "Camada de Serviços"
+        J[services/bookstore/*]
+        K[services/admin/*]
+        L[CRUDService Genérico (futuro)]
+    end
+
+    subgraph "Persistência"
+        M[(SQLite/PostgreSQL)]
+        N[model/*.py]
+    end
+
+    subgraph "Ferramentas de Geração"
+        O[utils/generate_from_model.py]
+        P[Model Builder Visual]
+        Q[API Playground → Geração]
+    end
+
+    A --> B
+    B --> G
+    C --> H
+    D --> I
+    E --> H
+    F --> H
+
+    G --> J
+    H --> K
+    I --> K
+
+    J --> N
+    K --> N
+    N --> M
+
+    O -.-> N
+    P -.-> O
+    Q -.-> P
 ```
 
-### 4.2 Fluxo de Criação de um Novo CRUD
+### 7.2 Fluxo de Criação de um Novo Modelo via Interface Visual
 
 ```mermaid
 sequenceDiagram
-    participant Dev as Desenvolvedor
-    participant Model as Modelo (ex: Book)
-    participant CRUDB as Módulo crud_base
-    participant App as create_app()
-
-    Dev->>Model: 1. Escreve modelo SQLAlchemy
-    Dev->>Model: 2. Aplica @crud_model com configuração
-    Model->>CRUDB: 3. Decorator guarda config na classe
-    App->>CRUDB: 4. Chama generate_blueprint(Book)
-    CRUDB->>CRUDB: 5. Cria CRUDService para o modelo
-    CRUDB->>App: 6. Retorna blueprint(s) já com rotas
-    App->>App: 7. Registra blueprint
-```
-
-### 4.3 Estrutura de Rotas Geradas (para Web)
-
-| Método | Rota                     | Ação principal                              |
-|--------|--------------------------|---------------------------------------------|
-| GET    | `/books`                 | Listagem paginada com filtros e busca       |
-| GET    | `/books/new`             | Formulário de criação (rascunho automático) |
-| POST   | `/books`                 | Cria e publica (se não usar soft‑delete)    |
-| GET    | `/books/<id>`            | Detalhe do item                             |
-| GET    | `/books/<id>/edit`       | Formulário de edição                         |
-| PUT    | `/books/<id>`            | Atualiza dados (via AJAX ou formulário)     |
-| POST   | `/books/<id>/trash`      | Move para lixeira (soft‑delete)             |
-| POST   | `/books/<id>/restore`    | Restaura da lixeira                         |
-| DELETE | `/books/<id>/permanent`  | Exclusão definitiva (apenas admin)          |
-
-*Rotas API:* prefixo `/api/books` com os mesmos verbos retornando JSON.
-
-## 5. Comportamento Detalhado dos Componentes
-
-### 5.1 `CrudConfig`
-
-Armazena as seguintes informações (exemplo de propriedades):
-
-- `list_display` – lista de nomes de colunas a exibir na tabela.  
-- `search_fields` – colunas onde será feita a busca textual (LIKE).  
-- `filter_fields` – colunas que podem ser usadas em filtros por igualdade.  
-- `form_fields` – campos a renderizar no formulário de criação/edição.  
-- `file_fields` – campos que são upload de arquivo (imagem, documento).  
-- `soft_delete` – booleano: se `True`, usa um campo `status` com valores `active`, `trash`.  
-- `status_field` – nome do campo que guarda o status (padrão `status`).  
-- `templates_base` – diretório dentro de `templates` onde ficarão os arquivos `list.html`, `form.html`, `detail.html`.  
-- `url_prefix` – prefixo da URL web.  
-- `per_page` – quantidade de itens por página na listagem.  
-- `default_sort` – coluna e direção padrão para ordenação.  
-- `permissions` – dicionário com funções permitidas para cada ação (ex: `"delete": "is_admin"`).  
-
-### 5.2 Decorador `@crud_model`
-
-- Recebe uma instância de `CrudConfig`.  
-- Adiciona à classe do modelo um atributo interno `_crud_config` (ou `__crud_config__`) com essa configuração.  
-- Pode também injetar automaticamente um `CRUDService` como atributo de classe.  
-
-### 5.3 `CRUDService` Genérico
-
-Operações implementadas (usando SQLAlchemy e a configuração):
-
-- `list_items(page, per_page, search, filters, sort)` – retorna objeto paginado com os itens, respeitando soft‑delete (só exibe `active` se não for lixeira).  
-- `get_item(id)` – obtém por chave primária.  
-- `create_item(data)` – cria instância (se soft‑delete, coloca status `active` ou `draft`).  
-- `update_item(id, data)` – atualiza campos permitidos (apenas os listados em `form_fields`).  
-- `trash_item(id)` – se soft‑delete ativo, muda status para `trash` e registra data.  
-- `restore_item(id)` – restaura de `trash` para `active`.  
-- `delete_permanent(id)` – remove do banco (requer verificação de permissão).  
-- `get_form_fields_metadata()` – retorna metadados de cada campo (tipo, obrigatório, etc.) para renderização de formulário dinâmico.  
-
-### 5.4 Geração de Blueprints
-
-A função `generate_blueprint`:
-
-1. Cria um blueprint web (e outro API) usando o `url_prefix` da configuração.  
-2. Para cada rota, define o endpoint, os métodos HTTP e a função de view correspondente.  
-3. Nas views web, faz o seguinte:  
-   - Chama o `CRUDService` apropriado.  
-   - Renderiza templates com o nome base (`templates_base/list.html`, etc.).  
-   - Injeta automaticamente no contexto do template: o item (ou lista), a configuração `CrudConfig` e helpers para montar URLs de filtro/ordenação.  
-4. Nas views API, serializa os resultados usando `to_dict()` do modelo (se existir) ou um serializador padrão.  
-
-### 5.5 Templates Dinâmicos
-
-Os templates não são gerados em arquivos físicos (embora se possa gerar), mas sim **templates reutilizáveis** que dependem da configuração passada no contexto.
-
-- **`list.html`**:  
-  - Exibe tabela com colunas `list_display`.  
-  - Acima da tabela, insere barra de busca (se `search_fields` não vazio) e filtros por `filter_fields`.  
-  - Coluna de ações com botões “Ver”, “Editar”, “Lixeira” (se soft‑delete), “Restaurar” (quando na lixeira), “Excluir permanente” (para admin).  
-  - Paginação automática.  
-
-- **`form.html`**:  
-  - Itera sobre `form_fields`.  
-  - Para cada campo, descobre o tipo (string, número, data, booleano, foreign key) e renderiza o input apropriado.  
-  - Se `file_fields` contiver o campo, renderiza input do tipo file.  
-  - Inclui CSRF token e botão de submit.  
-
-- **`detail.html`**:  
-  - Exibe todos os campos (ou apenas um conjunto pré‑definido) de forma legível.  
-  - Botões de editar, mover para lixeira, etc.  
-
-## 6. Integração com a Aplicação Existente
-
-No `main.py`, dentro da função `register_core_blueprints` (ou similar), deve-se:
-
-1. Iterar por uma lista de modelos que possuem `_crud_config`.  
-2. Para cada um, chamar `generate_web_blueprint` e `generate_api_blueprint`.  
-3. Registrar ambos os blueprints na aplicação Flask.  
-
-O administrador do projeto pode optar por substituir blueprints manuais (como o `book_bp` atual) pelos gerados automaticamente, ou usá-los apenas para novos modelos.
-
-## 7. Considerações sobre Funcionalidades Específicas do Projeto
-
-- **Soft‑delete com status**: O modelo `Book` já possui `BookStatus` (draft, active, trash). O gerador deve usar `status` como campo de estado e respeitar o ciclo:  
-  - Criação → `draft` (se formulário novo) ou `active` (se publicação direta).  
-  - Publicação de rascunho → `active`.  
-  - Trash → `trash`.  
-  - Restaurar → `active`.  
-
-- **Rascunhos (drafts)**: O sistema pode ter uma rota extra `/books/drafts` ou um filtro na listagem (`?status=draft`). O gerador suporta essa distinção via `status_field` e valores predefinidos.  
-
-- **Upload de imagem de capa**: O campo `cover_url` pode ser marcado como `file_field`, fazendo o gerador tratar o upload e salvar o caminho.  
-
-- **Autorização**: As rotas geradas devem usar `@login_required` por padrão. Ações destrutivas (exclusão permanente) devem verificar `current_user.is_admin` conforme a configuração de permissões.  
-
-## 8. Personalização e Pontos de Extensão
-
-- **Validações específicas** podem ser adicionadas no próprio modelo via métodos `validate()` chamados pelo `CRUDService`.  
-- **Campos com opções fixas** (ex: `genre`) podem ser renderizados como `select` se o modelo fornecer um método `get_genre_choices()`.  
-- **Relacionamentos** (ex: `user_id`) podem ser representados como `select` carregado automaticamente do modelo relacionado.  
-- **Templates personalizados** por modelo: se existir o arquivo `templates_base/list_custom.html`, o gerador deve usá-lo em vez do genérico.  
-
-## 9. Diagrama de Sequência de uma Requisição de Listagem
-
-```mermaid
-sequenceDiagram
-    participant User as Navegador
-    participant Route as Rota /books (gerada)
-    participant Service as CRUDService
+    participant Admin as Administrador
+    participant UI as Model Builder (HTML/JS)
+    participant API as API /builder/model
+    participant Service as ModelGeneratorService
     participant DB as Banco de Dados
-    participant Template as Template list.html
+    participant FS as Sistema de Arquivos
+    participant App as Aplicação Flask
 
-    User->>Route: GET /books?search=Tolkien&page=2
-    Route->>Service: list_items(search="Tolkien", page=2)
-    Service->>DB: query com filtros e paginação
-    DB-->>Service: itens + total
-    Service-->>Route: objeto paginado
-    Route->>Template: renderiza com items, config, paginação
-    Template-->>User: HTML completo
+    Admin->>UI: Preenche formulário (nome, campos, anotações)
+    Admin->>UI: Clica em "Pré‑visualizar"
+    UI->>API: POST /builder/model/preview
+    API->>Service: gerar_preview(definição)
+    Service-->>API: código gerado (string)
+    API-->>UI: exibe preview (Ace Editor)
+    Admin->>UI: Clica em "Gerar Modelo"
+    UI->>API: POST /builder/model/generate
+    API->>Service: gerar_arquivo(definição)
+    Service->>FS: escreve model/<modulo>/<nome>.py
+    Service->>DB: salva definição (model_definition)
+    Service->>App: dispara sinal de recarga (opcional)
+    App->>App: recarrega blueprints (em desenvolvimento)
+    Service-->>API: sucesso
+    API-->>UI: modelo gerado + link para CRUD
+    UI-->>Admin: confirmação
 ```
 
-## 10. Possíveis Evoluções Futuras
-
-- **Geração de testes automáticos** a partir da configuração.  
-- **Integração com sistema de logs** para registrar ações de CRUD.  
-- **Cache** de listagens paginadas com base nos filtros.  
-- **Exportação** dos dados listados para Excel/CSV usando a mesma configuração de `list_display`.  
-
-
-
-
-
-
-
-#### Sistema de navegação revisar... 
-
-
+### 7.3 Fluxo de Execução de uma Tarefa Agendada (com aprovação)
 
 ```mermaid
-flowchart TD
-    Base[base.html] -->|extend| BookManage[books/manage.html]
-    Base -->|extend| MalteManage[maltes/manage.html]
-    Base -->|extend| UserManage[users/manage.html]
-    Base -->|extend| Outros[...]
+sequenceDiagram
+    participant Scheduler as APScheduler (job)
+    participant Service as TaskService
+    participant DB as Banco
+    participant Task as Função/HTTP/SQL
+    participant Log as TaskLog
 
-    BookManage -->|usa| CRUD_JS[crud.js]
-    MalteManage -->|usa| CRUD_JS
-    UserManage -->|usa| CRUD_JS
-
-    CRUD_JS -->|fetch| API[API /api/books, /api/maltes, ...]
+    loop a cada minuto
+        Scheduler->>Service: verificar_tarefas_vencidas()
+        Service->>DB: busca ScheduledTask com next_run <= now() AND status='active'
+        DB-->>Service: lista de tarefas
+        loop para cada tarefa
+            alt tarefa requer aprovação e aprovada
+                Service->>Task: executar (chamada, HTTP, SQL)
+                Task-->>Service: resultado
+                Service->>Log: registrar execução (sucesso/falha)
+                Service->>DB: atualizar last_run, next_run (usando croniter)
+            else tarefa pendente de aprovação
+                Service->>Log: registra "aguardando aprovação" (sem executar)
+            end
+        end
+    end
 ```
+
+---
+
+## 8. Próximos Passos (Implementação)
+
+Com base na aprovação deste backlog, a equipe deve executar na seguinte ordem:
+
+1. **Modelos de dados** (criar as tabelas `system_config`, `model_definition`, `scheduled_task`, `message_queue`, `task_log`, `query_log`).
+2. **Serviços base** (`ConfigService`, `ModelGeneratorService`).
+3. **Endpoints da API Builder** (model_builder_api, query_api, playground_api).
+4. **Interface do Model Builder** (página com editor de campos e pré‑visualização).
+5. **Interface do Playground** (SQL + API).
+6. **Integração da Geração de Modelo a partir da Resposta da API**.
+7. **Implementação do Scheduler e Worker** (APScheduler, processamento de fila).
+8. **Páginas de Tasks e Mensageria** (listagem, aprovação, dashboards gráficos).
+9. **Página de Configurações** (abas).
+
+Cada etapa será entregue com testes unitários e de integração.
+
+---
+
+## 9. Considerações Finais
+
+O Pyteca, com essa especificação, se torna uma **verdadeira plataforma RAD** que permite:
+
+- Desenvolvedores tradicionais usarem anotações nos modelos para geração instantânea de CRUDs completos.
+- Administradores ou analistas criarem novos modelos via interface visual, sem escrever código.
+- Qualquer usuário técnico testar queries SQL e APIs externas, e **gerar modelos automaticamente** a partir de respostas JSON.
+- Automatizar tarefas recorrentes (backups, integrações, envio de e-mails) com agendamento e aprovação.
+- Monitorar tudo através de dashboards elegantes e configurar o sistema sem editar arquivos.
+
+Tudo isso mantendo a flexibilidade de um framework Flask tradicional, permitindo personalização em qualquer camada.

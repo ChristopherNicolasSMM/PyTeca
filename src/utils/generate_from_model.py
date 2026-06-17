@@ -163,29 +163,83 @@ def load_classes_from_file(
 # HELPERS DE RENDERIZAÇÃO DE BLOCOS (colunas, filtros, campos)
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _build_columns_block(metadata: Dict) -> str:
-    """Gera bloco de ColumnDef(...) para o controller."""
+def _build_columns_block(metadata: Dict, model_class=None, relationship_fields: list[dict] | None = None) -> str:
+    """
+    Gera bloco de ColumnDef(...) para o controller.
+
+    Resolve automaticamente colunas que referenciam relacionamentos FK:
+    - "user.username" (com ponto)      → vira "user_username" (Jinja não resolve pontos)
+    - "author" (nome puro do relacionamento) → vira "author_name"
+    O model NÃO precisa ser editado; a normalização ocorre aqui no gerador.
+    Exige que o model tenha @property correspondente (ex: author_name, user_username).
+    """
     cols  = metadata.get("ui_listview", {}).get("columns", [])
+    rel_names = {r["name"] for r in (relationship_fields or [])}  # ex: {"author_id", "user_id", "book_id"}
+    # Nomes de relacionamento sem o sufixo _id (ex: "author", "user", "book")
+    rel_bare = {r[:-3] if r.endswith("_id") else r for r in rel_names}
+
     lines = []
     for c in cols:
         name     = c["name"]
         label    = c.get("label", name)
-        sortable = "True" if c.get("sortable") else "False"
+        sortable = c.get("sortable", False)
         width    = f'"{c["width"]}"' if c.get("width") else "None"
         align    = c.get("align", "start")
+
+        resolved_name = name
+        # Caso 1: chave com ponto, ex. "user.username" -> "user_username"
+        if "." in name:
+            resolved_name = name.replace(".", "_")
+            sortable = False  # relacionamento nunca é sortable direto
+        # Caso 2: nome puro de relacionamento, ex. "author" -> "author_name"
+        elif name in rel_bare or (model_class and hasattr(model_class, name)
+                                   and name not in (metadata.get("ui_form", {}).get("fields", []) or [])
+                                   and _looks_like_relationship(model_class, name)):
+            resolved_name = f"{name}_name"
+            sortable = False
+
+        sortable_str = "True" if sortable else "False"
         lines.append(
-            f'        ColumnDef("{name}", "{label}", '
-            f'sortable={sortable}, width={width}, align="{align}")'
+            f'        ColumnDef("{resolved_name}", "{label}", '
+            f'sortable={sortable_str}, width={width}, align="{align}")'
         )
     return ",\n".join(lines) if lines else '        ColumnDef("id", "ID", sortable=True)'
 
 
-def _build_filters_block(metadata: Dict) -> str:
-    """Gera bloco de FilterDef(...) para o controller."""
+def _looks_like_relationship(model_class, field_name: str) -> bool:
+    """Verifica se um atributo do model é um relacionamento SQLAlchemy (não uma coluna)."""
+    try:
+        from sqlalchemy.orm import RelationshipProperty
+        attr = getattr(model_class, field_name, None)
+        if attr is None:
+            return False
+        prop = getattr(attr, "property", None)
+        return isinstance(prop, RelationshipProperty)
+    except Exception:
+        return False
+
+
+def _build_filters_block(metadata: Dict, model_class=None) -> str:
+    """
+    Gera bloco de FilterDef(...) para o controller.
+    Filtros cujo campo já está marcado com @choices no model são OMITIDOS aqui —
+    o controller gerado monta esses dinamicamente via SELECT DISTINCT,
+    evitando duplicação visual (dois campos "Gênero" na tela).
+    """
     filters = metadata.get("ui_listview", {}).get("filters", [])
-    lines   = []
+    choices_field_names = set()
+    if model_class:
+        try:
+            from annotations import get_choices_fields
+            choices_field_names = {ch["field"] for ch in get_choices_fields(model_class)}
+        except Exception:
+            choices_field_names = set()
+
+    lines = []
     for f in filters:
-        name  = f["name"]
+        name = f["name"]
+        if name in choices_field_names:
+            continue  # já será gerado dinamicamente como select com @choices
         ftype = f.get("type", "text")
         label = f.get("label", name)
         ph    = f', placeholder="{f["placeholder"]}"' if f.get("placeholder") else ""
@@ -454,8 +508,8 @@ def _build_context(
         "plural":             plural,
         "label":              label,
         "default_sort":       default_sort,
-        "columns":            _build_columns_block(metadata),
-        "filters":            _build_filters_block(metadata),
+        "columns":            _build_columns_block(metadata, model_class, relationship_fields),
+        "filters":            _build_filters_block(metadata, model_class),
         "fields_rows":        _build_fields_rows(class_name_lower, form_fields_list, relationship_fields, enum_fields),
         "form_fields":        _build_form_fields(form_fields_list, relationship_fields, enum_fields, model_class),
         "relationship_fields": relationship_fields,
