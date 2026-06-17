@@ -416,9 +416,21 @@ class TaskService:
                 coalesce=True,
             )
 
+            # Limpeza de snapshots de versionamento — só remove algo se o
+            # usuário tiver configurado retention_days ou retention_max_per_file
+            # acima de zero em SystemConfig (padrão é nunca apagar nada).
+            scheduler.add_job(
+                func=lambda: cls._job_cleanup_snapshots(app),
+                trigger=IntervalTrigger(hours=24),
+                id="cleanup_snapshots",
+                replace_existing=True,
+                max_instances=1,
+                coalesce=True,
+            )
+
             scheduler.start()
             app._scheduler = scheduler
-            logger.info("APScheduler iniciado com sucesso (process_queue=15s, run_due_tasks=60s).")
+            logger.info("APScheduler iniciado com sucesso (process_queue=15s, run_due_tasks=60s, cleanup_snapshots=24h).")
 
         except ImportError:
             logger.warning(
@@ -456,6 +468,23 @@ class TaskService:
                     cls._execute_task(task)
             except Exception as e:
                 logger.error("Erro no job run_due_tasks: %s", e)
+
+    @classmethod
+    def _job_cleanup_snapshots(cls, app) -> None:
+        """
+        Job periódico (24h): aplica a política de retenção de CodeSnapshot
+        configurada em SystemConfig. Por padrão (retention_days=0,
+        retention_max_per_file=0) este job não remove nada — só age quando
+        o usuário explicitamente configurar um limite.
+        """
+        with app.app_context():
+            try:
+                from utils.versioning import cleanup_old_snapshots
+                removed = cleanup_old_snapshots()
+                if removed:
+                    logger.info("Limpeza de snapshots: %d removidos.", removed)
+            except Exception as e:
+                logger.error("Erro no job cleanup_snapshots: %s", e)
 
     @classmethod
     def _sync_scheduler(cls, task: ScheduledTask) -> None:

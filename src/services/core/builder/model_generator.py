@@ -231,6 +231,8 @@ class ModelGenerator:
 
         # Encadeia a pipeline completa: controller + service + routes + templates
         try:
+            from utils.versioning import start_generation_run
+            start_generation_run(model_name=model_def.name, triggered_by="ui:model_builder")
             generate(str(file_path), theme="standard", overwrite=False, add_to_root_menu=True)
         except Exception as e:
             return {

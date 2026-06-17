@@ -42,11 +42,13 @@ def create_app():
 
     from db.database import init_db
     from utils.dev_setup import ensure_dev_admin
+    from utils.ensure_default_config import ensure_default_system_config
 
     init_db(app)
 
     with app.app_context():
-        ensure_dev_admin()
+        ensure_default_system_config()  # roda em qualquer ambiente, aditivo
+        ensure_dev_admin()              # roda só em DEV (ver dev_setup.py)
 
     login_manager = LoginManager()
     login_manager.init_app(app)
