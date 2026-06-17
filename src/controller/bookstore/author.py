@@ -101,11 +101,14 @@ def _get_choices_filters(service: AuthorService) -> list[FilterDef]:
     """
     Constrói FilterDefs com SELECT DISTINCT para campos @choices.
     Chamado DENTRO de list() — já dentro do app context com DB disponível.
+    Campos que já existem em SMART_LIST_CONFIG.filters são substituídos (não duplicados).
     """
+    existing_names = {f.name for f in SMART_LIST_CONFIG.filters}
     filters = []
     for ch in _CHOICES_META:
         field = ch["field"]
         label = ch["label"]
+        # Pula se já existe como filtro estático (será substituído)
         try:
             options = service.distinct_values(field)
         except Exception:
@@ -133,36 +136,46 @@ def list():
         (user_layout or {}).get("per_page", SMART_LIST_CONFIG.default_page_size),
     ))
 
+    # ── Filtros @choices (SELECT DISTINCT) — lazy, dentro do app context ──────
+    choices_filters = _get_choices_filters(service)
+
+    # Mescla: filtros @choices substituem filtros estáticos com mesmo nome
+    if choices_filters:
+        from copy import copy
+        choices_names  = {f.name for f in choices_filters}
+        base_filters   = [f for f in SMART_LIST_CONFIG.filters if f.name not in choices_names]
+        cfg_with_choices = copy(SMART_LIST_CONFIG)
+        cfg_with_choices.filters = base_filters + choices_filters
+    else:
+        cfg_with_choices = SMART_LIST_CONFIG
+
+    # Coleta valores dos filtros @choices da query string
+    extra_filters = {
+        ch["field"]: request.args.get(ch["field"], "").strip() or None
+        for ch in _CHOICES_META
+    }
+    extra_filters = {k: v for k, v in extra_filters.items() if v}
+
     service = AuthorService()
     result  = service.list(
         page=int(request.args.get("page", 1)),
         per_page=per_page,
         status=status,
         search=request.args.get("search", "").strip() or None,
-        sort=request.args.get("sort", SMART_LIST_CONFIG.default_sort),
-        direction=request.args.get("dir", SMART_LIST_CONFIG.default_dir),
+        sort=request.args.get("sort", cfg_with_choices.default_sort),
+        direction=request.args.get("dir", cfg_with_choices.default_dir),
+        extra_filters=extra_filters,
     )
 
     if export in ("csv", "excel", "pdf"):
-        all_result  = service.list(page=1, per_page=10_000, status=status)
+        all_result   = service.list(page=1, per_page=10_000, status=status, extra_filters=extra_filters)
         visible_cols = (user_layout or {}).get("columns") or None
         if export == "csv":
-            return export_csv(SMART_LIST_CONFIG, all_result.items, visible_cols)
+            return export_csv(cfg_with_choices, all_result.items, visible_cols)
         if export == "excel":
-            return export_excel(SMART_LIST_CONFIG, all_result.items, visible_cols)
+            return export_excel(cfg_with_choices, all_result.items, visible_cols)
         if export == "pdf":
-            return export_pdf(SMART_LIST_CONFIG, all_result.items, visible_cols, title="Autoress")
-
-    # ── Filtros @choices (SELECT DISTINCT) — lazy, dentro do app context ──────
-    choices_filters = _get_choices_filters(service)
-
-    # Injeta filtros @choices no config para o renderer os incluir
-    if choices_filters:
-        from copy import copy
-        cfg_with_choices = copy(SMART_LIST_CONFIG)
-        cfg_with_choices.filters = SMART_LIST_CONFIG.filters + choices_filters
-    else:
-        cfg_with_choices = SMART_LIST_CONFIG
+            return export_pdf(cfg_with_choices, all_result.items, visible_cols, title="Autoress")
 
     renderer = SmartListRenderer(cfg_with_choices)
     sl = renderer.build_context(

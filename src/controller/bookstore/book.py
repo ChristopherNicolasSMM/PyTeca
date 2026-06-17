@@ -3,7 +3,7 @@ from __future__ import annotations
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
-from annotations import get_model_metadata, get_choices_fields
+from annotations import get_model_metadata
 from utils.generate_from_model import _get_relationship_fields
 from model.bookstore.book import Book, BookStatus
 from model.core.user_layout_pref import UserLayoutPref
@@ -13,7 +13,7 @@ from utils.smart_list.export import export_csv, export_excel, export_pdf
 
 book_bp = Blueprint("books", __name__, url_prefix="/books")
 
-# ── Configuração SmartList (estática — sem queries de banco) ──────────────────
+# ── Configuração SmartList ────────────────────────────────────────────────────
 
 SMART_LIST_CONFIG = SmartListConfig(
     list_id="books",
@@ -38,7 +38,8 @@ SMART_LIST_CONFIG = SmartListConfig(
     export_filename="books",
 )
 
-# ── Helpers de metadados (executados no import — só leem o mapper, sem DB) ────
+# ── Enum, date e campos obrigatórios ─────────────────────────────────────────
+# Detectados automaticamente via metadados do modelo para uso no template do modal
 
 def _get_enum_fields():
     """Detecta campos Enum do modelo para gerar <select> no modal."""
@@ -47,9 +48,9 @@ def _get_enum_fields():
     from enum import EnumMeta
     import inspect
 
-    result   = []
+    result = []
     metadata = get_model_metadata(Book)
-    form_fields  = metadata.get("ui_form", {}).get("fields", [])
+    form_fields = metadata.get("ui_form", {}).get("fields", [])
     model_module = inspect.getmodule(Book)
 
     for field_name in form_fields:
@@ -94,29 +95,9 @@ def _get_required_fields():
     ]
 
 
-# Executados no import — seguros pois só leem o mapper SQLAlchemy (sem query)
 ENUM_FIELDS     = _get_enum_fields()
 DATE_FIELDS     = _get_date_fields()
 REQUIRED_FIELDS = _get_required_fields()
-_CHOICES_META   = get_choices_fields(Book)  # lista de {field, label, order}
-
-
-def _get_choices_filters(service: BookService) -> list[FilterDef]:
-    """
-    Constrói FilterDefs com SELECT DISTINCT para campos @choices.
-    Chamado DENTRO de list() — já dentro do app context com DB disponível.
-    """
-    filters = []
-    for ch in _CHOICES_META:
-        field = ch["field"]
-        label = ch["label"]
-        try:
-            options = service.distinct_values(field)
-        except Exception:
-            options = []
-        filters.append(FilterDef(name=field, label=label, type="select", options=options))
-    return filters
-
 
 # ── Listagem ──────────────────────────────────────────────────────────────────
 
@@ -137,38 +118,56 @@ def list():
         (user_layout or {}).get("per_page", SMART_LIST_CONFIG.default_page_size),
     ))
 
+    # Filtros @choices — campos com select distinct (genre, language, etc.)
+    _choices_fields = ["genre"]  # atualizar se adicionar @choices no model
+    extra_filters = {
+        f: request.args.get(f, "").strip() or None
+        for f in _choices_fields
+        if request.args.get(f, "").strip()
+    }
+
+    # @choices substitui filtros estáticos com mesmo nome no SmartListConfig
+    from utils.smart_list import FilterDef
+    from copy import copy
+    choices_filters = []
     service = BookService()
-    result  = service.list(
+    for field in _choices_fields:
+        try:
+            opts = service.distinct_values(field)
+        except Exception:
+            opts = []
+        choices_filters.append(FilterDef(
+            name=field,
+            label=field.replace("_", " ").title(),
+            type="select",
+            options=opts
+        ))
+
+    cfg = copy(SMART_LIST_CONFIG)
+    choices_names = {f.name for f in choices_filters}
+    cfg.filters   = [f for f in SMART_LIST_CONFIG.filters if f.name not in choices_names] + choices_filters
+
+    result = service.list(
         page=int(request.args.get("page", 1)),
         per_page=per_page,
         status=status,
         search=request.args.get("search", "").strip() or None,
-        sort=request.args.get("sort", SMART_LIST_CONFIG.default_sort),
-        direction=request.args.get("dir", SMART_LIST_CONFIG.default_dir),
+        sort=request.args.get("sort", cfg.default_sort),
+        direction=request.args.get("dir", cfg.default_dir),
+        extra_filters=extra_filters,
     )
 
     if export in ("csv", "excel", "pdf"):
-        all_result  = service.list(page=1, per_page=10_000, status=status)
+        all_result = service.list(page=1, per_page=10_000, status=status, extra_filters=extra_filters)
         visible_cols = (user_layout or {}).get("columns") or None
         if export == "csv":
-            return export_csv(SMART_LIST_CONFIG, all_result.items, visible_cols)
+            return export_csv(cfg, all_result.items, visible_cols)
         if export == "excel":
-            return export_excel(SMART_LIST_CONFIG, all_result.items, visible_cols)
+            return export_excel(cfg, all_result.items, visible_cols)
         if export == "pdf":
-            return export_pdf(SMART_LIST_CONFIG, all_result.items, visible_cols, title="Livross")
+            return export_pdf(cfg, all_result.items, visible_cols, title="Livros")
 
-    # ── Filtros @choices (SELECT DISTINCT) — lazy, dentro do app context ──────
-    choices_filters = _get_choices_filters(service)
-
-    # Injeta filtros @choices no config para o renderer os incluir
-    if choices_filters:
-        from copy import copy
-        cfg_with_choices = copy(SMART_LIST_CONFIG)
-        cfg_with_choices.filters = SMART_LIST_CONFIG.filters + choices_filters
-    else:
-        cfg_with_choices = SMART_LIST_CONFIG
-
-    renderer = SmartListRenderer(cfg_with_choices)
+    renderer = SmartListRenderer(cfg)
     sl = renderer.build_context(
         items=result.items,
         total=result.total,
@@ -177,7 +176,7 @@ def list():
     )
 
     metadata = get_model_metadata(Book)
-    form_fields_list    = metadata.get("ui_form", {}).get("fields", [])
+    form_fields_list  = metadata.get("ui_form", {}).get("fields", [])
     relationship_fields = _get_relationship_fields(Book)
 
     return render_template(

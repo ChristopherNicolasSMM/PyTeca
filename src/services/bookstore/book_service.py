@@ -40,25 +40,6 @@ try:
 except Exception:
     _SORTABLE = {"id"}
 
-# Status de lixeira — usa "trash" se o Enum não tiver TRASH
-_TRASH_STATUS: str = getattr(BookStatus, "TRASH", type("_", (), {"value": "trash"})()).value     if hasattr(BookStatus, "TRASH") else "trash"
-
-
-def _is_trash(obj) -> bool:
-    """Verifica se o objeto está na lixeira, independente do tipo do status."""
-    val = obj.status
-    if hasattr(val, "value"):
-        return val.value == _TRASH_STATUS
-    return str(val) == _TRASH_STATUS
-
-
-def _set_trash(obj) -> None:
-    """Define status como lixeira de forma segura."""
-    try:
-        obj.status = BookStatus(_TRASH_STATUS)
-    except (ValueError, KeyError):
-        obj.status = _TRASH_STATUS
-
 
 def _parse_date(value: Any) -> datetime | None:
     """Converte string de data para datetime. Aceita ISO, BR e datetime nativo."""
@@ -129,6 +110,7 @@ class BookService:
         search: str | None = None,
         sort: str = "id",
         direction: str = "asc",
+        extra_filters: dict | None = None,
     ) -> BookListResult:
 
         query = Book.query
@@ -146,6 +128,12 @@ class BookService:
             search_filters.append(Author.name.ilike(pattern))
             if search_filters:
                 query = query.filter(or_(*search_filters))
+
+        # ── Filtros extras (@choices: genre, language, publisher, etc.) ───────
+        for field, value in (extra_filters or {}).items():
+            if value and hasattr(Book, field):
+                col = getattr(Book, field)
+                query = query.filter(col == value)
 
         # Ordena apenas por colunas diretas; ignora relacionamentos para evitar NotImplementedError
         if sort not in _SORTABLE:
@@ -235,7 +223,7 @@ class BookService:
         obj = self.get_by_id(id)
         if not obj:
             return ServiceResult(success=False, error="Registro não encontrado.", code=404)
-        if _is_trash(obj):
+        if obj.status == BookStatus.TRASH:
             return ServiceResult(success=False, error="Não é possível editar um registro na lixeira.", code=400)
         self._apply_fields(obj, data)
         try:
@@ -250,9 +238,9 @@ class BookService:
         obj = self.get_by_id(id)
         if not obj:
             return ServiceResult(success=False, error="Não encontrado.", code=404)
-        if _is_trash(obj):
+        if obj.status == BookStatus.TRASH:
             return ServiceResult(success=False, error="Já está na lixeira.", code=400)
-        _set_trash(obj)
+        obj.status = BookStatus.TRASH
         obj.trashed_at = datetime.now(timezone.utc)
         obj.updated_at = datetime.now(timezone.utc)
         db.session.commit()
@@ -262,12 +250,9 @@ class BookService:
         obj = self.get_by_id(id)
         if not obj:
             return ServiceResult(success=False, error="Não encontrado.", code=404)
-        if not _is_trash(obj):
+        if obj.status != BookStatus.TRASH:
             return ServiceResult(success=False, error="Não está na lixeira.", code=400)
-        try:
-            obj.status = BookStatus.ACTIVE
-        except (ValueError, KeyError):
-            obj.status = "active"
+        obj.status = BookStatus.ACTIVE
         obj.trashed_at = None
         obj.updated_at = datetime.now(timezone.utc)
         db.session.commit()
@@ -277,7 +262,7 @@ class BookService:
         obj = self.get_by_id(id)
         if not obj:
             return ServiceResult(success=False, error="Não encontrado.", code=404)
-        if not _is_trash(obj):
+        if obj.status != BookStatus.TRASH:
             return ServiceResult(
                 success=False,
                 error="Apenas registros na lixeira podem ser excluídos permanentemente.",
@@ -303,26 +288,6 @@ class BookService:
         return ServiceResult(success=True, data={"id": id})
 
     # ── Helpers ───────────────────────────────────────────────────────────────
-
-
-    def distinct_values(self, field: str) -> list[tuple[str, str]]:
-        """
-        Retorna valores distintos de uma coluna para popular filtros select.
-        Usado por campos marcados com @choices no model.
-        """
-        from sqlalchemy import distinct, cast, String
-        try:
-            col = getattr(Book, field)
-            rows = (
-                db.session.query(distinct(col))
-                .filter(col.isnot(None), col != "")
-                .order_by(col)
-                .all()
-            )
-            return [(str(r[0]), str(r[0])) for r in rows if r[0]]
-        except Exception as e:
-            logger.warning("distinct_values falhou para campo '%s': %s", field, e)
-            return []
 
     def _apply_fields(self, obj: Book, data: dict, strict: bool = True) -> None:
         """

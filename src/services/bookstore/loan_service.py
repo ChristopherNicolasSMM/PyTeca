@@ -40,25 +40,6 @@ try:
 except Exception:
     _SORTABLE = {"id"}
 
-# Status de lixeira — usa "trash" se o Enum não tiver TRASH
-_TRASH_STATUS: str = getattr(LoanStatus, "TRASH", type("_", (), {"value": "trash"})()).value     if hasattr(LoanStatus, "TRASH") else "trash"
-
-
-def _is_trash(obj) -> bool:
-    """Verifica se o objeto está na lixeira, independente do tipo do status."""
-    val = obj.status
-    if hasattr(val, "value"):
-        return val.value == _TRASH_STATUS
-    return str(val) == _TRASH_STATUS
-
-
-def _set_trash(obj) -> None:
-    """Define status como lixeira de forma segura."""
-    try:
-        obj.status = LoanStatus(_TRASH_STATUS)
-    except (ValueError, KeyError):
-        obj.status = _TRASH_STATUS
-
 
 def _parse_date(value: Any) -> datetime | None:
     """Converte string de data para datetime. Aceita ISO, BR e datetime nativo."""
@@ -129,6 +110,7 @@ class LoanService:
         search: str | None = None,
         sort: str = "id",
         direction: str = "asc",
+        extra_filters: dict | None = None,
     ) -> LoanListResult:
 
         query = Loan.query
@@ -149,6 +131,12 @@ class LoanService:
             search_filters.append(Book.title.ilike(pattern))
             if search_filters:
                 query = query.filter(or_(*search_filters))
+
+        # ── Filtros extras (campos @choices como genre, language, etc.) ───────
+        for field, value in (extra_filters or {}).items():
+            if value and hasattr(Loan, field):
+                col = getattr(Loan, field)
+                query = query.filter(col == value)
 
         # Ordena apenas por colunas diretas; ignora relacionamentos para evitar NotImplementedError
         if sort not in _SORTABLE:
@@ -238,7 +226,7 @@ class LoanService:
         obj = self.get_by_id(id)
         if not obj:
             return ServiceResult(success=False, error="Registro não encontrado.", code=404)
-        if _is_trash(obj):
+        if obj.status == LoanStatus.TRASH:
             return ServiceResult(success=False, error="Não é possível editar um registro na lixeira.", code=400)
         self._apply_fields(obj, data)
         try:
@@ -253,9 +241,9 @@ class LoanService:
         obj = self.get_by_id(id)
         if not obj:
             return ServiceResult(success=False, error="Não encontrado.", code=404)
-        if _is_trash(obj):
+        if obj.status == LoanStatus.TRASH:
             return ServiceResult(success=False, error="Já está na lixeira.", code=400)
-        _set_trash(obj)
+        obj.status = LoanStatus.TRASH
         obj.trashed_at = datetime.now(timezone.utc)
         obj.updated_at = datetime.now(timezone.utc)
         db.session.commit()
@@ -265,12 +253,9 @@ class LoanService:
         obj = self.get_by_id(id)
         if not obj:
             return ServiceResult(success=False, error="Não encontrado.", code=404)
-        if not _is_trash(obj):
+        if obj.status != LoanStatus.TRASH:
             return ServiceResult(success=False, error="Não está na lixeira.", code=400)
-        try:
-            obj.status = LoanStatus.ACTIVE
-        except (ValueError, KeyError):
-            obj.status = "active"
+        obj.status = LoanStatus.ACTIVE
         obj.trashed_at = None
         obj.updated_at = datetime.now(timezone.utc)
         db.session.commit()
@@ -280,7 +265,7 @@ class LoanService:
         obj = self.get_by_id(id)
         if not obj:
             return ServiceResult(success=False, error="Não encontrado.", code=404)
-        if not _is_trash(obj):
+        if obj.status != LoanStatus.TRASH:
             return ServiceResult(
                 success=False,
                 error="Apenas registros na lixeira podem ser excluídos permanentemente.",
@@ -306,26 +291,6 @@ class LoanService:
         return ServiceResult(success=True, data={"id": id})
 
     # ── Helpers ───────────────────────────────────────────────────────────────
-
-
-    def distinct_values(self, field: str) -> list[tuple[str, str]]:
-        """
-        Retorna valores distintos de uma coluna para popular filtros select.
-        Usado por campos marcados com @choices no model.
-        """
-        from sqlalchemy import distinct, cast, String
-        try:
-            col = getattr(Loan, field)
-            rows = (
-                db.session.query(distinct(col))
-                .filter(col.isnot(None), col != "")
-                .order_by(col)
-                .all()
-            )
-            return [(str(r[0]), str(r[0])) for r in rows if r[0]]
-        except Exception as e:
-            logger.warning("distinct_values falhou para campo '%s': %s", field, e)
-            return []
 
     def _apply_fields(self, obj: Loan, data: dict, strict: bool = True) -> None:
         """

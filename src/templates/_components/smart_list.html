@@ -160,7 +160,7 @@
 </div>{# /toolbar #}
 
 {# ── Tabela ────────────────────────────────────────────────────────────────── #}
-<div class="table-responsive">
+<div class="table-responsive" id="sl-table-wrap-{{ sl.config.list_id }}">
   <table class="table table-hover align-middle sl-table"
          id="sl-table-{{ sl.config.list_id }}"
          data-list-id="{{ sl.config.list_id }}">
@@ -254,20 +254,17 @@
     </tbody>
   </table>
 </div>{# /table-responsive #}
-
-{# Toast de feedback de filtro #}
-<div id="sl-toast-{{ sl.config.list_id }}"
-     class="toast align-items-center border-0 position-fixed bottom-0 end-0 m-3"
-     role="alert" aria-atomic="true" style="z-index:9999;">
+{# Toast de feedback AJAX #}
+<div id="sl-toast-{{ sl.config.list_id }}" class="toast align-items-center border-0 position-fixed bottom-0 end-0 m-3" role="alert" style="z-index:9999;">
   <div class="d-flex">
-    <div class="toast-body" id="sl-toast-msg-{{ sl.config.list_id }}"></div>
+    <div class="toast-body fw-semibold" id="sl-toast-msg-{{ sl.config.list_id }}"></div>
     <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast"></button>
   </div>
 </div>
 
+<div id="sl-pagination-{{ sl.config.list_id }}">
 {# ── Paginação ─────────────────────────────────────────────────────────────── #}
 {% if sl.pages > 1 %}
-<div id="sl-pagination-{{ sl.config.list_id }}">
 <nav aria-label="Paginação {{ sl.config.list_id }}">
   <ul class="pagination pagination-sm justify-content-center mb-0 flex-wrap">
 
@@ -445,71 +442,64 @@
   };
 
 
-  /* ── AJAX Filter ─────────────────────────────────────────────────────── */
+  /* ── AJAX Filter ──────────────────────────────────────────────────────── */
   window.slFilterSubmit = function (form) {
     if (!form) return;
-    var listId = (form.id || "").replace("sl-filter-form-", "");
-    var params  = new URLSearchParams(new FormData(form));
-    params.set("page", "1");
-    // Remove parâmetros vazios
-    for (var [k, v] of [...params.entries()]) {
-      if (v === "") params.delete(k);
-    }
-    var url = window.location.pathname + "?" + params.toString();
+    var listId = (form.id || '').replace('sl-filter-form-', '');
+    var params = new URLSearchParams();
+    // Coleta todos os inputs/selects do form que têm valor
+    form.querySelectorAll('input[name], select[name]').forEach(function (el) {
+      if (el.value && el.value.trim()) params.set(el.name, el.value.trim());
+    });
+    params.set('page', '1');
+    var url = window.location.pathname + '?' + params.toString();
 
-    // Loading state
-    var wrap = document.getElementById("sl-table-wrap-" + listId);
-    if (wrap) wrap.style.opacity = "0.5";
+    var wrap = document.getElementById('sl-table-wrap-' + listId);
+    var pag  = document.getElementById('sl-pagination-' + listId);
+    if (wrap) wrap.style.opacity = '0.45';
 
-    fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } })
+    fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
       .then(function (r) { return r.text(); })
       .then(function (html) {
-        var parser = new DOMParser();
-        var doc    = parser.parseFromString(html, "text/html");
-
-        // Substitui tbody
-        var newWrap = doc.getElementById("sl-table-wrap-" + listId);
-        if (newWrap && wrap) wrap.innerHTML = newWrap.innerHTML;
-
-        // Substitui paginação
-        var pagOld = document.getElementById("sl-pagination-" + listId);
-        var pagNew = doc.getElementById("sl-pagination-" + listId);
-        if (pagOld && pagNew) pagOld.innerHTML = pagNew.innerHTML;
-
-        // Atualiza URL sem reload
-        window.history.pushState({}, "", url);
-
-        // Verifica se resultado é vazio e mostra toast
-        if (wrap && wrap.querySelector("tbody tr td[colspan]")) {
-          slShowToast(listId, "Nenhum registro encontrado para os filtros aplicados.", "warning");
+        var doc    = new DOMParser().parseFromString(html, 'text/html');
+        var newWrap = doc.getElementById('sl-table-wrap-' + listId);
+        var newPag  = doc.getElementById('sl-pagination-' + listId);
+        if (newWrap && wrap) wrap.outerHTML = newWrap.outerHTML;
+        if (newPag  && pag)  pag.outerHTML  = newPag.outerHTML;
+        window.history.pushState({}, '', url);
+        // Re-fetch after DOM update (outerHTML replaced elements)
+        var wrapNow = document.getElementById('sl-table-wrap-' + listId);
+        if (wrapNow) wrapNow.style.opacity = '1';
+        // Toast se não há registros
+        var tbody = document.querySelector('#sl-table-wrap-' + listId + ' tbody');
+        var hasEmpty = tbody && tbody.querySelector('td[colspan]');
+        if (hasEmpty) {
+          slShowToast(listId, 'Nenhum registro encontrado para os filtros aplicados.', 'warning');
         }
-
-        if (wrap) wrap.style.opacity = "1";
       })
-      .catch(function () {
-        if (wrap) wrap.style.opacity = "1";
-        slShowToast(listId, "Erro ao filtrar. Tente novamente.", "danger");
+      .catch(function (err) {
+        if (wrap) wrap.style.opacity = '1';
+        slShowToast(listId, 'Erro ao aplicar filtro. Tente novamente.', 'danger');
       });
   };
 
-  /* ── Toast helper ────────────────────────────────────────────────────── */
+  /* ── Toast helper ─────────────────────────────────────────────────────── */
   window.slShowToast = function (listId, msg, type) {
-    var toast    = document.getElementById("sl-toast-" + listId);
-    var toastMsg = document.getElementById("sl-toast-msg-" + listId);
-    if (!toast || !toastMsg) return;
-    toastMsg.textContent = msg;
-    toast.className = "toast align-items-center border-0 position-fixed bottom-0 end-0 m-3 text-bg-" + (type || "info");
-    var bsToast = bootstrap.Toast.getOrCreateInstance(toast, { delay: 3500 });
-    bsToast.show();
+    var el  = document.getElementById('sl-toast-' + listId);
+    var txt = document.getElementById('sl-toast-msg-' + listId);
+    if (!el || !txt) return;
+    txt.textContent = msg;
+    el.className = 'toast align-items-center border-0 position-fixed bottom-0 end-0 m-3 text-bg-' + (type || 'info');
+    bootstrap.Toast.getOrCreateInstance(el, { delay: 3500 }).show();
   };
 
-  /* ── Submete com Enter nos campos de texto ───────────────────────────── */
-  document.addEventListener("keydown", function (e) {
-    if (e.key !== "Enter") return;
-    var input = e.target.closest(".sl-filter-group input");
-    if (!input) return;
+  /* ── Enter em campos de texto dispara filtro AJAX ─────────────────────── */
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter') return;
+    var inp = e.target.closest('.sl-filter-group input[type="text"]');
+    if (!inp) return;
     e.preventDefault();
-    slFilterSubmit(input.closest("form"));
+    slFilterSubmit(inp.closest('form'));
   });
 
   /* ── Limpar filtro individual ────────────────────────────────────────── */
@@ -520,7 +510,7 @@
     var form  = btn.closest("form");
     if (!form) return;
     var input = form.querySelector("[name='" + field + "']");
-    if (input) { input.value = ""; slFilterSubmit(form); }
+    if (input) { input.value = ''; slFilterSubmit(form); }
   });
 
   /* ── Mudança de per_page ─────────────────────────────────────────────── */
