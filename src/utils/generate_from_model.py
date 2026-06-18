@@ -540,22 +540,6 @@ def _write_file(path: Path, content: str, overwrite: bool = False) -> bool:
     path.write_text(content, encoding="utf-8")
     action = "atualizado" if path.exists() else "gerado"
     print(f"  ✓ {path}")
-
-    # ── Versionamento ──────────────────────────────────────────────────────
-    # Integração num único ponto: nenhum .j2 precisa saber que isso existe.
-    # Falha em versionar nunca deve impedir a geração do arquivo em si —
-    # por isso o try/except silencioso (com aviso) em vez de propagar.
-    try:
-        from utils.versioning import snapshot_if_needed
-        from model.core.admin.code_snapshot import SnapshotOrigin
-        snapshot_if_needed(
-            file_path=str(path),
-            new_content=content,
-            origin=SnapshotOrigin.GENERATED,
-        )
-    except Exception as e:
-        print(f"  ⚠  Versionamento não aplicado para {path}: {e}")
-
     return True
 
 
@@ -831,20 +815,6 @@ def _run_generation(
         return
 
     print(f"  📄 Processando: {file_path}")
-
-    # Inicia o agrupamento de versionamento desta execução — todos os
-    # arquivos escritos a partir daqui (controller, service, templates)
-    # compartilham o mesmo generation_run_id.
-    # Se um chamador externo (ex: Model Builder UI) já iniciou um run
-    # antes de chamar generate(), respeitamos esse contexto em vez de
-    # sobrescrever — permite diferenciar "cli:generate" de "ui:model_builder"
-    # sem mudar a assinatura pública de generate().
-    try:
-        from utils.versioning import start_generation_run, _current_run_id
-        if _current_run_id.get() is None:
-            start_generation_run(model_name=file_path.stem, triggered_by="cli:generate")
-    except Exception:
-        pass  # versionamento é aditivo; nunca bloqueia a geração
     
     # Carrega classes do arquivo
     classes = load_classes_from_file(str(file_path), class_name_filter)
@@ -878,6 +848,15 @@ def _run_generation(
         if plural_override:
             metadata["plural"] = plural_override
         final_plural = metadata.get("plural", cls_name.lower() + "s")
+
+        # ── Sincronização de permissões (Camada 1 + Camada 2) ──────────────
+        # Código lidera, banco segue: nunca cria nada manualmente via UI.
+        # Falha em sincronizar nunca bloqueia a geração do CRUD em si.
+        try:
+            from utils.permissions_sync import sync_model_permissions
+            sync_model_permissions(cls, final_plural)
+        except Exception as e:
+            print(f"  ⚠  Sincronização de permissões não aplicada: {e}")
 
         generate_controller(str(file_path), cls_name, final_plural, metadata, loader,
                             overwrite, model_class=cls, output_subdir=output_subdir)

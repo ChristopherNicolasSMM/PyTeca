@@ -42,13 +42,11 @@ def create_app():
 
     from db.database import init_db
     from utils.dev_setup import ensure_dev_admin
-    from utils.ensure_default_config import ensure_default_system_config
 
     init_db(app)
 
     with app.app_context():
-        ensure_default_system_config()  # roda em qualquer ambiente, aditivo
-        ensure_dev_admin()              # roda só em DEV (ver dev_setup.py)
+        ensure_dev_admin()
 
     login_manager = LoginManager()
     login_manager.init_app(app)
@@ -59,9 +57,22 @@ def create_app():
     @login_manager.user_loader
     def load_user(user_id):
         from db.database import db
-        from  model.core.user import User
+        from model.core.user import User
+        from model.core.role import Role
+        from sqlalchemy.orm import joinedload
 
-        return db.session.get(User, int(user_id))
+        # Eager load de roles + permissions: sem isso, cada chamada de
+        # has_permission() ao longo do request dispara novas queries
+        # lazy (N+1) — uma página com vários decorators @permission_required
+        # checando ações diferentes multiplicaria o custo. Carregando aqui,
+        # uma única vez por request, current_user.roles[].permissions já
+        # vem pronto em memória.
+        return (
+            db.session.query(User)
+            .options(joinedload(User.roles).joinedload(Role.permissions))
+            .filter(User.id == int(user_id))
+            .first()
+        )
 
     CORS(app)
 

@@ -173,3 +173,51 @@ def choices(field: str, label: str | None = None, order: str = "asc"):
 def get_choices_fields(cls) -> list[dict]:
     """Retorna a lista de campos com @choices definidos."""
     return getattr(cls, '_choices_fields', [])
+
+
+# ---- @permission: Camada 2 (granularidade de negócio) ----
+def permission(action: str, role_required: str | None = None, description: str | None = None):
+    """
+    Declara que uma ação de negócio deste model exige uma permissão específica.
+
+    Diferente da Camada 1 (rota, automática — toda rota gerada já recebe
+    @permission_required("<plural>.<acao>")), esta anotação serve para
+    ações que não mapeiam 1:1 para uma rota, ou quando você quer atribuir
+    uma permissão a um papel específico já no momento da geração.
+
+    Uso no model:
+        @permission("trash", role_required="librarian",
+                     description="Mover livro para a lixeira")
+        @permission("delete_permanent", role_required="admin")
+        class Book(db.Model):
+            ...
+
+    Fluxo (código lidera, banco segue):
+        1. Você escreve @permission(...) no model.
+        2. Ao rodar `generate`, o gerador sincroniza automaticamente uma
+           linha em `permissions` (cria se não existir, nunca duplica).
+        3. Se role_required for informado e o Role já existir, a
+           associação Role<->Permission também é garantida.
+        4. A UI de Admin Roles NUNCA cria Permission do zero — ela só
+           lê o que o código gerou e permite associar a outros Roles
+           ou atribuir Roles a usuários.
+
+    O nome da permissão sincronizada segue o padrão "<plural>.<action>",
+    ex: "books.trash", "books.delete_permanent" — mesmo padrão da Camada 1,
+    para nunca haver dois formatos de nome de permissão coexistindo.
+    """
+    def decorator(cls):
+        if not hasattr(cls, '_permissions'):
+            cls._permissions = []
+        cls._permissions.append({
+            "action": action,
+            "role_required": role_required,
+            "description": description or f"Permite '{action}' em {cls.__name__}",
+        })
+        return cls
+    return decorator
+
+
+def get_permissions_meta(cls) -> list[dict]:
+    """Retorna a lista de permissões de negócio (@permission) declaradas no model."""
+    return getattr(cls, '_permissions', [])

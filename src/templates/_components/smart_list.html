@@ -101,8 +101,8 @@
 
     {# Contador de registros #}
     {% if sl.config.show_count %}
-    <span class="badge bg-secondary sl-count-badge" title="Total de registros">
-      <i class="bi bi-list-ul me-1"></i>{{ sl.total }}
+    <span class="badge bg-secondary sl-count-badge" id="sl-count-{{ sl.config.list_id }}" title="Total de registros">
+      <i class="bi bi-list-ul me-1"></i><span class="sl-count-value">{{ sl.total }}</span>
     </span>
     {% endif %}
 
@@ -467,6 +467,12 @@
         if (newWrap && wrap) wrap.outerHTML = newWrap.outerHTML;
         if (newPag  && pag)  pag.outerHTML  = newPag.outerHTML;
         window.history.pushState({}, '', url);
+
+        // Atualiza o badge de contagem com o total retornado pelo servidor
+        var newCount = doc.querySelector('#sl-count-' + listId + ' .sl-count-value');
+        var curCount = document.querySelector('#sl-count-' + listId + ' .sl-count-value');
+        if (newCount && curCount) curCount.textContent = newCount.textContent;
+
         // Re-fetch after DOM update (outerHTML replaced elements)
         var wrapNow = document.getElementById('sl-table-wrap-' + listId);
         if (wrapNow) wrapNow.style.opacity = '1';

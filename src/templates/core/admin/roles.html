@@ -1,0 +1,606 @@
+{% extends "core/base.html" %}
+
+{% block title %}Usuários e Papéis{% endblock %}
+
+{% block content %}
+<div class="pagetitle">
+  <h1>Usuários e Papéis</h1>
+  <nav>
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{{ url_for('web.dashboard') }}">Home</a></li>
+      <li class="breadcrumb-item active">Usuários e Papéis</li>
+    </ol>
+  </nav>
+</div>
+
+<section class="section">
+  <div class="row g-3">
+
+    <!-- ══════════════════════════════════════════════════════════════
+         Papéis (Roles)
+    ═══════════════════════════════════════════════════════════════ -->
+    <div class="col-lg-5">
+      <div class="card">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <h5 class="card-title mb-0">Papéis</h5>
+            <button class="btn btn-sm btn-primary" id="btnNewRole">
+              <i class="bi bi-plus-lg me-1"></i>Novo Papel
+            </button>
+          </div>
+
+          <div id="rolesList" class="list-group">
+            <div class="text-center text-muted py-3">Carregando...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════
+         Detalhe do papel selecionado — permissões associadas
+    ═══════════════════════════════════════════════════════════════ -->
+    <div class="col-lg-7">
+      <div class="card h-100">
+        <div class="card-body">
+          <div id="roleDetailEmpty" class="text-muted text-center my-5">
+            <i class="bi bi-shield-lock" style="font-size:2.5rem;opacity:.3;"></i>
+            <p class="mt-2 mb-0">Selecione um papel à esquerda para gerenciar suas permissões.</p>
+          </div>
+
+          <div id="roleDetailWrap" class="d-none">
+            <div class="d-flex justify-content-between align-items-start mb-3">
+              <div>
+                <h5 class="mb-0" id="roleDetailName"></h5>
+                <small class="text-muted" id="roleDetailDescription"></small>
+              </div>
+              <button class="btn btn-sm btn-outline-danger" id="btnDeleteRole">
+                <i class="bi bi-trash3 me-1"></i>Remover papel
+              </button>
+            </div>
+
+            <div class="mb-2 d-flex align-items-center gap-2">
+              <input type="text" class="form-control form-control-sm" id="permFilter"
+                     placeholder="Filtrar permissões... (ex: books, loans, admin)">
+            </div>
+
+            <div class="table-responsive" style="max-height:480px;overflow-y:auto;">
+              <table class="table table-sm table-hover align-middle">
+                <thead class="sticky-top">
+                  <tr>
+                    <th style="width:36px;"></th>
+                    <th>Permissão</th>
+                    <th>Descrição</th>
+                  </tr>
+                </thead>
+                <tbody id="permTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════
+         Usuários — cadastro, edição e atribuição de papéis
+    ═══════════════════════════════════════════════════════════════ -->
+    <div class="col-12">
+      <div class="card">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <h5 class="card-title mb-0">Usuários</h5>
+            <button class="btn btn-sm btn-primary" id="btnNewUser">
+              <i class="bi bi-person-plus me-1"></i>Novo Usuário
+            </button>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle">
+              <thead>
+                <tr>
+                  <th>Login</th>
+                  <th>Nome completo</th>
+                  <th>E-mail</th>
+                  <th>Celular</th>
+                  <th>Admin</th>
+                  <th>Status</th>
+                  <th>Papéis</th>
+                  <th class="text-end">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="usersTableBody">
+                <tr><td colspan="8" class="text-center text-muted py-3">Carregando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- Modal: criar/editar usuário -->
+<div class="modal fade" id="userFormModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="userFormTitle">Novo Usuário</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="ufId">
+
+        <div class="alert alert-danger d-none" id="ufErrors"></div>
+
+        <h6 class="text-muted">Identidade</h6>
+        <div class="row g-2 mb-3">
+          <div class="col-md-4">
+            <label class="form-label small">Login (usuário) *</label>
+            <input type="text" class="form-control form-control-sm" id="ufUsername">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small">Nickname *</label>
+            <input type="text" class="form-control form-control-sm" id="ufNome">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small">Senha <span id="ufPasswordHint" class="text-muted">*</span></label>
+            <input type="password" class="form-control form-control-sm" id="ufPassword" placeholder="">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small">Nome completo *</label>
+            <input type="text" class="form-control form-control-sm" id="ufNomeCompleto">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label small">E-mail *</label>
+            <input type="email" class="form-control form-control-sm" id="ufEmail">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label small">Celular *</label>
+            <input type="text" class="form-control form-control-sm" id="ufCelular" placeholder="(11) 99999-9999">
+          </div>
+        </div>
+
+        <h6 class="text-muted">Documento (opcional)</h6>
+        <div class="row g-2 mb-3">
+          <div class="col-md-4">
+            <label class="form-label small">CPF</label>
+            <input type="text" class="form-control form-control-sm" id="ufCpf" placeholder="000.000.000-00">
+          </div>
+        </div>
+
+        <h6 class="text-muted">Endereço (opcional)</h6>
+        <div class="row g-2 mb-3">
+          <div class="col-md-7">
+            <label class="form-label small">Rua</label>
+            <input type="text" class="form-control form-control-sm" id="ufRua">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label small">Número</label>
+            <input type="text" class="form-control form-control-sm" id="ufNumero">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label small">Complemento</label>
+            <input type="text" class="form-control form-control-sm" id="ufComplemento">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small">Bairro</label>
+            <input type="text" class="form-control form-control-sm" id="ufBairro">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small">Cidade</label>
+            <input type="text" class="form-control form-control-sm" id="ufCidade">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label small">UF</label>
+            <input type="text" class="form-control form-control-sm" id="ufUf" maxlength="2" placeholder="SP">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label small">CEP</label>
+            <input type="text" class="form-control form-control-sm" id="ufCep" placeholder="00000-000">
+          </div>
+        </div>
+
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" id="ufIsAdmin">
+          <label class="form-check-label" for="ufIsAdmin">Administrador (acesso irrestrito)</label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-primary" id="btnSaveUser">Salvar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: novo papel -->
+<div class="modal fade" id="newRoleModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Novo Papel</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">Nome</label>
+          <input type="text" class="form-control" id="newRoleName" placeholder="ex: librarian">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Descrição</label>
+          <input type="text" class="form-control" id="newRoleDescription" placeholder="opcional">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-primary" id="btnSaveNewRole">Criar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: atribuir papel a usuário -->
+<div class="modal fade" id="assignRoleModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Atribuir Papel</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="assignUserId">
+        <p class="mb-2">Usuário: <strong id="assignUserName"></strong></p>
+        <select class="form-select" id="assignRoleSelect"></select>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-primary" id="btnConfirmAssign">Atribuir</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  'use strict';
+
+  const API = '/api/admin/roles';
+  let allRoles = [];
+  let allPermissions = [];
+  let selectedRoleId = null;
+
+  // ── Carrega papéis ──────────────────────────────────────────────────────
+  async function loadRoles() {
+    const res  = await fetch(`${API}/`);
+    const data = await res.json();
+    allRoles = data.roles || [];
+    renderRolesList();
+  }
+
+  function renderRolesList() {
+    const box = document.getElementById('rolesList');
+    if (!allRoles.length) {
+      box.innerHTML = '<div class="text-center text-muted py-3">Nenhum papel criado ainda.</div>';
+      return;
+    }
+    box.innerHTML = allRoles.map(r => `
+      <button type="button" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center ${r.id === selectedRoleId ? 'active' : ''}"
+              onclick="window.selectRole(${r.id})">
+        <span>
+          <strong>${r.name}</strong>
+          ${r.description ? `<br><small class="${r.id === selectedRoleId ? '' : 'text-muted'}">${r.description}</small>` : ''}
+        </span>
+        <span class="badge ${r.id === selectedRoleId ? 'bg-light text-dark' : 'bg-secondary'}">${r.permissions.length}</span>
+      </button>
+    `).join('');
+  }
+
+  // ── Carrega permissões disponíveis (somente leitura, vêm do código) ────
+  async function loadPermissions() {
+    const res  = await fetch(`${API}/permissions`);
+    const data = await res.json();
+    allPermissions = data.permissions || [];
+  }
+
+  // ── Seleciona papel e mostra suas permissões ────────────────────────────
+  window.selectRole = function (roleId) {
+    selectedRoleId = roleId;
+    renderRolesList();
+    renderRoleDetail();
+  };
+
+  function renderRoleDetail() {
+    const role = allRoles.find(r => r.id === selectedRoleId);
+    document.getElementById('roleDetailEmpty').classList.toggle('d-none', !!role);
+    document.getElementById('roleDetailWrap').classList.toggle('d-none', !role);
+    if (!role) return;
+
+    document.getElementById('roleDetailName').textContent = role.name;
+    document.getElementById('roleDetailDescription').textContent = role.description || '';
+
+    const assignedIds = new Set(role.permissions.map(p => p.id));
+    const filterVal = (document.getElementById('permFilter').value || '').toLowerCase();
+
+    const grouped = {};
+    allPermissions
+      .filter(p => !filterVal || p.name.toLowerCase().includes(filterVal) || (p.description || '').toLowerCase().includes(filterVal))
+      .forEach(p => {
+        grouped[p.group] = grouped[p.group] || [];
+        grouped[p.group].push(p);
+      });
+
+    const tbody = document.getElementById('permTableBody');
+    const groupNames = Object.keys(grouped).sort();
+    if (!groupNames.length) {
+      tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted py-3">Nenhuma permissão encontrada.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = groupNames.map(group => `
+      <tr class="table-light"><td colspan="3"><strong>${group}</strong></td></tr>
+      ${grouped[group].map(p => `
+        <tr>
+          <td>
+            <input type="checkbox" class="form-check-input" ${assignedIds.has(p.id) ? 'checked' : ''}
+                   onchange="window.togglePermission(${role.id}, ${p.id}, this.checked)">
+          </td>
+          <td><code>${p.name}</code></td>
+          <td><small class="text-muted">${p.description || ''}</small></td>
+        </tr>
+      `).join('')}
+    `).join('');
+  }
+
+  document.getElementById('permFilter').addEventListener('input', renderRoleDetail);
+
+  window.togglePermission = async function (roleId, permId, checked) {
+    const method = checked ? 'POST' : 'DELETE';
+    const res  = await fetch(`${API}/${roleId}/permissions/${permId}`, { method });
+    const data = await res.json();
+    if (data.success) {
+      const idx = allRoles.findIndex(r => r.id === roleId);
+      if (idx >= 0) allRoles[idx] = data.role;
+      renderRolesList();
+    }
+  };
+
+  // ── Novo papel ───────────────────────────────────────────────────────────
+  const newRoleModal = new bootstrap.Modal(document.getElementById('newRoleModal'));
+  document.getElementById('btnNewRole').addEventListener('click', () => newRoleModal.show());
+
+  document.getElementById('btnSaveNewRole').addEventListener('click', async () => {
+    const name = document.getElementById('newRoleName').value.trim();
+    const description = document.getElementById('newRoleDescription').value.trim();
+    if (!name) { alert('Informe um nome.'); return; }
+
+    const res  = await fetch(`${API}/`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, description }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      newRoleModal.hide();
+      document.getElementById('newRoleName').value = '';
+      document.getElementById('newRoleDescription').value = '';
+      await loadRoles();
+      window.selectRole(data.role.id);
+    } else {
+      alert(data.error);
+    }
+  });
+
+  // ── Remover papel ───────────────────────────────────────────────────────
+  document.getElementById('btnDeleteRole').addEventListener('click', async () => {
+    if (!selectedRoleId) return;
+    const role = allRoles.find(r => r.id === selectedRoleId);
+    if (!confirm(`Remover o papel '${role.name}'? Usuários com este papel perderão as permissões associadas a ele.`)) return;
+
+    const res  = await fetch(`${API}/${selectedRoleId}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (data.success) {
+      selectedRoleId = null;
+      await loadRoles();
+      renderRoleDetail();
+      await loadUsers();
+    } else {
+      alert(data.error);
+    }
+  });
+
+  // ── Usuários ─────────────────────────────────────────────────────────────
+  let allUsers = [];
+
+  async function loadUsers() {
+    const res  = await fetch(`${API}/users`);
+    const data = await res.json();
+    allUsers = data.users || [];
+    renderUsersTable();
+  }
+
+  function renderUsersTable() {
+    const tbody = document.getElementById('usersTableBody');
+    if (!allUsers.length) {
+      tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">Nenhum usuário.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = allUsers.map(u => `
+      <tr>
+        <td>${u.username}</td>
+        <td>${u.nome_completo || '—'}</td>
+        <td><small class="text-muted">${u.email || '—'}</small></td>
+        <td><small>${u.celular || '—'}</small></td>
+        <td>${u.is_admin ? '<span class="badge bg-danger">Admin</span>' : '<span class="text-muted">—</span>'}</td>
+        <td>${u.is_active ? '<span class="badge bg-success">Ativo</span>' : '<span class="badge bg-secondary">Inativo</span>'}</td>
+        <td>
+          ${(u.roles || []).map(r => `
+            <span class="badge bg-secondary me-1">
+              ${r.name}
+              <a href="#" class="text-white text-decoration-none ms-1" onclick="window.revokeRole(${u.id}, ${r.id}); return false;" title="Revogar">×</a>
+            </span>
+          `).join('') || '<span class="text-muted">—</span>'}
+        </td>
+        <td class="text-end text-nowrap">
+          <button class="btn btn-sm btn-outline-secondary" onclick="window.openEditUserModal(${u.id})" title="Editar">
+            <i class="bi bi-pencil"></i>
+          </button>
+          <button class="btn btn-sm btn-outline-primary" onclick="window.openAssignModal(${u.id}, '${u.username}')" title="Atribuir papel">
+            <i class="bi bi-plus-lg"></i>
+          </button>
+          ${u.is_active
+            ? `<button class="btn btn-sm btn-outline-warning" onclick="window.toggleUserActive(${u.id}, false)" title="Desativar"><i class="bi bi-slash-circle"></i></button>`
+            : `<button class="btn btn-sm btn-outline-success" onclick="window.toggleUserActive(${u.id}, true)" title="Ativar"><i class="bi bi-check-circle"></i></button>`}
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  const assignRoleModal = new bootstrap.Modal(document.getElementById('assignRoleModal'));
+
+  window.openAssignModal = function (userId, username) {
+    document.getElementById('assignUserId').value = userId;
+    document.getElementById('assignUserName').textContent = username;
+    const select = document.getElementById('assignRoleSelect');
+    select.innerHTML = allRoles.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
+    assignRoleModal.show();
+  };
+
+  document.getElementById('btnConfirmAssign').addEventListener('click', async () => {
+    const userId = document.getElementById('assignUserId').value;
+    const roleId = document.getElementById('assignRoleSelect').value;
+    const res  = await fetch(`${API}/users/${userId}/roles/${roleId}`, { method: 'POST' });
+    const data = await res.json();
+    if (data.success) {
+      assignRoleModal.hide();
+      await loadUsers();
+    } else {
+      alert(data.error);
+    }
+  });
+
+  window.revokeRole = async function (userId, roleId) {
+    if (!confirm('Revogar este papel do usuário?')) return;
+    const res  = await fetch(`${API}/users/${userId}/roles/${roleId}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (data.success) await loadUsers();
+  };
+
+  // ── Criar/editar usuário ────────────────────────────────────────────────
+  const USERS_API = '/api/admin/users';
+  const userFormModal = new bootstrap.Modal(document.getElementById('userFormModal'));
+
+  function clearUserForm() {
+    ['ufId', 'ufUsername', 'ufNome', 'ufNomeCompleto', 'ufEmail', 'ufCelular',
+     'ufPassword', 'ufCpf', 'ufRua', 'ufNumero', 'ufComplemento', 'ufBairro',
+     'ufCidade', 'ufUf', 'ufCep'].forEach(id => { document.getElementById(id).value = ''; });
+    document.getElementById('ufIsAdmin').checked = false;
+    document.getElementById('ufErrors').classList.add('d-none');
+  }
+
+  document.getElementById('btnNewUser').addEventListener('click', () => {
+    clearUserForm();
+    document.getElementById('userFormTitle').textContent = 'Novo Usuário';
+    document.getElementById('ufPasswordHint').textContent = '*';
+    document.getElementById('ufUsername').disabled = false;
+    userFormModal.show();
+  });
+
+  window.openEditUserModal = async function (userId) {
+    clearUserForm();
+    const res  = await fetch(`${USERS_API}/${userId}`);
+    const data = await res.json();
+    if (!data.success) { alert(data.error); return; }
+
+    const u = data.user;
+    document.getElementById('userFormTitle').textContent = `Editar: ${u.username}`;
+    document.getElementById('ufPasswordHint').textContent = '(deixe em branco para manter a atual)';
+    document.getElementById('ufId').value = u.id;
+    document.getElementById('ufUsername').value = u.username || '';
+    document.getElementById('ufNome').value = u.nome || '';
+    document.getElementById('ufNomeCompleto').value = u.nome_completo || '';
+    document.getElementById('ufEmail').value = u.email || '';
+    document.getElementById('ufCelular').value = u.celular || '';
+    document.getElementById('ufCpf').value = u.cpf || '';
+    document.getElementById('ufRua').value = u.endereco_rua || '';
+    document.getElementById('ufNumero').value = u.endereco_numero || '';
+    document.getElementById('ufComplemento').value = u.endereco_complemento || '';
+    document.getElementById('ufBairro').value = u.endereco_bairro || '';
+    document.getElementById('ufCidade').value = u.endereco_cidade || '';
+    document.getElementById('ufUf').value = u.endereco_uf || '';
+    document.getElementById('ufCep').value = u.endereco_cep || '';
+    document.getElementById('ufIsAdmin').checked = !!u.is_admin;
+
+    userFormModal.show();
+  };
+
+  function showUserFormErrors(errors) {
+    const box = document.getElementById('ufErrors');
+    if (!errors || !errors.length) { box.classList.add('d-none'); return; }
+    box.innerHTML = '<strong>Corrija antes de salvar:</strong><ul class="mb-0 mt-1">' +
+      errors.map(e => `<li>${e}</li>`).join('') + '</ul>';
+    box.classList.remove('d-none');
+  }
+
+  document.getElementById('btnSaveUser').addEventListener('click', async () => {
+    const id = document.getElementById('ufId').value;
+    const isUpdate = !!id;
+
+    const payload = {
+      username: document.getElementById('ufUsername').value.trim(),
+      nome: document.getElementById('ufNome').value.trim(),
+      nome_completo: document.getElementById('ufNomeCompleto').value.trim(),
+      email: document.getElementById('ufEmail').value.trim(),
+      celular: document.getElementById('ufCelular').value.trim(),
+      cpf: document.getElementById('ufCpf').value.trim(),
+      endereco_rua: document.getElementById('ufRua').value.trim(),
+      endereco_numero: document.getElementById('ufNumero').value.trim(),
+      endereco_complemento: document.getElementById('ufComplemento').value.trim(),
+      endereco_bairro: document.getElementById('ufBairro').value.trim(),
+      endereco_cidade: document.getElementById('ufCidade').value.trim(),
+      endereco_uf: document.getElementById('ufUf').value.trim(),
+      endereco_cep: document.getElementById('ufCep').value.trim(),
+      is_admin: document.getElementById('ufIsAdmin').checked,
+    };
+    const password = document.getElementById('ufPassword').value;
+    if (password) payload.password = password;
+
+    const url    = isUpdate ? `${USERS_API}/${id}` : `${USERS_API}/`;
+    const method = isUpdate ? 'PUT' : 'POST';
+
+    const btn = document.getElementById('btnSaveUser');
+    btn.disabled = true;
+    try {
+      const res  = await fetch(url, {
+        method, headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        showUserFormErrors(data.errors || [data.error]);
+        return;
+      }
+      userFormModal.hide();
+      await loadUsers();
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  window.toggleUserActive = async function (userId, activate) {
+    const action = activate ? 'activate' : 'deactivate';
+    if (!activate && !confirm('Desativar este usuário? Ele não conseguirá mais fazer login.')) return;
+    const res  = await fetch(`${USERS_API}/${userId}/${action}`, { method: 'POST' });
+    const data = await res.json();
+    if (data.success) await loadUsers();
+    else alert(data.error);
+  };
+
+  // ── Init ─────────────────────────────────────────────────────────────────
+  (async function init() {
+    await loadPermissions();
+    await loadRoles();
+    await loadUsers();
+  })();
+})();
+</script>
+{% endblock %}

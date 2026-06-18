@@ -23,13 +23,32 @@ class User(UserMixin, db.Model):
     is_admin = Column(Boolean, default=False)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-    # Campos de perfil
-    nome = Column(String(120))
-    nome_completo = Column(String(255))
+
+    # ── Identidade (obrigatórios) ───────────────────────────────────────────
+    # `nome` já era usado em todo o projeto como nickname/nome de exibição
+    # curto (header, saudações) — mantido o mesmo nome de coluna para não
+    # quebrar nenhum template ou serviço existente.
+    nome = Column(String(120), nullable=False)               # nickname
+    nome_completo = Column(String(255), nullable=False)        # nome completo
+    celular = Column(String(20), nullable=False)               # obrigatório (diferente de `telefone`, que é opcional/fixo)
+
+    # ── Identidade (opcionais) ───────────────────────────────────────────────
+    cpf = Column(String(14), unique=True, nullable=True)        # formatado: 000.000.000-00; validado via utils.validators
+
+    # ── Endereço completo (opcional, campos separados) ─────────────────────
+    endereco_rua = Column(String(255), nullable=True)
+    endereco_numero = Column(String(20), nullable=True)
+    endereco_complemento = Column(String(120), nullable=True)
+    endereco_bairro = Column(String(120), nullable=True)
+    endereco_cidade = Column(String(120), nullable=True)
+    endereco_uf = Column(String(2), nullable=True)
+    endereco_cep = Column(String(10), nullable=True)
+
+    # ── Campos de perfil (já existentes, sem alteração) ─────────────────────
     empresa = Column(String(255))
     cargo = Column(String(255))
     pais = Column(String(120))
-    endereco = Column(String(255))
+    endereco = Column(String(255))  # legado — mantido por compatibilidade; novo cadastro usa os campos separados acima
     telefone = Column(String(50))
     sobre = Column(Text)
     twitter = Column(String(255))
@@ -57,6 +76,38 @@ class User(UserMixin, db.Model):
         """Define a senha do usuário"""
         self.password_hash = generate_password_hash(password)
 
+    def set_cpf(self, cpf: str | None) -> None:
+        """
+        Define o CPF já validando o dígito verificador e normalizando
+        o formato. Lança ValueError se o CPF for inválido — a camada
+        de serviço deve capturar isso e devolver um erro 422 amigável,
+        nunca deixar propagar como 500.
+        """
+        from utils.validators import validate_cpf, format_cpf
+
+        if not cpf:
+            self.cpf = None
+            return
+        if not validate_cpf(cpf):
+            raise ValueError("CPF inválido.")
+        self.cpf = format_cpf(cpf)
+
+    @property
+    def endereco_completo(self) -> str:
+        """Endereço formatado para exibição — usa os campos separados."""
+        if not self.endereco_rua:
+            return "—"
+        parts = [self.endereco_rua]
+        if self.endereco_numero:
+            parts.append(f"nº {self.endereco_numero}")
+        if self.endereco_complemento:
+            parts.append(self.endereco_complemento)
+        line1 = ", ".join(parts)
+        line2_parts = [p for p in [self.endereco_bairro, self.endereco_cidade, self.endereco_uf] if p]
+        line2 = " - ".join(line2_parts)
+        cep = f"CEP {self.endereco_cep}" if self.endereco_cep else ""
+        return " | ".join(p for p in [line1, line2, cep] if p)
+
     def check_password(self, password):
         """Verifica se a senha está correta"""
         return check_password_hash(self.password_hash, password)
@@ -74,6 +125,10 @@ class User(UserMixin, db.Model):
         return self.check_password(password)
     
     def has_permission(self, permission_name):
+        # is_admin é tratado como "tem todas as permissões" (fix18) —
+        # único ponto de decisão de autorização, sem caminhos paralelos.
+        if self.is_admin:
+            return True
         for role in self.roles:
             for perm in role.permissions:
                 if perm.name == permission_name:
@@ -92,6 +147,15 @@ class User(UserMixin, db.Model):
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "nome": self.nome,
             "nome_completo": self.nome_completo,
+            "celular": self.celular,
+            "cpf": self.cpf,
+            "endereco_rua": self.endereco_rua,
+            "endereco_numero": self.endereco_numero,
+            "endereco_complemento": self.endereco_complemento,
+            "endereco_bairro": self.endereco_bairro,
+            "endereco_cidade": self.endereco_cidade,
+            "endereco_uf": self.endereco_uf,
+            "endereco_cep": self.endereco_cep,
             "empresa": self.empresa,
             "cargo": self.cargo,
             "pais": self.pais,
