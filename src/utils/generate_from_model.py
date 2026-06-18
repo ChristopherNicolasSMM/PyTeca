@@ -828,8 +828,20 @@ def _run_generation(
     loader,
     overwrite: bool,
     add_to_root_menu: bool = False,
+    only: Optional[set] = None,
 ) -> None:
-    """Executa geração para um arquivo de model."""
+    """
+    Executa geração para um arquivo de model.
+
+    `only` controla quais artefatos gerar. Valores aceitos (como set):
+        "controller", "service", "routes", "templates"
+    None = gera tudo (comportamento padrão).
+
+    Exemplos via CLI:
+        --only controller,service     → só controller e service
+        --skip html                   → tudo exceto templates HTML
+        --skip controller             → tudo exceto controller
+    """
     # Garante que o caminho é absoluto e existente
     file_path = file_path.resolve()
     if not file_path.exists():
@@ -880,14 +892,19 @@ def _run_generation(
         except Exception as e:
             print(f"  ⚠  Sincronização de permissões não aplicada: {e}")
 
-        generate_controller(str(file_path), cls_name, final_plural, metadata, loader,
+        _all = only is None
+        if _all or "controller" in only:
+            generate_controller(str(file_path), cls_name, final_plural, metadata, loader,
+                                overwrite, model_class=cls, output_subdir=output_subdir)
+        if _all or "service" in only:
+            generate_service(str(file_path), cls_name, final_plural, metadata, loader,
+                             overwrite, model_class=cls, output_subdir=output_subdir)
+        if _all or "routes" in only:
+            generate_routes(str(file_path), cls_name, final_plural, metadata, loader,
                             overwrite, model_class=cls, output_subdir=output_subdir)
-        generate_service(str(file_path), cls_name, final_plural, metadata, loader,
-                         overwrite, model_class=cls, output_subdir=output_subdir)
-        generate_routes(str(file_path), cls_name, final_plural, metadata, loader,
-                        overwrite, model_class=cls, output_subdir=output_subdir)
-        generate_templates(str(file_path), cls_name, final_plural, metadata, loader,
-                           overwrite, add_to_root_menu, model_class=cls, output_subdir=output_subdir)
+        if _all or "templates" in only:
+            generate_templates(str(file_path), cls_name, final_plural, metadata, loader,
+                               overwrite, add_to_root_menu, model_class=cls, output_subdir=output_subdir)
 
 def generate_from_config() -> None:
     """Gera CRUDs para todos os modelos listados em config.yaml."""
@@ -918,10 +935,24 @@ def generate_from_config() -> None:
         )
 
 
-def generate(model_path: str, theme: str = "standard", overwrite: bool = False, add_to_root_menu: bool = False) -> None:
+def generate(
+    model_path: str,
+    theme: str = "standard",
+    overwrite: bool = False,
+    add_to_root_menu: bool = False,
+    only: Optional[set] = None,
+) -> None:
     """
-    Gera todos os artefatos para um único arquivo de model.
-    Exemplo: generate("model/author.py") ou generate("model/bookstore/loan.py")
+    Gera artefatos para um único arquivo de model.
+
+    Parâmetros:
+        model_path      — caminho para o model (ex: "model/bookstore/book.py")
+        theme           — pasta de templates (padrão: "standard")
+        overwrite       — sobrescreve arquivos já existentes
+        add_to_root_menu — adiciona entrada no menu raiz
+        only            — set com os artefatos a gerar:
+                          {"controller", "service", "routes", "templates"}
+                          None (padrão) = gera todos
     """
     file_path = Path(model_path)
     if not file_path.exists():
@@ -929,13 +960,16 @@ def generate(model_path: str, theme: str = "standard", overwrite: bool = False, 
         return
 
     loader = get_loader(theme)
-    print(f"Tema de templates: '{theme}'  |  overwrite={overwrite}")
-    _run_generation(file_path, None, None, loader, overwrite, add_to_root_menu=add_to_root_menu)
-    
+    if only:
+        print(f"Tema: '{theme}'  |  overwrite={overwrite}  |  only={sorted(only)}")
+    else:
+        print(f"Tema de templates: '{theme}'  |  overwrite={overwrite}")
+    _run_generation(file_path, None, None, loader, overwrite,
+                    add_to_root_menu=add_to_root_menu, only=only)
+
     try:
         from api.routes.core.options_routes import refresh_options_cache
         refresh_options_cache()
         print("Cache de opções recarregado.")
     except Exception as e:
-        print(f"Não foi possível recarregar o cache: {e}")    
-    
+        print(f"Não foi possível recarregar o cache: {e}")

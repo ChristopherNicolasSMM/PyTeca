@@ -252,18 +252,49 @@ def register_cli_commands(app):
             click.echo("Falha ao conectar com o banco.", err=True)
             
     @app.cli.command("generate")
-    @click.option("--model",     "-m", default=None,       help="Caminho do model (ex: model/author.py)")
-    @click.option("--theme",     "-t", default="standard", help="Tema de templates (padrão: standard)")
-    @click.option("--overwrite", "-o", is_flag=True,       help="Sobrescreve arquivos existentes")
-    @click.option("--add-to-root-menu", is_flag=True,      help="Adiciona entrada no menu raiz")
+    @click.option("--model",          "-m", default=None,       help="Caminho do model (ex: model/author.py)")
+    @click.option("--theme",          "-t", default="standard", help="Tema de templates (padrão: standard)")
+    @click.option("--overwrite",      "-o", is_flag=True,       help="Sobrescreve arquivos existentes")
+    @click.option("--add-to-root-menu",     is_flag=True,       help="Adiciona entrada no menu raiz")
+    @click.option("--only",                 default=None,
+                  help="Gera só os artefatos listados (separados por vírgula). "
+                       "Valores: controller, service, routes, templates. "
+                       "Ex: --only controller,service")
+    @click.option("--skip",                 default=None,
+                  help="Pula os artefatos listados (separados por vírgula). "
+                       "Valores: controller, service, routes, templates. "
+                       "Atalho: --skip html equivale a --skip templates. "
+                       "Ex: --skip templates  ou  --skip html")
     @with_appcontext
-    def generate_command(model, theme, overwrite, add_to_root_menu):
+    def generate_command(model, theme, overwrite, add_to_root_menu, only, skip):
         """Gera estrutura CRUD a partir de modelos anotados."""
         from utils.generate_from_model import generate, generate_from_config
+
+        # Resolve set de artefatos a gerar
+        _all_artifacts = {"controller", "service", "routes", "templates"}
+        only_set = None
+
+        if only:
+            # --only tem prioridade sobre --skip se ambos forem informados
+            raw = {a.strip().lower() for a in only.split(",")}
+            only_set = {("templates" if a == "html" else a) for a in raw} & _all_artifacts
+            if not only_set:
+                click.echo(f"⚠  --only não reconhecido: '{only}'. Valores válidos: {', '.join(sorted(_all_artifacts))}")
+                return
+        elif skip:
+            raw = {a.strip().lower() for a in skip.split(",")}
+            skip_set = {("templates" if a == "html" else a) for a in raw} & _all_artifacts
+            if skip_set:
+                only_set = _all_artifacts - skip_set
+            else:
+                click.echo(f"⚠  --skip não reconhecido: '{skip}'. Valores válidos: {', '.join(sorted(_all_artifacts))} (ou 'html')")
+                return
+
         if model:
-            generate(model, theme=theme, overwrite=overwrite, add_to_root_menu=add_to_root_menu)
+            generate(model, theme=theme, overwrite=overwrite,
+                     add_to_root_menu=add_to_root_menu, only=only_set)
         else:
-            generate_from_config()          
+            generate_from_config()
 
 
 
