@@ -14,6 +14,20 @@ from model.bookstore.book import Book, BookStatus
 
 logger = logging.getLogger(__name__)
 
+# ── Hooks de customização (pré/pós) ──────────────────────────────────────────
+# book_service_hooks.py é criado uma única vez pelo gerador
+# e nunca sobrescrito depois — ver controller_hooks para o mesmo princípio.
+def _noop(*args, **kwargs):
+    return None
+
+try:
+    from services.bookstore import book_service_hooks as _hooks
+except ImportError:
+    _hooks = None
+
+def _hook(name):
+    return getattr(_hooks, name, _noop) if _hooks else _noop
+
 # ── Campos de data do modelo (converter string → datetime) ────────────────────
 _DATE_FIELDS: set[str] = set()
 try:
@@ -350,6 +364,8 @@ class BookService:
         from sqlalchemy import Integer
         from sqlalchemy.orm import ColumnProperty
 
+        data = _hook("pbo_apply_fields")(obj, data) or data
+
         # Monta set de campos Integer do modelo para conversão automática
         _int_fields: set[str] = set()
         for _prop in obj.__class__.__mapper__.iterate_properties:
@@ -381,5 +397,7 @@ class BookService:
                     value = None
 
             setattr(obj, key, value)
+
+        _hook("pai_apply_fields")(obj, data)
 
         obj.updated_at = datetime.now(timezone.utc)

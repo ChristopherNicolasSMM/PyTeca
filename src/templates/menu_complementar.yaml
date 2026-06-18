@@ -20,27 +20,31 @@ items:
     endpoint: "admin_config.index"
     icon: "bi-gear"
     parent: "Administração"
+    requires_permission: "admin"
 
   - name: "Tarefas"
     endpoint: "admin_tasks.index"
     icon: "bi-clock-history"
     parent: "Administração"
+    requires_permission: "admin"
 
   - name: "Model Builder"
     endpoint: "admin_model_builder.index"
     icon: "bi-code-square"
     parent: "Administração"
+    requires_permission: "admin"
 
   - name: "Playground"
     endpoint: "builder_query.index"
     icon: "bi-terminal"
     parent: "Administração"
+    requires_permission: "admin"
 
-  # Usuários: endpoint será habilitado na Fase 5 (RBAC visual)
-  # - name: "Usuários"
-  #   endpoint: "admin.users"
-  #   icon: "bi-people"
-  #   parent: "Administração"
+  - name: "Usuários e Papéis"
+    endpoint: "admin_roles.index"
+    icon: "bi-shield-lock"
+    parent: "Administração"
+    requires_permission: "admin"
 
 ###################################################################################################
 # Itens do menu "Relatórios" (subitens do pai "Relatórios")

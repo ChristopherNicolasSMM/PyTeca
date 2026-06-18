@@ -11,6 +11,23 @@ from services.bookstore.author_service import AuthorService
 from utils.smart_list import ColumnDef, FilterDef, SmartListConfig, SmartListRenderer
 from utils.smart_list.export import export_csv, export_excel, export_pdf
 
+# ── Hooks de customização (pré/pós) ──────────────────────────────────────────
+# author_hooks.py é criado uma única vez pelo gerador e nunca
+# sobrescrito depois — é o lugar certo para customizar comportamento sem
+# perder a edição ao regenerar este controller. Import tolerante: funciona
+# mesmo se o arquivo ainda não existir (geração antiga) ou se alguma função
+# específica tiver sido removida do stub.
+def _noop(*args, **kwargs):
+    return None
+
+try:
+    from controller.bookstore import author_hooks as _hooks
+except ImportError:
+    _hooks = None
+
+def _hook(name):
+    return getattr(_hooks, name, _noop) if _hooks else _noop
+
 author_bp = Blueprint("authors", __name__, url_prefix="/authors")
 
 # ── Configuração SmartList (estática — sem queries de banco) ──────────────────
@@ -124,6 +141,10 @@ def _build_choices_filters(service: "AuthorService") -> list[FilterDef]:
 @author_bp.route("/")
 @login_required
 def list():
+    early = _hook("pbo_list")(request)
+    if early is not None:
+        return early
+
     status = request.args.get("status", AuthorStatus.ACTIVE.value)
     export = request.args.get("export", "")
 
@@ -190,7 +211,7 @@ def list():
     form_fields_list    = metadata.get("ui_form", {}).get("fields", [])
     relationship_fields = _get_relationship_fields(Author)
 
-    return render_template(
+    response = render_template(
         "bookstore/authors/manage.html",
         sl=sl,
         counts=service.count_by_status(),
@@ -206,6 +227,7 @@ def list():
         plural="authors",
         output_subdir="bookstore",
     )
+    return _hook("pai_list")(response, request) or response
 
 
 # ── Detalhe ───────────────────────────────────────────────────────────────────
@@ -244,9 +266,17 @@ def detail(item_id: int):
 @login_required
 def trash(author_id: int):
     service = AuthorService()
+    obj = service.get_by_id(author_id)
+
+    early = _hook("pbo_delete")(author_id, "trash", obj)
+    if early is not None:
+        return early
+
     r = service.trash(author_id)
     flash("Movido para a lixeira." if r.success else r.error,
           "success" if r.success else "danger")
+
+    _hook("pai_delete")(author_id, "trash", obj, r)
     return redirect(request.referrer or url_for("authors.list"))
 
 
@@ -265,10 +295,19 @@ def restore(author_id: int):
 def delete_permanent(author_id: int):
     if not current_user.is_admin:
         abort(403)
+
     service = AuthorService()
+    obj = service.get_by_id(author_id)
+
+    early = _hook("pbo_delete")(author_id, "delete_permanent", obj)
+    if early is not None:
+        return early
+
     r = service.delete_permanent(author_id)
     flash("Excluído permanentemente." if r.success else r.error,
           "success" if r.success else "danger")
+
+    _hook("pai_delete")(author_id, "delete_permanent", obj, r)
     return redirect(url_for("authors.list", status="trash"))
 
 

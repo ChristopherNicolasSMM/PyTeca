@@ -682,6 +682,14 @@ def generate_controller(
     content = loader.render("controller.py.j2", ctx)
     _write_file(output_dir / f"{class_name.lower()}.py", content, overwrite)
 
+    # Hooks pré/pós — criados uma única vez, nunca sobrescritos depois.
+    try:
+        from utils.hooks_scaffold import ensure_hooks_file, CONTROLLER_HOOKS
+        if ensure_hooks_file(output_dir, class_name, class_name.lower(), "controller", CONTROLLER_HOOKS):
+            print(f"  🪝 Hooks criados: {output_dir / f'{class_name.lower()}_hooks.py'}")
+    except Exception as e:
+        print(f"  ⚠  Scaffold de hooks (controller) não aplicado: {e}")
+
 
 def generate_service(
     model_file: str,
@@ -702,6 +710,13 @@ def generate_service(
     content = loader.render("service.py.j2", ctx)
     _write_file(output_dir / f"{class_name.lower()}_service.py", content, overwrite)
 
+    try:
+        from utils.hooks_scaffold import ensure_hooks_file, SERVICE_HOOKS
+        if ensure_hooks_file(output_dir, class_name, f"{class_name.lower()}_service", "service", SERVICE_HOOKS):
+            print(f"  🪝 Hooks criados: {output_dir / f'{class_name.lower()}_service_hooks.py'}")
+    except Exception as e:
+        print(f"  ⚠  Scaffold de hooks (service) não aplicado: {e}")
+
 
 def generate_routes(
     model_file: str,
@@ -721,6 +736,13 @@ def generate_routes(
     ctx = _build_context(class_name, plural, metadata, model_class=model_class, output_subdir=output_subdir)
     content = loader.render("routes.py.j2", ctx)
     _write_file(output_dir / f"{class_name.lower()}_routes.py", content, overwrite)
+
+    try:
+        from utils.hooks_scaffold import ensure_hooks_file, ROUTES_HOOKS
+        if ensure_hooks_file(output_dir, class_name, f"{class_name.lower()}_routes", "routes (API)", ROUTES_HOOKS):
+            print(f"  🪝 Hooks criados: {output_dir / f'{class_name.lower()}_routes_hooks.py'}")
+    except Exception as e:
+        print(f"  ⚠  Scaffold de hooks (routes) não aplicado: {e}")
 
 
 def generate_templates(

@@ -11,6 +11,23 @@ from services.{{ output_subdir }}.{{ class_name_lower }}_service import {{ class
 from utils.smart_list import ColumnDef, FilterDef, SmartListConfig, SmartListRenderer
 from utils.smart_list.export import export_csv, export_excel, export_pdf
 
+# ── Hooks de customização (pré/pós) ──────────────────────────────────────────
+# {{ class_name_lower }}_hooks.py é criado uma única vez pelo gerador e nunca
+# sobrescrito depois — é o lugar certo para customizar comportamento sem
+# perder a edição ao regenerar este controller. Import tolerante: funciona
+# mesmo se o arquivo ainda não existir (geração antiga) ou se alguma função
+# específica tiver sido removida do stub.
+def _noop(*args, **kwargs):
+    return None
+
+try:
+    from controller.{{ output_subdir }} import {{ class_name_lower }}_hooks as _hooks
+except ImportError:
+    _hooks = None
+
+def _hook(name):
+    return getattr(_hooks, name, _noop) if _hooks else _noop
+
 {{ class_name_lower }}_bp = Blueprint("{{ plural }}", __name__, url_prefix="/{{ plural }}")
 
 # ── Configuração SmartList (estática — sem queries de banco) ──────────────────
@@ -122,6 +139,10 @@ def _build_choices_filters(service: "{{ class_name }}Service") -> list[FilterDef
 @{{ class_name_lower }}_bp.route("/")
 @login_required
 def list():
+    early = _hook("pbo_list")(request)
+    if early is not None:
+        return early
+
     status = request.args.get("status", {{ class_name }}Status.ACTIVE.value)
     export = request.args.get("export", "")
 
@@ -188,7 +209,7 @@ def list():
     form_fields_list    = metadata.get("ui_form", {}).get("fields", [])
     relationship_fields = _get_relationship_fields({{ class_name }})
 
-    return render_template(
+    response = render_template(
         "{{ output_subdir }}/{{ plural }}/manage.html",
         sl=sl,
         counts=service.count_by_status(),
@@ -204,6 +225,7 @@ def list():
         plural="{{ plural }}",
         output_subdir="{{ output_subdir }}",
     )
+    return _hook("pai_list")(response, request) or response
 
 
 # ── Detalhe ───────────────────────────────────────────────────────────────────
@@ -242,9 +264,17 @@ def detail(item_id: int):
 @login_required
 def trash({{ class_name_lower }}_id: int):
     service = {{ class_name }}Service()
+    obj = service.get_by_id({{ class_name_lower }}_id)
+
+    early = _hook("pbo_delete")({{ class_name_lower }}_id, "trash", obj)
+    if early is not None:
+        return early
+
     r = service.trash({{ class_name_lower }}_id)
     flash("Movido para a lixeira." if r.success else r.error,
           "success" if r.success else "danger")
+
+    _hook("pai_delete")({{ class_name_lower }}_id, "trash", obj, r)
     return redirect(request.referrer or url_for("{{ plural }}.list"))
 
 
@@ -263,10 +293,19 @@ def restore({{ class_name_lower }}_id: int):
 def delete_permanent({{ class_name_lower }}_id: int):
     if not current_user.is_admin:
         abort(403)
+
     service = {{ class_name }}Service()
+    obj = service.get_by_id({{ class_name_lower }}_id)
+
+    early = _hook("pbo_delete")({{ class_name_lower }}_id, "delete_permanent", obj)
+    if early is not None:
+        return early
+
     r = service.delete_permanent({{ class_name_lower }}_id)
     flash("Excluído permanentemente." if r.success else r.error,
           "success" if r.success else "danger")
+
+    _hook("pai_delete")({{ class_name_lower }}_id, "delete_permanent", obj, r)
     return redirect(url_for("{{ plural }}.list", status="trash"))
 
 

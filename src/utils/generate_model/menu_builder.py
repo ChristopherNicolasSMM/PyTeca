@@ -232,6 +232,34 @@ def apply_menu_customization(items: list[dict], config: dict) -> list[dict]:
 
     return filtered
 
+
+def filter_menu_by_permission(items: list[dict], user) -> list[dict]:
+    """
+    Remove itens do menu (e seus filhos) que o usuário não tem permissão
+    para ver. Só filtra itens que declaram `requires_permission` — itens
+    sem esse campo são visíveis para qualquer usuário autenticado.
+
+    Exemplo no menu_complementar.yaml:
+        - name: "Usuários e Papéis"
+          endpoint: "admin_roles.index"
+          requires_permission: "admin"
+    """
+    if not user or not getattr(user, 'is_authenticated', False):
+        return []
+    result = []
+    for item in items:
+        perm = item.get("requires_permission")
+        if perm and not user.has_permission(perm):
+            continue
+        filtered_item = dict(item)
+        if "children" in filtered_item:
+            filtered_item["children"] = filter_menu_by_permission(
+                filtered_item["children"], user
+            )
+        result.append(filtered_item)
+    return result
+
+
 #def get_full_menu() -> list[dict]:
 def get_full_menu(user_id=None):
     # 1. Verificar se existe customização salva (prioridade máxima)

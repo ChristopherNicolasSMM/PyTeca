@@ -184,11 +184,18 @@ def register_context_processors(app):
     print(50 * "=")  # Debug    
     print("Registrando context processors do menu dinâmico")
     
-    from utils.generate_model.menu_builder import get_full_menu
+    from utils.generate_model.menu_builder import get_full_menu, filter_menu_by_permission
     @app.context_processor
     def inject_dynamic_menu():
+        from flask_login import current_user
         menu_items = get_full_menu()
-        
+
+        # Filtra por requires_permission — só remove itens que declaram permissão
+        # explícita e o usuário não possui. Itens sem requires_permission aparecem
+        # para qualquer usuário autenticado (comportamento padrão).
+        if current_user.is_authenticated:
+            menu_items = filter_menu_by_permission(menu_items, current_user)
+
         def safe_url_for(endpoint, **values):
             if not endpoint:
                 return "#"
@@ -196,8 +203,8 @@ def register_context_processors(app):
                 return url_for(endpoint, **values)
             except Exception:
                 app.logger.debug("Endpoint '%s' não encontrado", endpoint)
-                return "#" 
-        return {"menu_items": menu_items, "safe_url_for": safe_url_for}    
+                return "#"
+        return {"menu_items": menu_items, "safe_url_for": safe_url_for}
     
     
     @app.context_processor

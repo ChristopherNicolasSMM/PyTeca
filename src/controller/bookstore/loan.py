@@ -11,6 +11,23 @@ from services.bookstore.loan_service import LoanService
 from utils.smart_list import ColumnDef, FilterDef, SmartListConfig, SmartListRenderer
 from utils.smart_list.export import export_csv, export_excel, export_pdf
 
+# ── Hooks de customização (pré/pós) ──────────────────────────────────────────
+# loan_hooks.py é criado uma única vez pelo gerador e nunca
+# sobrescrito depois — é o lugar certo para customizar comportamento sem
+# perder a edição ao regenerar este controller. Import tolerante: funciona
+# mesmo se o arquivo ainda não existir (geração antiga) ou se alguma função
+# específica tiver sido removida do stub.
+def _noop(*args, **kwargs):
+    return None
+
+try:
+    from controller.bookstore import loan_hooks as _hooks
+except ImportError:
+    _hooks = None
+
+def _hook(name):
+    return getattr(_hooks, name, _noop) if _hooks else _noop
+
 loan_bp = Blueprint("loans", __name__, url_prefix="/loans")
 
 # ── Configuração SmartList (estática — sem queries de banco) ──────────────────
@@ -128,6 +145,10 @@ def _build_choices_filters(service: "LoanService") -> list[FilterDef]:
 @loan_bp.route("/")
 @login_required
 def list():
+    early = _hook("pbo_list")(request)
+    if early is not None:
+        return early
+
     status = request.args.get("status", LoanStatus.ACTIVE.value)
     export = request.args.get("export", "")
 
@@ -194,7 +215,7 @@ def list():
     form_fields_list    = metadata.get("ui_form", {}).get("fields", [])
     relationship_fields = _get_relationship_fields(Loan)
 
-    return render_template(
+    response = render_template(
         "bookstore/loans/manage.html",
         sl=sl,
         counts=service.count_by_status(),
@@ -210,6 +231,7 @@ def list():
         plural="loans",
         output_subdir="bookstore",
     )
+    return _hook("pai_list")(response, request) or response
 
 
 # ── Detalhe ───────────────────────────────────────────────────────────────────
@@ -248,9 +270,17 @@ def detail(item_id: int):
 @login_required
 def trash(loan_id: int):
     service = LoanService()
+    obj = service.get_by_id(loan_id)
+
+    early = _hook("pbo_delete")(loan_id, "trash", obj)
+    if early is not None:
+        return early
+
     r = service.trash(loan_id)
     flash("Movido para a lixeira." if r.success else r.error,
           "success" if r.success else "danger")
+
+    _hook("pai_delete")(loan_id, "trash", obj, r)
     return redirect(request.referrer or url_for("loans.list"))
 
 
@@ -269,10 +299,19 @@ def restore(loan_id: int):
 def delete_permanent(loan_id: int):
     if not current_user.is_admin:
         abort(403)
+
     service = LoanService()
+    obj = service.get_by_id(loan_id)
+
+    early = _hook("pbo_delete")(loan_id, "delete_permanent", obj)
+    if early is not None:
+        return early
+
     r = service.delete_permanent(loan_id)
     flash("Excluído permanentemente." if r.success else r.error,
           "success" if r.success else "danger")
+
+    _hook("pai_delete")(loan_id, "delete_permanent", obj, r)
     return redirect(url_for("loans.list", status="trash"))
 
 
