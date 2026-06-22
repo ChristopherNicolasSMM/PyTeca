@@ -1,0 +1,1087 @@
+<!--
+  ============================================================
+  Dashboard de Mostura e Fervura — Exemplo com Nice Admin
+  ============================================================
+  Baseado no template Nice Admin do projeto PyTeca
+  https://github.com/ChristopherNicolasSMM/PyTeca
+  ============================================================
+-->
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BrewDash · Controle de Mostura e Fervura</title>
+
+  <!-- ===== Nice Admin Assets (via PyTeca/static) ===== -->
+  <!-- Bootstrap 5 + Bootstrap Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
+  <!-- Nice Admin Core CSS (estilos personalizados do template) -->
+  <link rel="stylesheet" href="https://raw.githubusercontent.com/ChristopherNicolasSMM/PyTeca/main/src/static/css/style.css">
+
+  <!-- Chart.js para gráficos -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js">
+  </script>
+
+  <style>
+    /* Ajustes específicos para o dashboard de cerveja */
+    :root {
+      --mash-color: #e67e22;
+      --boil-color: #e74c3c;
+      --step-active: #4154f1;
+      --card-bg: #ffffff;
+      --border-radius: 12px;
+      --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06);
+    }
+
+    body {
+      background: #f0f4fc;
+      font-family: "Open Sans", sans-serif;
+    }
+
+    /* Cabeçalho do dashboard */
+    .brew-header {
+      background: linear-gradient(135deg, #012970 0%, #1a3a7a 100%);
+      color: #fff;
+      padding: 18px 30px;
+      border-radius: var(--border-radius);
+      margin-bottom: 24px;
+      box-shadow: 0 4px 20px rgba(1, 41, 112, 0.25);
+    }
+    .brew-header .badge-status {
+      font-size: 0.9rem;
+      padding: 6px 16px;
+      border-radius: 30px;
+      background: rgba(255, 255, 255, 0.15);
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    .brew-header .badge-status .bi {
+      margin-right: 6px;
+    }
+    .brew-header .clock-display {
+      font-size: 1.8rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      font-family: "Nunito", sans-serif;
+    }
+    .brew-header .clock-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      opacity: 0.7;
+      letter-spacing: 1px;
+    }
+
+    /* Cards */
+    .brew-card {
+      background: var(--card-bg);
+      border-radius: var(--border-radius);
+      box-shadow: var(--shadow-sm);
+      padding: 18px 20px 20px 20px;
+      height: 100%;
+      border: 1px solid rgba(0, 0, 0, 0.03);
+      transition: transform 0.15s ease, box-shadow 0.2s ease;
+    }
+    .brew-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.07);
+    }
+    .brew-card .card-title {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #6c7a8d;
+      font-weight: 600;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .brew-card .card-title .bi {
+      font-size: 1.1rem;
+    }
+    .brew-card .value-big {
+      font-size: 2.2rem;
+      font-weight: 700;
+      font-family: "Nunito", sans-serif;
+      line-height: 1.2;
+      color: #012970;
+    }
+    .brew-card .value-big .unit {
+      font-size: 1rem;
+      font-weight: 400;
+      color: #6c7a8d;
+      margin-left: 4px;
+    }
+    .brew-card .sub-info {
+      font-size: 0.85rem;
+      color: #6c7a8d;
+      margin-top: 4px;
+    }
+    .brew-card .sub-info .bi {
+      margin-right: 4px;
+    }
+
+    /* Indicadores de status (bombas, etc) */
+    .status-dot {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      margin-right: 6px;
+      transition: background 0.3s;
+    }
+    .status-dot.on {
+      background: #2ecc71;
+      box-shadow: 0 0 8px rgba(46, 204, 113, 0.5);
+    }
+    .status-dot.off {
+      background: #e74c3c;
+      box-shadow: 0 0 8px rgba(231, 76, 60, 0.3);
+    }
+
+    /* Barras de potência */
+    .power-bar-wrap {
+      background: #eef2f7;
+      border-radius: 8px;
+      height: 10px;
+      overflow: hidden;
+      margin-top: 6px;
+    }
+    .power-bar-wrap .power-bar {
+      height: 100%;
+      border-radius: 8px;
+      transition: width 0.4s ease;
+      background: linear-gradient(90deg, #f39c12, #e67e22);
+    }
+    .power-bar-wrap .power-bar.boil-bar {
+      background: linear-gradient(90deg, #e74c3c, #c0392b);
+    }
+    .power-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      color: #555;
+      margin-top: 2px;
+    }
+
+    /* Step Controller */
+    .step-list .step-item {
+      display: flex;
+      align-items: center;
+      padding: 8px 12px;
+      border-radius: 8px;
+      margin-bottom: 6px;
+      background: #f8faff;
+      border-left: 4px solid transparent;
+      transition: all 0.2s;
+    }
+    .step-list .step-item.active {
+      background: #eef3ff;
+      border-left-color: var(--step-active);
+      font-weight: 600;
+    }
+    .step-list .step-item .step-idx {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: #dce3f0;
+      color: #34495e;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 700;
+      margin-right: 12px;
+      flex-shrink: 0;
+    }
+    .step-list .step-item.active .step-idx {
+      background: var(--step-active);
+      color: #fff;
+    }
+    .step-list .step-item .step-name {
+      flex: 1;
+      font-size: 0.9rem;
+    }
+    .step-list .step-item .step-temp {
+      font-size: 0.8rem;
+      color: #6c7a8d;
+      margin-right: 10px;
+    }
+    .step-list .step-item .step-status {
+      font-size: 0.7rem;
+      padding: 2px 10px;
+      border-radius: 20px;
+      background: #eef2f7;
+      color: #555;
+    }
+    .step-list .step-item.active .step-status {
+      background: #d4e0ff;
+      color: var(--step-active);
+    }
+
+    /* Próximos passos (mini) */
+    .next-steps .next-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 0;
+      font-size: 0.85rem;
+      border-bottom: 1px dashed #eee;
+    }
+    .next-steps .next-item:last-child {
+      border-bottom: 0;
+    }
+    .next-steps .next-item .ni-name {
+      color: #34495e;
+    }
+    .next-steps .next-item .ni-temp {
+      color: #6c7a8d;
+      font-size: 0.8rem;
+    }
+
+    /* Sinótico simplificado (P&ID visual) */
+    .synoptic {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 6px 0;
+    }
+    .synoptic .vessel {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 10px 14px;
+      background: #f8faff;
+      border-radius: 10px;
+      border: 1px solid #e9edf4;
+    }
+    .synoptic .vessel .v-icon {
+      font-size: 2rem;
+      color: #4154f1;
+      width: 48px;
+      text-align: center;
+    }
+    .synoptic .vessel .v-info {
+      flex: 1;
+    }
+    .synoptic .vessel .v-info .v-name {
+      font-weight: 600;
+      font-size: 0.9rem;
+      color: #012970;
+    }
+    .synoptic .vessel .v-info .v-temp {
+      font-size: 1.6rem;
+      font-weight: 700;
+      font-family: "Nunito", sans-serif;
+    }
+    .synoptic .vessel .v-info .v-temp .v-unit {
+      font-size: 0.9rem;
+      font-weight: 400;
+      color: #6c7a8d;
+    }
+    .synoptic .vessel .v-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .synoptic .vessel .v-actions .tag {
+      font-size: 0.7rem;
+      padding: 2px 10px;
+      border-radius: 20px;
+      background: #eef2f7;
+      color: #555;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .synoptic .vessel .v-actions .tag .bi {
+      font-size: 0.8rem;
+    }
+
+    /* Volume display */
+    .volume-display {
+      display: flex;
+      align-items: baseline;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .volume-display .vol-item {
+      text-align: center;
+    }
+    .volume-display .vol-item .vol-value {
+      font-size: 1.8rem;
+      font-weight: 700;
+      font-family: "Nunito", sans-serif;
+      color: #012970;
+    }
+    .volume-display .vol-item .vol-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      color: #6c7a8d;
+      letter-spacing: 0.5px;
+    }
+    .volume-display .vol-item .vol-delta {
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+    .volume-display .vol-item .vol-delta.neg {
+      color: #e74c3c;
+    }
+    .volume-display .vol-item .vol-delta.pos {
+      color: #2ecc71;
+    }
+
+    /* Tempo do passo */
+    .step-timer {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 6px;
+    }
+    .step-timer .timer-ring {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: #eef3ff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--step-active);
+      font-family: "Nunito", sans-serif;
+    }
+    .step-timer .timer-info {
+      flex: 1;
+    }
+    .step-timer .timer-info .timer-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      color: #6c7a8d;
+      letter-spacing: 0.5px;
+    }
+    .step-timer .timer-info .timer-progress {
+      height: 6px;
+      background: #eef2f7;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 4px;
+    }
+    .step-timer .timer-info .timer-progress .tp-fill {
+      height: 100%;
+      background: var(--step-active);
+      border-radius: 4px;
+      transition: width 0.5s ease;
+    }
+
+    /* Responsivo */
+    @media (max-width: 768px) {
+      .brew-header .clock-display {
+        font-size: 1.2rem;
+      }
+      .brew-card .value-big {
+        font-size: 1.6rem;
+      }
+      .synoptic .vessel {
+        flex-wrap: wrap;
+      }
+      .volume-display {
+        gap: 10px;
+      }
+    }
+
+    /* Scroll personalizado para gráfico */
+    .chart-container {
+      position: relative;
+      height: 200px;
+    }
+
+    /* Badge de alerta */
+    .alert-badge {
+      background: #fff3cd;
+      color: #856404;
+      padding: 2px 12px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ============================================================ -->
+  <!-- MAIN WRAPPER (estilo Nice Admin)                             -->
+  <!-- ============================================================ -->
+  <main id="main" style="margin-top: 0; padding: 20px 24px;">
+
+    <!-- ========================================================== -->
+    <!-- CABEÇALHO                                                  -->
+    <!-- ========================================================== -->
+    <div class="brew-header d-flex flex-wrap align-items-center justify-content-between">
+      <div class="d-flex align-items-center gap-3">
+        <div>
+          <h4 class="mb-0 fw-bold" style="color:#fff;">
+            <i class="bi bi-droplet me-2"></i>BrewDash
+          </h4>
+          <small style="opacity:0.7;">Mostura &amp; Fervura · Lote #042</small>
+        </div>
+        <span class="badge-status">
+          <i class="bi bi-record-fill text-success"></i> EM PRODUÇÃO
+        </span>
+      </div>
+      <div class="d-flex align-items-center gap-4 flex-wrap">
+        <div class="text-end">
+          <div class="clock-label">Tempo Total</div>
+          <div class="clock-display" id="totalTimeDisplay">01:23:45</div>
+        </div>
+        <div class="text-end">
+          <div class="clock-label">Próxima Ação</div>
+          <div class="clock-display" id="nextActionDisplay" style="font-size:1.2rem;">00:04:30</div>
+        </div>
+        <div>
+          <span class="alert-badge"><i class="bi bi-exclamation-triangle-fill me-1"></i> Verificar volume</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================================== -->
+    <!-- GRID PRINCIPAL (3 colunas no desktop, 1 no mobile)         -->
+    <!-- ========================================================== -->
+    <div class="row g-4">
+
+      <!-- ======================================================== -->
+      <!-- COLUNA ESQUERDA (SINÓTICO + SENSORES)                   -->
+      <!-- ======================================================== -->
+      <div class="col-lg-4">
+
+        <!-- BLOCO 1: SINÓTICO (P&ID simplificado) -->
+        <div class="brew-card">
+          <div class="card-title"><i class="bi bi-diagram-3"></i> Sinótico · P&amp;ID</div>
+
+          <div class="synoptic">
+            <!-- Mash Tun -->
+            <div class="vessel">
+              <div class="v-icon"><i class="bi bi-cup-hot"></i></div>
+              <div class="v-info">
+                <div class="v-name">Mash Tun <span style="font-weight:400;color:#6c7a8d;font-size:0.8rem;">(Mostura)</span></div>
+                <div class="v-temp" id="mashTempSynoptic">67.2 <span class="v-unit">°C</span></div>
+              </div>
+              <div class="v-actions">
+                <span class="tag"><span class="status-dot on" id="mashPumpDot"></span>Bomba</span>
+                <span class="tag"><i class="bi bi-fire"></i> <span id="mashPowerTag">85</span>%</span>
+              </div>
+            </div>
+
+            <!-- Kettle -->
+            <div class="vessel">
+              <div class="v-icon"><i class="bi bi-water"></i></div>
+              <div class="v-info">
+                <div class="v-name">Kettle <span style="font-weight:400;color:#6c7a8d;font-size:0.8rem;">(Fervura)</span></div>
+                <div class="v-temp" id="boilTempSynoptic">98.5 <span class="v-unit">°C</span></div>
+              </div>
+              <div class="v-actions">
+                <span class="tag"><span class="status-dot off" id="boilPumpDot"></span>Bomba</span>
+                <span class="tag"><i class="bi bi-fire"></i> <span id="boilPowerTag">0</span>%</span>
+              </div>
+            </div>
+
+            <!-- Whirlpool (extra) -->
+            <div class="vessel" style="border-color:#d5dce6;background:#fafcff;">
+              <div class="v-icon" style="color:#6c7a8d;"><i class="bi bi-arrow-repeat"></i></div>
+              <div class="v-info">
+                <div class="v-name">Whirlpool</div>
+                <div style="font-size:0.9rem;color:#6c7a8d;"><span id="whirlpoolStatus">Desligado</span> · <span id="whirlpoolTimer">0min</span></div>
+              </div>
+              <div class="v-actions">
+                <span class="tag"><span class="status-dot off" id="whirlpoolDot"></span>Status</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- BLOCO 3: SENSORES (detalhados) -->
+        <div class="brew-card mt-4">
+          <div class="card-title"><i class="bi bi-thermometer-half"></i> Sensores</div>
+          <div class="row g-3">
+            <div class="col-6">
+              <div style="font-size:0.75rem;color:#6c7a8d;">Mostura</div>
+              <div class="value-big" style="font-size:1.6rem;" id="mashTempDetail">67.2 <span class="unit">°C</span></div>
+              <div class="sub-info"><i class="bi bi-bullseye"></i> Set: <span id="mashSetpoint">67.0</span> °C</div>
+            </div>
+            <div class="col-6">
+              <div style="font-size:0.75rem;color:#6c7a8d;">Fervura</div>
+              <div class="value-big" style="font-size:1.6rem;" id="boilTempDetail">98.5 <span class="unit">°C</span></div>
+              <div class="sub-info"><i class="bi bi-bullseye"></i> Set: <span id="boilSetpoint">100.0</span> °C</div>
+            </div>
+            <div class="col-6">
+              <div style="font-size:0.75rem;color:#6c7a8d;">Pressão Mostura</div>
+              <div class="value-big" style="font-size:1.2rem;" id="pressMash">0.02 <span class="unit">bar</span></div>
+            </div>
+            <div class="col-6">
+              <div style="font-size:0.75rem;color:#6c7a8d;">Pressão Kettle</div>
+              <div class="value-big" style="font-size:1.2rem;" id="pressBoil">0.00 <span class="unit">bar</span></div>
+            </div>
+            <div class="col-12">
+              <div style="font-size:0.75rem;color:#6c7a8d;">pH (opcional)</div>
+              <div class="value-big" style="font-size:1.2rem;" id="phValue">5.4 <span class="unit">pH</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================== -->
+      <!-- COLUNA CENTRAL (GRÁFICO + ATUADORES)                    -->
+      <!-- ======================================================== -->
+      <div class="col-lg-4">
+
+        <!-- BLOCO 2: GRÁFICO DE TENDÊNCIA -->
+        <div class="brew-card">
+          <div class="card-title d-flex justify-content-between">
+            <span><i class="bi bi-graph-up"></i> Tendência · Temperatura x Tempo</span>
+            <span style="font-size:0.65rem;color:#6c7a8d;font-weight:400;">últimos 60 min</span>
+          </div>
+          <div class="chart-container">
+            <canvas id="trendChart"></canvas>
+          </div>
+          <div style="display:flex;gap:16px;font-size:0.75rem;margin-top:6px;flex-wrap:wrap;">
+            <span><span style="display:inline-block;width:20px;height:3px;background:#e67e22;border-radius:2px;margin-right:4px;"></span> Mostura</span>
+            <span><span style="display:inline-block;width:20px;height:3px;background:#e74c3c;border-radius:2px;margin-right:4px;"></span> Fervura</span>
+            <span><span style="display:inline-block;width:20px;height:3px;background:#4154f1;border-radius:2px;margin-right:4px;border-top:2px dashed #4154f1;"></span> Setpoint</span>
+          </div>
+        </div>
+
+        <!-- BLOCO 4: ATUADORES & POTÊNCIA -->
+        <div class="brew-card mt-4">
+          <div class="card-title"><i class="bi bi-power"></i> Atuadores · Potência Aferida</div>
+
+          <!-- Resistência Mostura -->
+          <div style="margin-bottom:16px;">
+            <div class="d-flex justify-content-between align-items-center">
+              <span style="font-weight:600;font-size:0.9rem;">Res. Mostura</span>
+              <span><span id="mashPowerPercent">85</span>% · <strong id="mashPowerWatts">3.400</strong> W</span>
+            </div>
+            <div class="power-bar-wrap">
+              <div class="power-bar" id="mashPowerBar" style="width:85%;"></div>
+            </div>
+            <div class="power-label">
+              <span>0%</span>
+              <span>Nominal: 4.000 W</span>
+              <span>100%</span>
+            </div>
+          </div>
+
+          <!-- Resistência Fervura -->
+          <div style="margin-bottom:16px;">
+            <div class="d-flex justify-content-between align-items-center">
+              <span style="font-weight:600;font-size:0.9rem;">Res. Fervura</span>
+              <span><span id="boilPowerPercent">0</span>% · <strong id="boilPowerWatts">0</strong> W</span>
+            </div>
+            <div class="power-bar-wrap">
+              <div class="power-bar boil-bar" id="boilPowerBar" style="width:0%;"></div>
+            </div>
+            <div class="power-label">
+              <span>0%</span>
+              <span>Nominal: 5.000 W</span>
+              <span>100%</span>
+            </div>
+          </div>
+
+          <!-- Bombas -->
+          <div class="row g-3">
+            <div class="col-4">
+              <div style="font-size:0.7rem;color:#6c7a8d;">Bomba Mostura</div>
+              <div><span class="status-dot on" id="mashPumpStatusDot"></span> <span id="mashPumpStatusText" style="font-weight:600;">LIGADA</span></div>
+              <div style="font-size:0.75rem;color:#6c7a8d;">RPM: <span id="mashPumpRPM">2.800</span></div>
+            </div>
+            <div class="col-4">
+              <div style="font-size:0.7rem;color:#6c7a8d;">Bomba Fervura</div>
+              <div><span class="status-dot off" id="boilPumpStatusDot"></span> <span id="boilPumpStatusText" style="font-weight:600;">DESLIGADA</span></div>
+              <div style="font-size:0.75rem;color:#6c7a8d;">RPM: <span id="boilPumpRPM">0</span></div>
+            </div>
+            <div class="col-4">
+              <div style="font-size:0.7rem;color:#6c7a8d;">Whirlpool</div>
+              <div><span class="status-dot off" id="whirlpoolStatusDot"></span> <span id="whirlpoolStatusText" style="font-weight:600;">DESLIGADO</span></div>
+              <div style="font-size:0.75rem;color:#6c7a8d;">Timer: <span id="whirlpoolTimerText">0min</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================== -->
+      <!-- COLUNA DIREITA (VOLUMES + STEP CONTROLLER)              -->
+      <!-- ======================================================== -->
+      <div class="col-lg-4">
+
+        <!-- BLOCO 5: VOLUMES -->
+        <div class="brew-card">
+          <div class="card-title"><i class="bi bi-droplet-half"></i> Volumes</div>
+
+          <div class="volume-display">
+            <div class="vol-item">
+              <div class="vol-value" id="volProgramado">25.0</div>
+              <div class="vol-label">Programado (L)</div>
+            </div>
+            <div class="vol-item">
+              <div class="vol-value" id="volReal">24.2</div>
+              <div class="vol-label">Real (L)</div>
+            </div>
+            <div class="vol-item">
+              <div class="vol-value" id="volDelta">-0.8</div>
+              <div class="vol-label">Δ (Real - Prog)</div>
+            </div>
+          </div>
+
+          <hr style="margin:12px 0;">
+
+          <div class="d-flex justify-content-between align-items-center">
+            <span style="font-size:0.85rem;color:#6c7a8d;"><i class="bi bi-speedometer2"></i> Vazão atual</span>
+            <span style="font-weight:600;" id="flowRate">2.3 L/min</span>
+          </div>
+          <div class="d-flex justify-content-between align-items-center mt-1">
+            <span style="font-size:0.85rem;color:#6c7a8d;"><i class="bi bi-droplet"></i> Pré/Enxague</span>
+            <span style="font-weight:600;" id="spargeVolume">12.0 L programado</span>
+          </div>
+        </div>
+
+        <!-- BLOCO 6: STEP CONTROLLER -->
+        <div class="brew-card mt-4">
+          <div class="card-title d-flex justify-content-between">
+            <span><i class="bi bi-list-check"></i> Step Controller</span>
+            <span style="font-size:0.7rem;background:#eef3ff;padding:2px 12px;border-radius:20px;color:#4154f1;">Passo <span id="stepCurrentIndex">2</span>/<span id="stepTotal">5</span></span>
+          </div>
+
+          <!-- Passo Atual (destaque) -->
+          <div style="background:#eef3ff;border-radius:10px;padding:14px 16px;margin-bottom:14px;border-left:5px solid #4154f1;">
+            <div class="d-flex justify-content-between align-items-start">
+              <div>
+                <div style="font-size:0.7rem;text-transform:uppercase;color:#6c7a8d;letter-spacing:0.5px;">Passo Atual</div>
+                <div style="font-size:1.3rem;font-weight:700;color:#012970;" id="stepCurrentName">Sacarificação</div>
+                <div style="font-size:0.85rem;color:#6c7a8d;"><span id="stepCurrentTemp">67</span>°C · Rampa: <span id="stepRampRate">0.5</span> °C/min</div>
+              </div>
+              <div style="text-align:right;">
+                <div style="font-size:0.7rem;color:#6c7a8d;">Tempo no passo</div>
+                <div style="font-size:1.2rem;font-weight:700;font-family:'Nunito',sans-serif;" id="stepElapsedDisplay">28:15</div>
+                <div style="font-size:0.75rem;color:#6c7a8d;">/ <span id="stepDurationDisplay">45:00</span></div>
+              </div>
+            </div>
+            <!-- Barra de progresso do passo -->
+            <div class="step-timer">
+              <div class="timer-ring" id="stepProgressPercent">63%</div>
+              <div class="timer-info">
+                <div class="timer-label">Progresso do passo</div>
+                <div class="timer-progress">
+                  <div class="tp-fill" id="stepProgressFill" style="width:63%;"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Lista de passos (todos) -->
+          <div style="font-size:0.75rem;text-transform:uppercase;color:#6c7a8d;letter-spacing:0.5px;margin-bottom:6px;">Próximos Passos</div>
+          <div class="step-list" id="stepList">
+            <!-- Preenchido via JavaScript com dados simulados -->
+          </div>
+
+          <!-- Próximos passos (resumo) -->
+          <div class="next-steps mt-2" id="nextStepsList">
+            <!-- Preenchido via JavaScript -->
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /row -->
+
+    <!-- ========================================================== -->
+    <!-- RODAPÉ (opcional)                                         -->
+    <!-- ========================================================== -->
+    <div class="text-center mt-4" style="font-size:0.75rem;color:#9aa9b9;border-top:1px solid #e9edf4;padding-top:16px;">
+      <i class="bi bi-github"></i> Baseado em <strong>Nice Admin</strong> · PyTeca · Dados simulados para demonstração
+    </div>
+
+  </main><!-- /#main -->
+
+  <!-- ============================================================ -->
+  <!-- SCRIPTS                                                     -->
+  <!-- ============================================================ -->
+
+  <!-- Bootstrap JS (opcional, para componentes interativos) -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js">
+  </script>
+
+  <script>
+    /**
+     * ============================================================
+     * SIMULAÇÃO DE DADOS EM TEMPO REAL
+     * ============================================================
+     * Este script gera dados falsos para demonstrar o dashboard.
+     * Em produção, substitua por leitura via WebSocket (Socket.IO)
+     * ou requisições AJAX para o backend (Raspberry Pi / Flask).
+     * ============================================================
+     */
+
+    (function() {
+      'use strict';
+
+      // ---- Referências DOM ----
+      const $ = id => document.getElementById(id);
+
+      // Cabeçalho
+      const totalTimeDisplay = $('totalTimeDisplay');
+      const nextActionDisplay = $('nextActionDisplay');
+
+      // Sinótico
+      const mashTempSynoptic = $('mashTempSynoptic');
+      const boilTempSynoptic = $('boilTempSynoptic');
+      const mashPowerTag = $('mashPowerTag');
+      const boilPowerTag = $('boilPowerTag');
+      const mashPumpDot = $('mashPumpDot');
+      const boilPumpDot = $('boilPumpDot');
+      const whirlpoolDot = $('whirlpoolDot');
+      const whirlpoolStatus = $('whirlpoolStatus');
+      const whirlpoolTimer = $('whirlpoolTimer');
+
+      // Sensores
+      const mashTempDetail = $('mashTempDetail');
+      const boilTempDetail = $('boilTempDetail');
+      const mashSetpoint = $('mashSetpoint');
+      const boilSetpoint = $('boilSetpoint');
+      const pressMash = $('pressMash');
+      const pressBoil = $('pressBoil');
+      const phValue = $('phValue');
+
+      // Atuadores / Potência
+      const mashPowerPercent = $('mashPowerPercent');
+      const mashPowerWatts = $('mashPowerWatts');
+      const mashPowerBar = $('mashPowerBar');
+      const boilPowerPercent = $('boilPowerPercent');
+      const boilPowerWatts = $('boilPowerWatts');
+      const boilPowerBar = $('boilPowerBar');
+      const mashPumpStatusDot = $('mashPumpStatusDot');
+      const mashPumpStatusText = $('mashPumpStatusText');
+      const mashPumpRPM = $('mashPumpRPM');
+      const boilPumpStatusDot = $('boilPumpStatusDot');
+      const boilPumpStatusText = $('boilPumpStatusText');
+      const boilPumpRPM = $('boilPumpRPM');
+      const whirlpoolStatusDot = $('whirlpoolStatusDot');
+      const whirlpoolStatusText = $('whirlpoolStatusText');
+      const whirlpoolTimerText = $('whirlpoolTimerText');
+
+      // Volumes
+      const volProgramado = $('volProgramado');
+      const volReal = $('volReal');
+      const volDelta = $('volDelta');
+      const flowRate = $('flowRate');
+      const spargeVolume = $('spargeVolume');
+
+      // Step Controller
+      const stepCurrentIndex = $('stepCurrentIndex');
+      const stepTotal = $('stepTotal');
+      const stepCurrentName = $('stepCurrentName');
+      const stepCurrentTemp = $('stepCurrentTemp');
+      const stepRampRate = $('stepRampRate');
+      const stepElapsedDisplay = $('stepElapsedDisplay');
+      const stepDurationDisplay = $('stepDurationDisplay');
+      const stepProgressPercent = $('stepProgressPercent');
+      const stepProgressFill = $('stepProgressFill');
+      const stepList = $('stepList');
+      const nextStepsList = $('nextStepsList');
+
+      // ---- Dados simulados ----
+      const STEPS = [
+        { id: 1, name: 'Proteína', temp: 52, duration: 15 },
+        { id: 2, name: 'Sacarificação', temp: 67, duration: 45 },
+        { id: 3, name: 'Mash Out', temp: 78, duration: 10 },
+        { id: 4, name: 'Fervura', temp: 100, duration: 60 },
+        { id: 5, name: 'Whirlpool', temp: 95, duration: 15 }
+      ];
+
+      let currentStepIndex = 1; // 0-based
+      let stepElapsed = 1695; // segundos
+      let totalElapsed = 5025; // segundos
+
+      // Estado dos atuadores
+      let mashPumpOn = true;
+      let boilPumpOn = false;
+      let whirlpoolOn = false;
+
+      // ---- Inicialização ----
+      function init() {
+        stepTotal.textContent = STEPS.length;
+        renderStepList();
+        renderNextSteps();
+        startSimulation();
+        setupChart();
+      }
+
+      // ---- Renderiza lista de passos ----
+      function renderStepList() {
+        let html = '';
+        STEPS.forEach((s, idx) => {
+          const active = idx === currentStepIndex ? 'active' : '';
+          const status = idx === currentStepIndex ? '⏳ Em andamento' : (idx < currentStepIndex ? '✅ Concluído' : '⏱️ Aguardando');
+          html += `
+            <div class="step-item ${active}">
+              <div class="step-idx">${idx + 1}</div>
+              <div class="step-name">${s.name}</div>
+              <div class="step-temp">${s.temp}°C</div>
+              <div class="step-status">${status}</div>
+            </div>
+          `;
+        });
+        stepList.innerHTML = html;
+      }
+
+      // ---- Renderiza próximos passos (mini) ----
+      function renderNextSteps() {
+        const next = STEPS.slice(currentStepIndex + 1, currentStepIndex + 4);
+        if (next.length === 0) {
+          nextStepsList.innerHTML = '<div style="color:#6c7a8d;font-size:0.85rem;">Nenhum passo restante</div>';
+          return;
+        }
+        let html = '';
+        next.forEach(s => {
+          html += `
+            <div class="next-item">
+              <span class="ni-name">${s.name}</span>
+              <span class="ni-temp">${s.temp}°C · ${s.duration}min</span>
+            </div>
+          `;
+        });
+        nextStepsList.innerHTML = html;
+      }
+
+      // ---- Atualiza UI com dados simulados ----
+      function updateUI() {
+        const step = STEPS[currentStepIndex];
+        const stepTotalSec = step.duration * 60;
+        const progress = Math.min(stepElapsed / stepTotalSec, 1);
+        const progressPct = Math.round(progress * 100);
+
+        // Cabeçalho
+        totalTimeDisplay.textContent = formatTime(totalElapsed);
+        const nextAction = Math.max(0, stepTotalSec - stepElapsed);
+        nextActionDisplay.textContent = formatTime(nextAction);
+
+        // Sinótico
+        const mashTemp = 67.2 + (Math.random() - 0.5) * 0.6;
+        const boilTemp = 98.5 + (Math.random() - 0.5) * 0.8;
+        mashTempSynoptic.innerHTML = `${mashTemp.toFixed(1)} <span class="v-unit">°C</span>`;
+        boilTempSynoptic.innerHTML = `${boilTemp.toFixed(1)} <span class="v-unit">°C</span>`;
+
+        const mashPow = Math.round(65 + Math.random() * 30);
+        const boilPow = Math.round(Math.random() * 15);
+        mashPowerTag.textContent = mashPow;
+        boilPowerTag.textContent = boilPow;
+        mashPumpDot.className = `status-dot ${mashPumpOn ? 'on' : 'off'}`;
+        boilPumpDot.className = `status-dot ${boilPumpOn ? 'on' : 'off'}`;
+        whirlpoolDot.className = `status-dot ${whirlpoolOn ? 'on' : 'off'}`;
+        whirlpoolStatus.textContent = whirlpoolOn ? 'Ligado' : 'Desligado';
+        whirlpoolTimer.textContent = whirlpoolOn ? '12min' : '0min';
+
+        // Sensores
+        mashTempDetail.innerHTML = `${mashTemp.toFixed(1)} <span class="unit">°C</span>`;
+        boilTempDetail.innerHTML = `${boilTemp.toFixed(1)} <span class="unit">°C</span>`;
+        mashSetpoint.textContent = step.temp.toFixed(1);
+        boilSetpoint.textContent = '100.0';
+        pressMash.innerHTML = `${(0.02 + Math.random() * 0.01).toFixed(2)} <span class="unit">bar</span>`;
+        pressBoil.innerHTML = `${(Math.random() * 0.02).toFixed(2)} <span class="unit">bar</span>`;
+        phValue.innerHTML = `${(5.3 + Math.random() * 0.3).toFixed(1)} <span class="unit">pH</span>`;
+
+        // Atuadores / Potência
+        mashPowerPercent.textContent = mashPow;
+        mashPowerWatts.textContent = (mashPow / 100 * 4000).toFixed(0);
+        mashPowerBar.style.width = mashPow + '%';
+        boilPowerPercent.textContent = boilPow;
+        boilPowerWatts.textContent = (boilPow / 100 * 5000).toFixed(0);
+        boilPowerBar.style.width = boilPow + '%';
+
+        mashPumpStatusDot.className = `status-dot ${mashPumpOn ? 'on' : 'off'}`;
+        mashPumpStatusText.textContent = mashPumpOn ? 'LIGADA' : 'DESLIGADA';
+        mashPumpRPM.textContent = mashPumpOn ? (2500 + Math.round(Math.random() * 600)) : '0';
+        boilPumpStatusDot.className = `status-dot ${boilPumpOn ? 'on' : 'off'}`;
+        boilPumpStatusText.textContent = boilPumpOn ? 'LIGADA' : 'DESLIGADA';
+        boilPumpRPM.textContent = boilPumpOn ? (1800 + Math.round(Math.random() * 400)) : '0';
+        whirlpoolStatusDot.className = `status-dot ${whirlpoolOn ? 'on' : 'off'}`;
+        whirlpoolStatusText.textContent = whirlpoolOn ? 'LIGADO' : 'DESLIGADO';
+        whirlpoolTimerText.textContent = whirlpoolOn ? '12min' : '0min';
+
+        // Volumes
+        const volProg = 25.0;
+        const volRealVal = 24.2 + (Math.random() - 0.5) * 0.3;
+        volProgramado.textContent = volProg.toFixed(1);
+        volReal.textContent = volRealVal.toFixed(1);
+        const delta = volRealVal - volProg;
+        volDelta.textContent = delta.toFixed(1);
+        volDelta.className = `vol-delta ${delta < 0 ? 'neg' : 'pos'}`;
+        flowRate.textContent = (2.0 + Math.random() * 0.8).toFixed(1) + ' L/min';
+        spargeVolume.textContent = '12.0 L programado';
+
+        // Step Controller
+        stepCurrentIndex.textContent = currentStepIndex + 1;
+        stepCurrentName.textContent = step.name;
+        stepCurrentTemp.textContent = step.temp;
+        stepRampRate.textContent = (0.3 + Math.random() * 0.6).toFixed(1);
+        stepElapsedDisplay.textContent = formatTime(stepElapsed);
+        stepDurationDisplay.textContent = formatTime(stepTotalSec);
+        stepProgressPercent.textContent = progressPct + '%';
+        stepProgressFill.style.width = progressPct + '%';
+
+        // Atualiza lista de passos e próximos
+        renderStepList();
+        renderNextSteps();
+
+        // Avança simulação (apenas para demonstração)
+        stepElapsed += 5;
+        totalElapsed += 5;
+
+        // Se o passo atual terminou, avança para o próximo (simulação)
+        if (stepElapsed >= stepTotalSec && currentStepIndex < STEPS.length - 1) {
+          currentStepIndex++;
+          stepElapsed = 0;
+          // Alterna estado das bombas para demonstrar
+          mashPumpOn = !mashPumpOn;
+          boilPumpOn = !boilPumpOn;
+          if (currentStepIndex === 4) whirlpoolOn = true;
+        }
+      }
+
+      // ---- Formata tempo (segundos → MM:SS ou HH:MM:SS) ----
+      function formatTime(sec) {
+        const h = Math.floor(sec / 3600);
+        const m = Math.floor((sec % 3600) / 60);
+        const s = Math.floor(sec % 60);
+        if (h > 0) {
+          return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        }
+        return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+      }
+
+      // ---- Loop de simulação ----
+      function startSimulation() {
+        updateUI();
+        setInterval(updateUI, 2000);
+      }
+
+      // ---- Gráfico com Chart.js ----
+      let chart = null;
+
+      function setupChart() {
+        const ctx = document.getElementById('trendChart').getContext('2d');
+
+        // Dados iniciais (últimos 60 pontos, 1 por minuto)
+        const labels = [];
+        const mashData = [];
+        const boilData = [];
+        const setpointData = [];
+
+        for (let i = 0; i < 60; i++) {
+          labels.push(`${i}m`);
+          mashData.push(65 + Math.random() * 6);
+          boilData.push(95 + Math.random() * 6);
+          setpointData.push(i < 30 ? 67 : 100);
+        }
+
+        chart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [{
+              label: 'Mostura',
+              data: mashData,
+              borderColor: '#e67e22',
+              backgroundColor: 'rgba(230, 126, 34, 0.08)',
+              borderWidth: 2.5,
+              pointRadius: 0,
+              tension: 0.3,
+              fill: true,
+            }, {
+              label: 'Fervura',
+              data: boilData,
+              borderColor: '#e74c3c',
+              backgroundColor: 'rgba(231, 76, 60, 0.06)',
+              borderWidth: 2.5,
+              pointRadius: 0,
+              tension: 0.3,
+              fill: true,
+            }, {
+              label: 'Setpoint',
+              data: setpointData,
+              borderColor: '#4154f1',
+              borderDash: [6, 4],
+              borderWidth: 2,
+              pointRadius: 0,
+              tension: 0.1,
+              fill: false,
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                mode: 'index',
+                intersect: false,
+                callbacks: {
+                  label: function(ctx) {
+                    return ctx.dataset.label + ': ' + ctx.parsed.y.toFixed(1) + '°C';
+                  }
+                }
+              }
+            },
+            scales: {
+              x: {
+                grid: { display: false },
+                ticks: { font: { size: 9 }, maxTicksLimit: 12 }
+              },
+              y: {
+                min: 40,
+                max: 110,
+                grid: { color: 'rgba(0,0,0,0.04)' },
+                ticks: { font: { size: 9 }, callback: (v) => v + '°C' }
+              }
+            },
+            interaction: {
+              intersect: false,
+              mode: 'index'
+            }
+          }
+        });
+
+        // Atualiza o gráfico a cada 3 segundos (simula novo dado)
+        setInterval(() => {
+          if (!chart) return;
+          const now = new Date();
+          const label = now.getMinutes() + 'm';
+
+          // Adiciona novo ponto, remove o mais antigo
+          chart.data.labels.push(label);
+          chart.data.labels.shift();
+
+          const newMash = 65 + Math.random() * 8;
+          const newBoil = 95 + Math.random() * 6;
+          const newSetpoint = chart.data.datasets[2].data[chart.data.datasets[2].data.length - 1];
+
+          chart.data.datasets[0].data.push(newMash);
+          chart.data.datasets[0].data.shift();
+          chart.data.datasets[1].data.push(newBoil);
+          chart.data.datasets[1].data.shift();
+          chart.data.datasets[2].data.push(newSetpoint);
+          chart.data.datasets[2].data.shift();
+
+          chart.update('none');
+        }, 3000);
+      }
+
+      // ---- Inicializa quando o DOM estiver pronto ----
+      document.addEventListener('DOMContentLoaded', init);
+
+    })();
+  </script>
+
+</body>
+</html>
