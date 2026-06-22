@@ -46,6 +46,51 @@ Toda vez que `generate()` processa um model, ele sincroniza automaticamente
 Você não escreve nada para isso existir — é automático para qualquer model
 gerado pelo CrudGen.
 
+**Importante (corrigido nesta versão)**: até esta entrega, essas 7
+permissões eram sincronizadas no banco mas **nenhuma rota gerada de fato
+verificava** — todas as rotas só checavam `@login_required`, e
+`delete_permanent` checava `current_user.is_admin` diretamente, ignorando
+o sistema de Roles/Permissions por completo. Era dado morto: você podia
+configurar um papel com permissão granular em `/admin/roles` e isso não
+tinha nenhum efeito real de controle de acesso. Corrigido — agora cada
+rota gerada usa `@permission_required("<permissão correspondente>")`.
+
+### Mapeamento rota → permissão
+
+Nem toda rota gerada corresponde 1:1 às 7 ações padrão (existem rotas
+auxiliares de rascunho — `draft`, `autosave`, `publish`, `discard`). Estas
+foram mapeadas para a permissão mais próxima semanticamente, em vez de
+criar permissões novas:
+
+| Rota (controller HTML) | Permissão exigida |
+|---|---|
+| `GET /` (list) | `<plural>.list` |
+| `GET /<id>` (detail) | `<plural>.detail` |
+| `POST /<id>/trash` | `<plural>.trash` |
+| `POST /<id>/restore` | `<plural>.restore` |
+| `POST /<id>/delete` (permanente) | `<plural>.delete_permanent` |
+| `POST /<id>/discard` (descartar rascunho) | `<plural>.create` |
+
+| Rota (API REST) | Permissão exigida |
+|---|---|
+| `GET /` (list) | `<plural>.list` |
+| `GET /<id>` (get) | `<plural>.detail` |
+| `POST /draft` | `<plural>.create` |
+| `PATCH /<id>/autosave` | `<plural>.update` |
+| `POST /<id>/publish` | `<plural>.create` |
+| `POST /` (create) | `<plural>.create` |
+| `PUT/PATCH /<id>` (update) | `<plural>.update` |
+| `POST /<id>/trash` | `<plural>.trash` |
+| `POST /<id>/restore` | `<plural>.restore` |
+| `DELETE /<id>` (permanente) | `<plural>.delete_permanent` |
+| `DELETE /<id>/discard` | `<plural>.create` |
+
+`current_user.is_admin` direto foi removido das rotas geradas — agora tudo
+passa por `has_permission()`, que já trata `is_admin=True` como acesso
+total (ver seção de unificação abaixo). O comportamento para administradores
+não muda; o que muda é que agora um papel não-admin pode receber
+`delete_permanent` sem precisar virar admin.
+
 ### Camada 2 — Model (`@permission`, granularidade de negócio)
 
 Para ações que não mapeiam 1:1 para uma rota padrão, ou quando você quer

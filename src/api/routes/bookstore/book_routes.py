@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from flask import Blueprint, jsonify, request
-from flask_login import current_user, login_required
+from flask_login import login_required
+from utils.permissions import permission_required
 
 from services.bookstore.book_service import BookService
 from model.bookstore.book import BookStatus
@@ -35,6 +36,7 @@ def _err(message: str, code: int = 400):
 
 @book_api_bp.route("/", methods=["GET"])
 @login_required
+@permission_required("books.list")
 def list():
     early = _hook("pbo_list")(request)
     if early is not None:
@@ -65,6 +67,7 @@ def list():
 
 @book_api_bp.route("/<int:id>", methods=["GET"])
 @login_required
+@permission_required("books.detail")
 def get(id: int):
     service = BookService()
     item = service.get_by_id(id)
@@ -77,6 +80,7 @@ def get(id: int):
 
 @book_api_bp.route("/draft", methods=["POST"])
 @login_required
+@permission_required("books.create")
 def create_draft():
     service = BookService()
     result = service.create_draft()
@@ -87,6 +91,7 @@ def create_draft():
 
 @book_api_bp.route("/<int:id>/autosave", methods=["PATCH"])
 @login_required
+@permission_required("books.update")
 def autosave_draft(id: int):
     data = request.get_json(silent=True) or {}
     service = BookService()
@@ -98,6 +103,7 @@ def autosave_draft(id: int):
 
 @book_api_bp.route("/<int:id>/publish", methods=["POST"])
 @login_required
+@permission_required("books.create")
 def publish_draft(id: int):
     data = request.get_json(silent=True) or {}
     service = BookService()
@@ -111,6 +117,7 @@ def publish_draft(id: int):
 
 @book_api_bp.route("/", methods=["POST"])
 @login_required
+@permission_required("books.create")
 def create():
     data = request.get_json(silent=True) or {}
     data = _hook("pbo_create")(data, request) or data
@@ -126,6 +133,7 @@ def create():
 
 @book_api_bp.route("/<int:id>", methods=["PUT", "PATCH"])
 @login_required
+@permission_required("books.update")
 def update(id: int):
     data = request.get_json(silent=True) or {}
     data = _hook("pbo_update")(id, data, request) or data
@@ -143,6 +151,7 @@ def update(id: int):
 
 @book_api_bp.route("/<int:id>/trash", methods=["POST"])
 @login_required
+@permission_required("books.trash")
 def trash(id: int):
     service = BookService()
     obj = service.get_by_id(id)
@@ -161,6 +170,7 @@ def trash(id: int):
 
 @book_api_bp.route("/<int:id>/restore", methods=["POST"])
 @login_required
+@permission_required("books.restore")
 def restore(id: int):
     service = BookService()
     result = service.restore(id)
@@ -171,10 +181,8 @@ def restore(id: int):
 
 @book_api_bp.route("/<int:id>", methods=["DELETE"])
 @login_required
+@permission_required("books.delete_permanent")
 def delete_permanent(id: int):
-    if not current_user.is_admin:
-        return _err("Apenas administradores podem excluir permanentemente.", 403)
-
     service = BookService()
     obj = service.get_by_id(id)
 
@@ -192,6 +200,7 @@ def delete_permanent(id: int):
 
 @book_api_bp.route("/<int:id>/discard", methods=["DELETE"])
 @login_required
+@permission_required("books.create")
 def discard_draft(id: int):
     service = BookService()
     result = service.discard_draft(id)

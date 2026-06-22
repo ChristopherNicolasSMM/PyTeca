@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
+from utils.permissions import permission_required
 
 from annotations import get_model_metadata, get_choices_fields
 from utils.generate_from_model import _get_relationship_fields
@@ -140,6 +141,7 @@ def _build_choices_filters(service: "AuthorService") -> list[FilterDef]:
 
 @author_bp.route("/")
 @login_required
+@permission_required("authors.list")
 def list():
     early = _hook("pbo_list")(request)
     if early is not None:
@@ -234,6 +236,7 @@ def list():
 
 @author_bp.route("/<int:item_id>")
 @login_required
+@permission_required("authors.detail")
 def detail(item_id: int):
     service = AuthorService()
     item = service.get_by_id(item_id)
@@ -264,6 +267,7 @@ def detail(item_id: int):
 
 @author_bp.route("/<int:author_id>/trash", methods=["POST"])
 @login_required
+@permission_required("authors.trash")
 def trash(author_id: int):
     service = AuthorService()
     obj = service.get_by_id(author_id)
@@ -282,6 +286,7 @@ def trash(author_id: int):
 
 @author_bp.route("/<int:author_id>/restore", methods=["POST"])
 @login_required
+@permission_required("authors.restore")
 def restore(author_id: int):
     service = AuthorService()
     r = service.restore(author_id)
@@ -292,10 +297,8 @@ def restore(author_id: int):
 
 @author_bp.route("/<int:author_id>/delete", methods=["POST"])
 @login_required
+@permission_required("authors.delete_permanent")
 def delete_permanent(author_id: int):
-    if not current_user.is_admin:
-        abort(403)
-
     service = AuthorService()
     obj = service.get_by_id(author_id)
 
@@ -313,6 +316,7 @@ def delete_permanent(author_id: int):
 
 @author_bp.route("/<int:author_id>/discard", methods=["POST"])
 @login_required
+@permission_required("authors.create")
 def discard_draft(author_id: int):
     service = AuthorService()
     r = service.discard_draft(author_id)

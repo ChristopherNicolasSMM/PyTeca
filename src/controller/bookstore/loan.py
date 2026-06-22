@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
+from utils.permissions import permission_required
 
 from annotations import get_model_metadata, get_choices_fields
 from utils.generate_from_model import _get_relationship_fields
@@ -144,6 +145,7 @@ def _build_choices_filters(service: "LoanService") -> list[FilterDef]:
 
 @loan_bp.route("/")
 @login_required
+@permission_required("loans.list")
 def list():
     early = _hook("pbo_list")(request)
     if early is not None:
@@ -238,6 +240,7 @@ def list():
 
 @loan_bp.route("/<int:item_id>")
 @login_required
+@permission_required("loans.detail")
 def detail(item_id: int):
     service = LoanService()
     item = service.get_by_id(item_id)
@@ -268,6 +271,7 @@ def detail(item_id: int):
 
 @loan_bp.route("/<int:loan_id>/trash", methods=["POST"])
 @login_required
+@permission_required("loans.trash")
 def trash(loan_id: int):
     service = LoanService()
     obj = service.get_by_id(loan_id)
@@ -286,6 +290,7 @@ def trash(loan_id: int):
 
 @loan_bp.route("/<int:loan_id>/restore", methods=["POST"])
 @login_required
+@permission_required("loans.restore")
 def restore(loan_id: int):
     service = LoanService()
     r = service.restore(loan_id)
@@ -296,10 +301,8 @@ def restore(loan_id: int):
 
 @loan_bp.route("/<int:loan_id>/delete", methods=["POST"])
 @login_required
+@permission_required("loans.delete_permanent")
 def delete_permanent(loan_id: int):
-    if not current_user.is_admin:
-        abort(403)
-
     service = LoanService()
     obj = service.get_by_id(loan_id)
 
@@ -317,6 +320,7 @@ def delete_permanent(loan_id: int):
 
 @loan_bp.route("/<int:loan_id>/discard", methods=["POST"])
 @login_required
+@permission_required("loans.create")
 def discard_draft(loan_id: int):
     service = LoanService()
     r = service.discard_draft(loan_id)

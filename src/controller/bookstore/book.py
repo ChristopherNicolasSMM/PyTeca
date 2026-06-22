@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
+from utils.permissions import permission_required
 
 from annotations import get_model_metadata, get_choices_fields
 from utils.generate_from_model import _get_relationship_fields
@@ -143,6 +144,7 @@ def _build_choices_filters(service: "BookService") -> list[FilterDef]:
 
 @book_bp.route("/")
 @login_required
+@permission_required("books.list")
 def list():
     early = _hook("pbo_list")(request)
     if early is not None:
@@ -237,6 +239,7 @@ def list():
 
 @book_bp.route("/<int:item_id>")
 @login_required
+@permission_required("books.detail")
 def detail(item_id: int):
     service = BookService()
     item = service.get_by_id(item_id)
@@ -267,6 +270,7 @@ def detail(item_id: int):
 
 @book_bp.route("/<int:book_id>/trash", methods=["POST"])
 @login_required
+@permission_required("books.trash")
 def trash(book_id: int):
     service = BookService()
     obj = service.get_by_id(book_id)
@@ -285,6 +289,7 @@ def trash(book_id: int):
 
 @book_bp.route("/<int:book_id>/restore", methods=["POST"])
 @login_required
+@permission_required("books.restore")
 def restore(book_id: int):
     service = BookService()
     r = service.restore(book_id)
@@ -295,10 +300,8 @@ def restore(book_id: int):
 
 @book_bp.route("/<int:book_id>/delete", methods=["POST"])
 @login_required
+@permission_required("books.delete_permanent")
 def delete_permanent(book_id: int):
-    if not current_user.is_admin:
-        abort(403)
-
     service = BookService()
     obj = service.get_by_id(book_id)
 
@@ -316,6 +319,7 @@ def delete_permanent(book_id: int):
 
 @book_bp.route("/<int:book_id>/discard", methods=["POST"])
 @login_required
+@permission_required("books.create")
 def discard_draft(book_id: int):
     service = BookService()
     r = service.discard_draft(book_id)
