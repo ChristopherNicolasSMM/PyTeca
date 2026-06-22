@@ -36,7 +36,7 @@ class AuthorStatus(str, PyEnum):
     ]
 )
 @display_field("name")   # ← fix: agora /api/options/authors retorna o nome correto
-@required("name", "Nome do autor é obrigatório!")
+@required("name", "Nome do autor é obrigatório")
 @max_length("name", 100)
 class Author(db.Model):
     __tablename__ = "authors"

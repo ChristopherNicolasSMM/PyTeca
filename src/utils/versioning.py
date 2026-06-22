@@ -65,9 +65,27 @@ def snapshot_if_needed(
     Decide, com base em SystemConfig (chaves versioning.*), se deve
     versionar esta escrita, e grava se aplicável.
 
-    Chamado de um único lugar: utils.generate_from_model._write_file().
-    Retorna o CodeSnapshot criado, ou None se nada foi versionado
-    (trigger desabilitado, ou modo on_diff sem alteração real).
+    Chamado de um único lugar: utils.generate_from_model._write_file(),
+    SEMPRE ANTES de path.write_text() sobrescrever o arquivo no disco.
+
+    IMPORTANTE — captura de edições manuais perdidas: o histórico só
+    conhece o que passou por esta função. Se alguém editar um arquivo
+    gerado diretamente no disco (fora do gerador) e depois rodar
+    `generate --overwrite`, essa edição manual nunca teria sido
+    registrada — o sistema compararia o novo conteúdo gerado com o
+    último snapshot do BANCO, que não sabe da edição manual, e
+    concluiria (corretamente, dado o que sabia) que nada mudou.
+    Resultado: a edição manual se perde sem nunca aparecer no histórico.
+
+    Para evitar isso, ANTES de decidir sobre o novo conteúdo, esta
+    função lê o conteúdo ATUAL do disco (se o arquivo já existir) e,
+    se ele divergir do último snapshot conhecido, captura essa versão
+    primeiro (origin=PRE_OVERWRITE) — preservando a edição manual no
+    histórico antes de ela ser sobrescrita.
+
+    Retorna o CodeSnapshot do novo conteúdo, ou None se nada foi
+    versionado para ele (trigger desabilitado, ou on_diff sem alteração
+    real) — independente de uma captura PRE_OVERWRITE ter ocorrido.
     """
     Config = _get_config()
 
@@ -78,14 +96,44 @@ def snapshot_if_needed(
     if trigger == "manual_only":
         return None
 
-    new_hash = _sha256(new_content)
-
     last = (
         CodeSnapshot.query
         .filter_by(file_path=file_path, is_current=True)
         .order_by(CodeSnapshot.created_at.desc())
         .first()
     )
+
+    # ── Captura de edição manual perdida (antes de qualquer outra decisão) ──
+    from pathlib import Path
+    disk_path = Path(file_path)
+    if disk_path.exists():
+        try:
+            disk_content = disk_path.read_text(encoding="utf-8")
+            disk_hash = _sha256(disk_content)
+            if last is None or last.content_hash != disk_hash:
+                # O disco tem algo que o histórico não conhece — é uma
+                # edição manual (ou a primeira vez que este arquivo entra
+                # no sistema de versionamento). Captura antes de prosseguir.
+                if last is not None:
+                    last.is_current = False
+                manual_snap = CodeSnapshot(
+                    file_path=file_path,
+                    content=disk_content,
+                    content_hash=disk_hash,
+                    size_bytes=len(disk_content.encode("utf-8")),
+                    origin=SnapshotOrigin.PRE_OVERWRITE,
+                    triggered_by="auto:pre_overwrite_capture",
+                    generation_run_id=_current_run_id.get(),
+                    is_current=True,
+                    parent_snapshot_id=last.id if last is not None else None,
+                )
+                db.session.add(manual_snap)
+                db.session.commit()
+                last = manual_snap  # a comparação seguinte usa esta como "última"
+        except (UnicodeDecodeError, OSError):
+            pass  # arquivo binário ou ilegível — não tenta versionar o disco
+
+    new_hash = _sha256(new_content)
 
     if trigger == "on_diff" and last is not None and last.content_hash == new_hash:
         return None  # conteúdo idêntico ao último — nada para versionar

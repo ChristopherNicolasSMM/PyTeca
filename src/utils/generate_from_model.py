@@ -540,6 +540,22 @@ def _write_file(path: Path, content: str, overwrite: bool = False) -> bool:
     path.write_text(content, encoding="utf-8")
     action = "atualizado" if path.exists() else "gerado"
     print(f"  ✓ {path}")
+
+    # ── Versionamento ──────────────────────────────────────────────────────
+    # Integração num único ponto: nenhum .j2 precisa saber que isso existe.
+    # Falha em versionar nunca deve impedir a geração do arquivo em si —
+    # por isso o try/except silencioso (com aviso) em vez de propagar.
+    try:
+        from utils.versioning import snapshot_if_needed
+        from model.core.admin.code_snapshot import SnapshotOrigin
+        snapshot_if_needed(
+            file_path=str(path),
+            new_content=content,
+            origin=SnapshotOrigin.GENERATED,
+        )
+    except Exception as e:
+        print(f"  ⚠  Versionamento não aplicado para {path}: {e}")
+
     return True
 
 
@@ -847,6 +863,18 @@ def _run_generation(
     if not file_path.exists():
         print(f"  ✗ Arquivo não encontrado: {file_path}")
         return
+
+    # Inicia o agrupamento de versionamento desta execução — todos os
+    # arquivos escritos a partir daqui (controller, service, templates)
+    # compartilham o mesmo generation_run_id. Se um chamador externo
+    # (ex: Model Builder UI) já iniciou um run antes de chamar generate(),
+    # respeitamos esse contexto em vez de sobrescrever.
+    try:
+        from utils.versioning import start_generation_run, _current_run_id
+        if _current_run_id.get() is None:
+            start_generation_run(model_name=file_path.stem, triggered_by="cli:generate")
+    except Exception:
+        pass  # versionamento é aditivo; nunca bloqueia a geração
 
     print(f"  📄 Processando: {file_path}")
     
