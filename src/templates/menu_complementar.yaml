@@ -46,6 +46,12 @@ items:
     parent: "Administração"
     requires_permission: "admin"
 
+  - name: "Histórico de Versões"
+    endpoint: "snapshot_viewer.index"
+    icon: "bi-clock-history"
+    parent: "Administração"
+    requires_permission: "admin"
+
 ###################################################################################################
 # Itens do menu "Relatórios" (subitens do pai "Relatórios")
 ###################################################################################################

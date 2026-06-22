@@ -1,0 +1,354 @@
+{% extends "core/base.html" %}
+
+{% block title %}Histórico de Versões{% endblock %}
+
+{% block content %}
+<div class="pagetitle">
+  <h1>Histórico de Versões</h1>
+  <nav>
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{{ url_for('web.dashboard') }}">Home</a></li>
+      <li class="breadcrumb-item active">Histórico de Versões</li>
+    </ol>
+  </nav>
+</div>
+
+<section class="section">
+  <div class="alert alert-info d-flex align-items-start gap-2">
+    <i class="bi bi-info-circle mt-1"></i>
+    <div>
+      Esta tela <strong>recupera e compara</strong> versões já capturadas pelo
+      sistema de versionamento (geração de código, restaurações). Para editar
+      arquivos de verdade, use o code-server configurado no servidor —
+      esta tela é só consulta e restauração, não um editor.
+    </div>
+  </div>
+
+  <div class="row g-3">
+
+    <!-- ══════════════════════════════════════════════════════════════
+         Lista de arquivos com histórico
+    ═══════════════════════════════════════════════════════════════ -->
+    <div class="col-lg-4">
+      <div class="card h-100">
+        <div class="card-body">
+          <h5 class="card-title">Arquivos</h5>
+          <input type="text" class="form-control form-control-sm mb-2" id="fileSearch"
+                 placeholder="Buscar por caminho...">
+          <div id="filesList" class="list-group" style="max-height:560px;overflow-y:auto;">
+            <div class="text-center text-muted py-3">Carregando...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════
+         Histórico do arquivo selecionado
+    ═══════════════════════════════════════════════════════════════ -->
+    <div class="col-lg-8">
+      <div class="card h-100">
+        <div class="card-body">
+          <div id="historyEmpty" class="text-muted text-center my-5">
+            <i class="bi bi-clock-history" style="font-size:2.5rem;opacity:.3;"></i>
+            <p class="mt-2 mb-0">Selecione um arquivo à esquerda para ver seu histórico.</p>
+          </div>
+
+          <div id="historyWrap" class="d-none">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <div>
+                <h5 class="mb-0" id="historyFileName"></h5>
+                <small class="text-muted">Selecione duas versões para comparar (clique para marcar A e B).</small>
+              </div>
+              <button class="btn btn-sm btn-outline-primary" id="btnCompare" disabled>
+                <i class="bi bi-file-diff me-1"></i>Comparar selecionadas
+              </button>
+            </div>
+
+            <div class="table-responsive mb-3" style="max-height:280px;overflow-y:auto;">
+              <table class="table table-sm table-hover align-middle">
+                <thead class="sticky-top bg-body">
+                  <tr>
+                    <th style="width:40px;"></th>
+                    <th>Quando</th>
+                    <th>Origem</th>
+                    <th>Disparado por</th>
+                    <th class="text-end">Ações</th>
+                  </tr>
+                </thead>
+                <tbody id="historyTableBody"></tbody>
+              </table>
+            </div>
+
+            <div id="diffEmpty" class="text-muted text-center py-4 border rounded">
+              Marque duas versões (A e B) na tabela acima e clique em "Comparar selecionadas".
+            </div>
+
+            <div id="diffWrap" class="d-none">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="mb-0">Comparação</h6>
+                <span id="diffIdenticalBadge" class="badge bg-secondary d-none">Conteúdo idêntico</span>
+              </div>
+              <div id="diffOutput"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- Modal: preview de uma única versão -->
+<div class="modal fade" id="previewModal" tabindex="-1">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="previewModalTitle">Pré-visualização</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="previewEditor" style="height:500px;font-size:13px;"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+        <button class="btn btn-warning" id="btnRestoreFromPreview">
+          <i class="bi bi-arrow-counterclockwise me-1"></i>Restaurar esta versão
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/diff2html/3.4.48/diff2html.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/diff2html/3.4.48/diff2html-ui.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.2/ace.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.2/mode-python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.2/theme-tomorrow.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.2/theme-tomorrow_night.min.js"></script>
+
+<script>
+(function () {
+  'use strict';
+
+  const API = '/api/admin/snapshots';
+  let currentFilePath = null;
+  let selectedForDiff = [];
+  let previewEditor = null;
+  let previewSnapshotId = null;
+
+  async function loadFiles(search) {
+    const box = document.getElementById('filesList');
+    const params = search ? `?search=${encodeURIComponent(search)}` : '';
+    try {
+      const res  = await fetch(`${API}/files${params}`);
+      const data = await res.json();
+      const files = data.files || [];
+      if (!files.length) {
+        box.innerHTML = '<div class="text-center text-muted py-3">Nenhum arquivo com histórico ainda.</div>';
+        return;
+      }
+      box.innerHTML = files.map(f => `
+        <button type="button" class="list-group-item list-group-item-action ${f.file_path === currentFilePath ? 'active' : ''}"
+                onclick="window.selectFile('${f.file_path}')">
+          <div class="d-flex justify-content-between align-items-start">
+            <small class="text-break">${f.file_path}</small>
+            <span class="badge ${f.file_path === currentFilePath ? 'bg-light text-dark' : 'bg-secondary'} ms-1">${f.version_count}</span>
+          </div>
+          ${f.model_name ? `<small class="${f.file_path === currentFilePath ? '' : 'text-muted'}">Model: ${f.model_name}</small>` : ''}
+        </button>
+      `).join('');
+    } catch {
+      box.innerHTML = '<div class="text-center text-danger py-3">Erro ao carregar arquivos.</div>';
+    }
+  }
+
+  let _searchTimer = null;
+  document.getElementById('fileSearch').addEventListener('input', (e) => {
+    clearTimeout(_searchTimer);
+    _searchTimer = setTimeout(() => loadFiles(e.target.value.trim()), 300);
+  });
+
+  window.selectFile = async function (filePath) {
+    currentFilePath = filePath;
+    selectedForDiff = [];
+    document.getElementById('historyEmpty').classList.add('d-none');
+    document.getElementById('historyWrap').classList.remove('d-none');
+    document.getElementById('historyFileName').textContent = filePath;
+    document.getElementById('diffWrap').classList.add('d-none');
+    document.getElementById('diffEmpty').classList.remove('d-none');
+    updateCompareButton();
+    loadFiles(document.getElementById('fileSearch').value.trim());
+
+    const tbody = document.getElementById('historyTableBody');
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">Carregando...</td></tr>';
+
+    try {
+      const res  = await fetch(`${API}/history?file_path=${encodeURIComponent(filePath)}`);
+      const data = await res.json();
+      renderHistory(data.history || []);
+    } catch {
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger py-3">Erro ao carregar histórico.</td></tr>';
+    }
+  };
+
+  const ORIGIN_LABELS = {
+    generated: '<span class="badge bg-primary-subtle text-primary-emphasis">Gerado</span>',
+    manual_edit: '<span class="badge bg-warning-subtle text-warning-emphasis">Edição manual</span>',
+    restore: '<span class="badge bg-success-subtle text-success-emphasis">Restauração</span>',
+    pre_overwrite: '<span class="badge bg-secondary-subtle text-secondary-emphasis">Pré-overwrite</span>',
+  };
+
+  function renderHistory(history) {
+    const tbody = document.getElementById('historyTableBody');
+    if (!history.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">Sem histórico.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = history.map(h => `
+      <tr data-snapshot-id="${h.id}">
+        <td>
+          <input type="checkbox" class="form-check-input diff-checkbox" value="${h.id}"
+                 onchange="window.toggleDiffSelection(${h.id}, this.checked)">
+        </td>
+        <td>
+          <small>${h.created_at ? new Date(h.created_at).toLocaleString('pt-BR') : '—'}</small>
+          ${h.is_current ? '<span class="badge bg-success ms-1">atual</span>' : ''}
+        </td>
+        <td>${ORIGIN_LABELS[h.origin] || h.origin}</td>
+        <td><small class="text-muted">${h.triggered_by || '—'}</small></td>
+        <td class="text-end">
+          <button class="btn btn-sm btn-outline-secondary" onclick="window.previewSnapshot(${h.id})" title="Ver conteúdo">
+            <i class="bi bi-eye"></i>
+          </button>
+          ${!h.is_current ? `
+          <button class="btn btn-sm btn-outline-warning" onclick="window.restoreSnapshot(${h.id})" title="Restaurar esta versão">
+            <i class="bi bi-arrow-counterclockwise"></i>
+          </button>` : ''}
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  window.toggleDiffSelection = function (id, checked) {
+    if (checked) {
+      if (selectedForDiff.length >= 2) {
+        const removed = selectedForDiff.shift();
+        const cb = document.querySelector(`input.diff-checkbox[value="${removed}"]`);
+        if (cb) cb.checked = false;
+      }
+      selectedForDiff.push(id);
+    } else {
+      selectedForDiff = selectedForDiff.filter(x => x !== id);
+    }
+    updateCompareButton();
+  };
+
+  function updateCompareButton() {
+    document.getElementById('btnCompare').disabled = selectedForDiff.length !== 2;
+  }
+
+  document.getElementById('btnCompare').addEventListener('click', async () => {
+    if (selectedForDiff.length !== 2) return;
+    const [idA, idB] = selectedForDiff.slice().sort((a, b) => a - b);
+
+    try {
+      const res  = await fetch(`${API}/diff?a=${idA}&b=${idB}`);
+      const data = await res.json();
+      if (!data.success) { alert(data.error); return; }
+      renderDiff(data.diff);
+    } catch {
+      alert('Erro ao gerar comparação.');
+    }
+  });
+
+  function renderDiff(diffData) {
+    document.getElementById('diffEmpty').classList.add('d-none');
+    document.getElementById('diffWrap').classList.remove('d-none');
+
+    const badge = document.getElementById('diffIdenticalBadge');
+    badge.classList.toggle('d-none', !diffData.identical);
+
+    const target = document.getElementById('diffOutput');
+    target.innerHTML = '';
+
+    if (diffData.identical) {
+      target.innerHTML = '<div class="text-muted text-center py-3">As duas versões selecionadas têm o mesmo conteúdo.</div>';
+      return;
+    }
+
+    const ui = new Diff2HtmlUI(target, diffData.unified_diff, {
+      drawFileList: false,
+      matching: 'lines',
+      outputFormat: 'side-by-side',
+      colorScheme: document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light',
+    });
+    ui.draw();
+  }
+
+  const previewModal = new bootstrap.Modal(document.getElementById('previewModal'));
+
+  function ensurePreviewEditor() {
+    if (previewEditor) return previewEditor;
+    previewEditor = ace.edit('previewEditor');
+    previewEditor.session.setMode('ace/mode/python');
+    previewEditor.setReadOnly(true);
+    previewEditor.setOptions({ fontSize: '13px', showPrintMargin: false });
+    previewEditor.setTheme(
+      document.documentElement.dataset.theme === 'dark' ? 'ace/theme/tomorrow_night' : 'ace/theme/tomorrow'
+    );
+    return previewEditor;
+  }
+
+  window.previewSnapshot = async function (snapshotId) {
+    previewSnapshotId = snapshotId;
+    try {
+      const res  = await fetch(`${API}/${snapshotId}`);
+      const data = await res.json();
+      if (!data.success) { alert(data.error); return; }
+
+      const snap = data.snapshot;
+      document.getElementById('previewModalTitle').textContent =
+        `${snap.file_path} — ${new Date(snap.created_at).toLocaleString('pt-BR')}`;
+
+      const isCurrent = snap.is_current;
+      document.getElementById('btnRestoreFromPreview').classList.toggle('d-none', isCurrent);
+
+      previewModal.show();
+      setTimeout(() => {
+        const editor = ensurePreviewEditor();
+        editor.setValue(snap.content, -1);
+      }, 150);
+    } catch {
+      alert('Erro ao carregar conteúdo.');
+    }
+  };
+
+  document.getElementById('btnRestoreFromPreview').addEventListener('click', () => {
+    if (previewSnapshotId) window.restoreSnapshot(previewSnapshotId);
+  });
+
+  window.restoreSnapshot = async function (snapshotId) {
+    if (!confirm(
+      'Restaurar esta versão? O arquivo no disco será sobrescrito com este ' +
+      'conteúdo agora. A versão atual não é perdida — vira parte do histórico.'
+    )) return;
+
+    try {
+      const res  = await fetch(`${API}/${snapshotId}/restore`, { method: 'POST' });
+      const data = await res.json();
+      if (!data.success) { alert(data.error); return; }
+
+      alert(data.message);
+      previewModal.hide();
+      if (currentFilePath) window.selectFile(currentFilePath);
+    } catch {
+      alert('Erro ao restaurar.');
+    }
+  };
+
+  loadFiles();
+})();
+</script>
+{% endblock %}
