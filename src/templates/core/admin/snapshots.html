@@ -121,8 +121,8 @@
 {% endblock %}
 
 {% block extra_js %}
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/diff2html/3.4.48/diff2html.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/diff2html/3.4.48/diff2html-ui.min.js"></script>
+<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/diff2html/bundles/css/diff2html.min.css">
+<script src="https://cdn.jsdelivr.net/npm/diff2html/bundles/js/diff2html-ui.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.2/ace.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.2/mode-python.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.2/theme-tomorrow.min.js"></script>
@@ -138,6 +138,13 @@
   let previewEditor = null;
   let previewSnapshotId = null;
 
+  // Escapa texto para uso seguro dentro de conteúdo HTML.
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
   async function loadFiles(search) {
     const box = document.getElementById('filesList');
     const params = search ? `?search=${encodeURIComponent(search)}` : '';
@@ -149,16 +156,24 @@
         box.innerHTML = '<div class="text-center text-muted py-3">Nenhum arquivo com histórico ainda.</div>';
         return;
       }
+      // IMPORTANTE: o caminho do arquivo nunca é interpolado dentro de um
+      // onclick="..." -- em paths do Windows isso contém `\`, e sequências
+      // como \b (backspace) ou \a corrompem a string JS antes da função
+      // ser chamada. Usamos data-file-path (texto puro) + addEventListener.
       box.innerHTML = files.map(f => `
         <button type="button" class="list-group-item list-group-item-action ${f.file_path === currentFilePath ? 'active' : ''}"
-                onclick="window.selectFile('${f.file_path}')">
+                data-file-path="${escapeHtml(f.file_path)}">
           <div class="d-flex justify-content-between align-items-start">
-            <small class="text-break">${f.file_path}</small>
+            <small class="text-break">${escapeHtml(f.file_path)}</small>
             <span class="badge ${f.file_path === currentFilePath ? 'bg-light text-dark' : 'bg-secondary'} ms-1">${f.version_count}</span>
           </div>
-          ${f.model_name ? `<small class="${f.file_path === currentFilePath ? '' : 'text-muted'}">Model: ${f.model_name}</small>` : ''}
+          ${f.model_name ? `<small class="${f.file_path === currentFilePath ? '' : 'text-muted'}">Model: ${escapeHtml(f.model_name)}</small>` : ''}
         </button>
       `).join('');
+
+      box.querySelectorAll('button[data-file-path]').forEach(btn => {
+        btn.addEventListener('click', () => window.selectFile(btn.dataset.filePath));
+      });
     } catch {
       box.innerHTML = '<div class="text-center text-danger py-3">Erro ao carregar arquivos.</div>';
     }
@@ -278,13 +293,25 @@
       return;
     }
 
-    const ui = new Diff2HtmlUI(target, diffData.unified_diff, {
-      drawFileList: false,
-      matching: 'lines',
-      outputFormat: 'side-by-side',
-      colorScheme: document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light',
-    });
-    ui.draw();
+    try {
+      const ui = new Diff2HtmlUI(target, diffData.unified_diff, {
+        drawFileList: false,
+        matching: 'lines',
+        outputFormat: 'side-by-side',
+        highlight: false,  // evita dependência de highlight.js, que não está carregado
+        colorScheme: document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light',
+      });
+      ui.draw();
+    } catch (e) {
+      console.error('Falha ao renderizar diff visual:', e);
+      // Fallback: mostra o diff como texto puro, sempre funciona mesmo se a lib falhar
+      const pre = document.createElement('pre');
+      pre.className = 'p-3 border rounded small';
+      pre.style.maxHeight = '500px';
+      pre.style.overflow = 'auto';
+      pre.textContent = diffData.unified_diff;
+      target.appendChild(pre);
+    }
   }
 
   const previewModal = new bootstrap.Modal(document.getElementById('previewModal'));

@@ -537,12 +537,14 @@ def _write_file(path: Path, content: str, overwrite: bool = False) -> bool:
     if path.exists() and not overwrite:
         print(f"  ⚠  Já existe (pulado): {path}")
         return False
-    path.write_text(content, encoding="utf-8")
-    action = "atualizado" if path.exists() else "gerado"
-    print(f"  ✓ {path}")
 
     # ── Versionamento ──────────────────────────────────────────────────────
-    # Integração num único ponto: nenhum .j2 precisa saber que isso existe.
+    # CRÍTICO: isso precisa rodar ANTES de path.write_text() abaixo.
+    # snapshot_if_needed() lê o conteúdo atual do disco para capturar
+    # qualquer edição manual que ainda não esteja no histórico — se a
+    # escrita já tivesse acontecido, essa leitura veria o conteúdo NOVO
+    # (que o próprio gerador está prestes a escrever), não a edição
+    # manual perdida, e a captura ficaria sem efeito nenhum.
     # Falha em versionar nunca deve impedir a geração do arquivo em si —
     # por isso o try/except silencioso (com aviso) em vez de propagar.
     try:
@@ -556,6 +558,9 @@ def _write_file(path: Path, content: str, overwrite: bool = False) -> bool:
     except Exception as e:
         print(f"  ⚠  Versionamento não aplicado para {path}: {e}")
 
+    path.write_text(content, encoding="utf-8")
+    action = "atualizado" if path.exists() else "gerado"
+    print(f"  ✓ {path}")
     return True
 
 
