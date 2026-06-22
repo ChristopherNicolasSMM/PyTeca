@@ -73,6 +73,56 @@ class ModelGenerator:
             if fname in ("id", "status", "created_at", "updated_at", "trashed_at"):
                 errors.append(f"Campo '{fname}' é reservado pelo sistema (gerado automaticamente).")
 
+            # Validação de FK: tabela, coluna-alvo e campo de exibição são
+            # obrigatórios e precisam corresponder ao schema real do banco.
+            # Sem isso, o model gerado poderia referenciar uma coluna que
+            # não existe, ou não é válida como alvo de FK (precisa ser PK
+            # ou ter constraint UNIQUE — exigência do próprio SQL, idêntica
+            # em SQLite e PostgreSQL).
+            ftype = (f.get("type") or "string").lower()
+            if ftype == "foreign_key" or f.get("fk_table"):
+                fk_table = (f.get("fk_table") or "").strip()
+                display_field = (f.get("display_field") or "").strip()
+                fk_target_column = (f.get("fk_target_column") or "").strip()
+
+                if not fk_table:
+                    errors.append(f"Campo '{fname or '(sem nome)'}': selecione a tabela referenciada.")
+                    continue
+
+                from services.core.builder.schema_inspector import SchemaInspector
+                info = SchemaInspector.get_table_info(fk_table)
+                if info is None:
+                    errors.append(f"Campo '{fname}': a tabela '{fk_table}' não existe no banco.")
+                    continue
+
+                target_names = {c["name"] for c in info["fk_target_candidates"]}
+                if not fk_target_column:
+                    # Sem escolha explícita: só é aceitável se houver exatamente
+                    # uma candidata (a UI já desabilita o select nesse caso).
+                    if len(target_names) != 1:
+                        errors.append(
+                            f"Campo '{fname}': selecione a coluna-alvo da FK em '{fk_table}' "
+                            f"(há {len(target_names)} candidatas válidas: {', '.join(sorted(target_names))})."
+                        )
+                elif fk_target_column not in target_names:
+                    errors.append(
+                        f"Campo '{fname}': '{fk_target_column}' não é uma coluna válida como alvo de FK "
+                        f"em '{fk_table}' (precisa ser chave primária ou ter UNIQUE). "
+                        f"Candidatas: {', '.join(sorted(target_names))}."
+                    )
+
+                if not display_field:
+                    errors.append(
+                        f"Campo '{fname or '(sem nome)'}': selecione o campo de exibição/pesquisa "
+                        f"(o que aparece nas listas e na busca — nunca o ID)."
+                    )
+                else:
+                    display_names = {c["name"] for c in info["display_field_candidates"]}
+                    if display_field not in display_names:
+                        errors.append(
+                            f"Campo '{fname}': a coluna '{display_field}' não existe na tabela '{fk_table}'."
+                        )
+
         return errors
 
     # ── Preparação de contexto ──────────────────────────────────────────────
@@ -100,6 +150,64 @@ class ModelGenerator:
         return None
 
     @classmethod
+    def _resolve_fk_class_name(cls, fk_table: str, explicit: str | None = None) -> str:
+        """
+        Resolve o nome da classe Python para uma tabela referenciada por FK.
+
+        Ordem de prioridade:
+        1. Nome explícito vindo do payload (se algum dia for enviado)
+        2. Nome real do model SQLAlchemy já registrado para essa tabela
+           (via db.Model.registry) — sempre correto quando existe
+        3. Heurística snake_case -> PascalCase por palavra (fallback para
+           tabelas sem model Python ainda mapeado)
+        """
+        if explicit:
+            return explicit
+        try:
+            from db.database import db
+            for mapper in db.Model.registry.mappers:
+                if mapper.local_table is not None and mapper.local_table.name == fk_table:
+                    return mapper.class_.__name__
+        except Exception:
+            pass
+        words = fk_table.split("_")
+        singular_words = [w[:-1] if w.endswith("s") and len(w) > 1 else w for w in words]
+        return "".join(w.capitalize() for w in singular_words)
+
+    @classmethod
+    def _resolve_fk_target(cls, fk_table: str, fk_target_column: str | None) -> tuple[str, str]:
+        """
+        Resolve (coluna_alvo, tipo_python) para uma FK.
+
+        - Se `fk_target_column` foi informado, usa-o (já validado em
+          validate_definition antes de chegar aqui).
+        - Se não foi informado mas só existe UMA candidata válida (o caso
+          comum: só o `id`), resolve automaticamente para ela.
+        - O tipo Python é inferido a partir do tipo real da coluna no banco
+          (ex: Integer para id, String para cpf) — necessário porque uma FK
+          para uma coluna UNIQUE de texto não pode ser tipada como int.
+        """
+        from services.core.builder.schema_inspector import SchemaInspector
+
+        target_column = (fk_target_column or "").strip()
+        info = SchemaInspector.get_table_info(fk_table)
+
+        if not target_column:
+            candidates = info["fk_target_candidates"] if info else []
+            target_column = candidates[0]["name"] if len(candidates) == 1 else "id"
+
+        py_type = "int"
+        if info:
+            for c in info["fk_target_candidates"]:
+                if c["name"] == target_column:
+                    col_type = c["type"].upper()
+                    if "VARCHAR" in col_type or "TEXT" in col_type or "CHAR" in col_type:
+                        py_type = "str"
+                    break
+
+        return target_column, py_type
+
+    @classmethod
     def _process_fields(cls, raw_fields: list[dict]) -> list[dict]:
         """
         Processa os campos definidos na UI, preparando o contexto rico
@@ -112,7 +220,10 @@ class ModelGenerator:
 
             if is_fk:
                 fk_table = f.get("fk_table", "").strip()
-                fk_class = f.get("fk_class") or fk_table.rstrip("s").capitalize()
+                fk_class = cls._resolve_fk_class_name(fk_table, f.get("fk_class"))
+                fk_target_column, fk_target_py_type = cls._resolve_fk_target(
+                    fk_table, f.get("fk_target_column")
+                )
                 relation_name = f["name"][:-3] if f["name"].endswith("_id") else f["name"]
                 processed.append({
                     "name": f["name"] if f["name"].endswith("_id") else f"{f['name']}_id",
@@ -120,7 +231,12 @@ class ModelGenerator:
                     "fk_table": fk_table,
                     "fk_class": fk_class,
                     "fk_relation_name": relation_name,
-                    "display_field": f.get("display_field") or "name",
+                    "fk_target_column": fk_target_column,
+                    "fk_target_py_type": fk_target_py_type,
+                    # Validado como obrigatório em validate_definition() — nunca
+                    # mais um fallback hardcoded para "name", que quebrava em
+                    # runtime quando a tabela real usava outro nome de coluna.
+                    "display_field": (f.get("display_field") or "").strip(),
                     "nullable": f.get("nullable", True),
                 })
                 continue

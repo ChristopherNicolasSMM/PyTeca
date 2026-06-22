@@ -72,7 +72,7 @@ class {{ class_name }}(db.Model):
 
     {% for field in fields %}
     {% if field.is_fk %}
-    {{ field.name }}: Mapped[int{% if field.nullable %} | None{% endif %}] = mapped_column(ForeignKey("{{ field.fk_table }}.id"){% if not field.nullable %}, nullable=False{% else %}, nullable=True{% endif %})
+    {{ field.name }}: Mapped[{{ field.fk_target_py_type|default('int') }}{% if field.nullable %} | None{% endif %}] = mapped_column(ForeignKey("{{ field.fk_table }}.{{ field.fk_target_column|default('id') }}"){% if not field.nullable %}, nullable=False{% else %}, nullable=True{% endif %})
     {% else %}
     {{ field.name }}: Mapped[{{ field.py_type }}{% if field.nullable %} | None{% endif %}] = mapped_column({{ field.type_mapped }}{% if field.nullable %}, nullable=True{% else %}, nullable=False{% endif %}{% if field.default is not none %}, default={{ field.default_repr }}{% endif %}{% if field.unique %}, unique=True{% endif %})
     {% endif %}

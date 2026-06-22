@@ -125,7 +125,20 @@
     <div class="col-12">
       <div class="card">
         <div class="card-body">
-          <h5 class="card-title">Modelos Criados via Builder</h5>
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+            <h5 class="card-title mb-0">Modelos Criados via Builder</h5>
+            <div class="d-flex gap-2 align-items-center">
+              <input type="text" class="form-control form-control-sm" id="mlSearch"
+                     placeholder="Buscar por nome ou tabela..." style="width:220px;">
+              <select class="form-select form-select-sm" id="mlModuleFilter" style="width:160px;">
+                <option value="">Todos os módulos</option>
+              </select>
+              <div class="form-check form-switch ms-2">
+                <input class="form-check-input" type="checkbox" id="mlGroupByModule">
+                <label class="form-check-label small" for="mlGroupByModule">Agrupar por módulo</label>
+              </div>
+            </div>
+          </div>
           <div class="table-responsive">
             <table class="table table-sm table-hover align-middle">
               <thead>
@@ -208,7 +221,9 @@
         </div>
         <div class="col-sm-2 fk-table-wrap d-none">
           <label class="form-label small mb-1">Tabela referenciada</label>
-          <input type="text" class="form-control form-control-sm field-fk-table" placeholder="ex: authors">
+          <select class="form-select form-select-sm field-fk-table">
+            <option value="">Carregando...</option>
+          </select>
         </div>
         <div class="col-sm-1 d-flex flex-column align-items-center">
           <label class="form-label small mb-1">Obrig.</label>
@@ -216,7 +231,28 @@
         </div>
       </div>
       <div class="row g-2 mt-1">
-        <div class="col-sm-3 offset-sm-9 text-end">
+        <div class="col-sm-3 fk-target-wrap d-none">
+          <label class="form-label small mb-1">
+            Coluna-alvo da FK
+            <i class="bi bi-info-circle text-muted" title="Coluna da tabela referenciada que esta FK aponta. Sempre a chave primária (id), a menos que exista outra coluna única (ex: CPF). Desabilitado quando só há uma opção válida."></i>
+          </label>
+          <select class="form-select form-select-sm field-fk-target" disabled>
+            <option value="">Selecione a tabela primeiro</option>
+          </select>
+        </div>
+        <div class="col-sm-3 fk-display-wrap d-none">
+          <label class="form-label small mb-1">
+            Campo de exibição/pesquisa
+            <i class="bi bi-info-circle text-muted" title="Campo da tabela referenciada usado em listas e na busca do dropdown FK (ex: nome, titulo). Nunca o ID."></i>
+          </label>
+          <select class="form-select form-select-sm field-fk-display">
+            <option value="">Selecione a tabela primeiro</option>
+          </select>
+        </div>
+        <div class="col-sm-1 fk-target-hint-wrap d-none">
+          <span class="badge bg-info-subtle text-info-emphasis fk-target-hint small" style="white-space:normal;"></span>
+        </div>
+        <div class="col-sm-3 offset-sm-2 text-end">
           <button type="button" class="btn btn-sm btn-outline-danger btn-remove-field">
             <i class="bi bi-trash3"></i> Remover
           </button>
@@ -225,15 +261,36 @@
     `;
     document.getElementById('fields-container').appendChild(row);
 
-    const typeSelect   = row.querySelector('.field-type');
-    const fkWrap        = row.querySelector('.fk-table-wrap');
-    const defaultWrap    = row.querySelector('.field-default-wrap');
+    const typeSelect      = row.querySelector('.field-type');
+    const fkWrap           = row.querySelector('.fk-table-wrap');
+    const fkTargetWrap      = row.querySelector('.fk-target-wrap');
+    const fkDisplayWrap     = row.querySelector('.fk-display-wrap');
+    const fkTargetHintWrap  = row.querySelector('.fk-target-hint-wrap');
+    const fkTableSelect    = row.querySelector('.field-fk-table');
+    const fkTargetSelect   = row.querySelector('.field-fk-target');
+    const fkDisplaySelect  = row.querySelector('.field-fk-display');
+    const fkTargetHint     = row.querySelector('.fk-target-hint');
+    const defaultWrap      = row.querySelector('.field-default-wrap');
 
     function syncFkVisibility() {
       const isFk = typeSelect.value === 'foreign_key';
       fkWrap.classList.toggle('d-none', !isFk);
+      fkTargetWrap.classList.toggle('d-none', !isFk);
+      fkDisplayWrap.classList.toggle('d-none', !isFk);
       defaultWrap.classList.toggle('d-none', isFk);
+      if (isFk && fkTableSelect.options.length <= 1) {
+        populateTableSelect(fkTableSelect);
+      }
     }
+
+    // Ao escolher a tabela, carrega via API as colunas reais dela e popula
+    // tanto o select de "coluna-alvo da FK" (PK + colunas UNIQUE — único
+    // formato que SQL aceita como destino de FOREIGN KEY, idêntico em
+    // SQLite e PostgreSQL) quanto o de "campo de exibição/pesquisa".
+    fkTableSelect.addEventListener('change', () => {
+      populateFkTargetAndDisplay(fkTableSelect.value, fkTargetSelect, fkDisplaySelect, fkTargetHint, fkTargetHintWrap);
+    });
+
     typeSelect.addEventListener('change', () => { syncFkVisibility(); refreshDependentSelects(); });
     row.querySelector('.field-name').addEventListener('input', refreshDependentSelects);
     row.querySelector('.btn-remove-field').addEventListener('click', () => { row.remove(); refreshDependentSelects(); });
@@ -241,6 +298,94 @@
     if (initial.type) typeSelect.value = initial.type;
     syncFkVisibility();
     refreshDependentSelects();
+
+    // Reconstrução ao editar (preview/erro de validação mantém valores escolhidos)
+    if (initial.fk_table) {
+      populateTableSelect(fkTableSelect, initial.fk_table).then(() => {
+        fkTableSelect.value = initial.fk_table;
+        populateFkTargetAndDisplay(
+          initial.fk_table, fkTargetSelect, fkDisplaySelect, fkTargetHint, fkTargetHintWrap,
+          initial.fk_target_column, initial.display_field
+        );
+      });
+    }
+  }
+
+  // ── Carrega tabelas reais do banco (introspecção via SchemaInspector) ──────
+  let _tablesCache = null;
+  async function populateTableSelect(selectEl, preselect) {
+    if (!_tablesCache) {
+      try {
+        const res  = await fetch(`${API}/tables`);
+        const data = await res.json();
+        _tablesCache = data.tables || [];
+      } catch {
+        _tablesCache = [];
+      }
+    }
+    selectEl.innerHTML = '<option value="">Selecione...</option>' +
+      _tablesCache.map(t => `<option value="${t.name}">${t.name} (${t.column_count} colunas)</option>`).join('');
+    if (preselect) selectEl.value = preselect;
+  }
+
+  // ── Carrega coluna-alvo (PK + UNIQUE) e campo de exibição da tabela ────────
+  // Auto-desabilita o select de coluna-alvo quando só há uma candidata válida
+  // (o caso comum: apenas o id) — nada para o usuário decidir nesse caso.
+  async function populateFkTargetAndDisplay(tableName, targetSelect, displaySelect, hintBadge, hintWrap, preTarget, preDisplay) {
+    targetSelect.innerHTML  = '<option value="">Carregando...</option>';
+    displaySelect.innerHTML = '<option value="">Carregando...</option>';
+    hintWrap.classList.add('d-none');
+
+    if (!tableName) {
+      targetSelect.innerHTML  = '<option value="">Selecione a tabela primeiro</option>';
+      displaySelect.innerHTML = '<option value="">Selecione a tabela primeiro</option>';
+      targetSelect.disabled = true;
+      return;
+    }
+
+    try {
+      const res  = await fetch(`${API}/tables/${tableName}`);
+      const data = await res.json();
+      const targets  = data.fk_target_candidates || [];
+      const displays = data.display_field_candidates || [];
+
+      // ── Coluna-alvo da FK ────────────────────────────────────────────────
+      targetSelect.innerHTML = targets.map(c =>
+        `<option value="${c.name}">${c.name}${c.is_pk ? ' (chave primária)' : ' (único)'}</option>`
+      ).join('');
+
+      if (targets.length <= 1) {
+        // Só uma candidata válida (geralmente o id) — nada a decidir, trava a escolha.
+        targetSelect.disabled = true;
+        if (targets.length === 1) targetSelect.value = targets[0].name;
+      } else {
+        targetSelect.disabled = false;
+        targetSelect.value = preTarget || targets[0].name;
+        hintWrap.classList.remove('d-none');
+        hintBadge.textContent = `${targets.length} opções`;
+        hintBadge.title = 'Esta tabela tem mais de uma coluna que pode ser usada como alvo da FK (chave primária ou única).';
+      }
+
+      // ── Campo de exibição/pesquisa ───────────────────────────────────────
+      const suggested = displays.filter(c => c.suggested_display_field);
+      const others     = displays.filter(c => !c.suggested_display_field);
+      displaySelect.innerHTML =
+        (suggested.length ? `<optgroup label="Sugeridos">` +
+          suggested.map(c => `<option value="${c.name}">${c.name}</option>`).join('') +
+          `</optgroup>` : '') +
+        (others.length ? `<optgroup label="Outros campos">` +
+          others.map(c => `<option value="${c.name}">${c.name}${c.is_fk ? ' (FK)' : ''}</option>`).join('') +
+          `</optgroup>` : '');
+
+      if (preDisplay) {
+        displaySelect.value = preDisplay;
+      } else if (suggested.length) {
+        displaySelect.value = suggested[0].name;
+      }
+    } catch {
+      targetSelect.innerHTML  = '<option value="">Erro ao carregar</option>';
+      displaySelect.innerHTML = '<option value="">Erro ao carregar</option>';
+    }
   }
 
   document.getElementById('addFieldBtn').addEventListener('click', () => addFieldRow());
@@ -274,6 +419,11 @@
       };
       if (type === 'foreign_key') {
         data.fk_table = row.querySelector('.field-fk-table').value.trim();
+        // Coluna real da tabela referenciada que esta FK aponta — PK por
+        // padrão, mas pode ser qualquer coluna UNIQUE (ex: CPF).
+        data.fk_target_column = row.querySelector('.field-fk-target').value.trim();
+        // Campo de exibição/pesquisa, escolhido a partir das colunas reais.
+        data.display_field = row.querySelector('.field-fk-display').value.trim();
       } else {
         const def = row.querySelector('.field-default').value.trim();
         if (def) data.default = def;
@@ -305,7 +455,27 @@
   }
 
   // ── Preview ───────────────────────────────────────────────────────────────
+  // ── Validação client-side: nenhum FK pode seguir incompleto ────────────────
+  function validateFkFields() {
+    const errors = [];
+    document.querySelectorAll('.field-row').forEach(row => {
+      const type = row.querySelector('.field-type').value;
+      if (type !== 'foreign_key') return;
+      const name    = row.querySelector('.field-name').value.trim() || '(sem nome)';
+      const table   = row.querySelector('.field-fk-table').value.trim();
+      const target  = row.querySelector('.field-fk-target').value.trim();
+      const display = row.querySelector('.field-fk-display').value.trim();
+      if (!table) errors.push(`Campo "${name}": selecione a tabela referenciada.`);
+      else if (!target) errors.push(`Campo "${name}": selecione a coluna-alvo da FK.`);
+      else if (!display) errors.push(`Campo "${name}": selecione o campo de exibição/pesquisa (não pode ser o ID).`);
+    });
+    return errors;
+  }
+
   document.getElementById('btnPreview').addEventListener('click', async () => {
+    const fkErrors = validateFkFields();
+    if (fkErrors.length) { showErrors(fkErrors); return; }
+
     const payload = collectPayload();
     const btn = document.getElementById('btnPreview');
     btn.disabled = true;
@@ -331,6 +501,9 @@
 
   // ── Criar ────────────────────────────────────────────────────────────────
   document.getElementById('btnCreate').addEventListener('click', async () => {
+    const fkErrors = validateFkFields();
+    if (fkErrors.length) { showErrors(fkErrors); return; }
+
     const payload = collectPayload();
     const btn = document.getElementById('btnCreate');
     btn.disabled  = true;
@@ -353,6 +526,7 @@
       const genData = await genRes.json();
       if (genData.success) {
         alert(genData.message || 'Modelo e CRUD gerados com sucesso! Reinicie o servidor para ver as novas rotas.');
+        loadModuleOptions();
         loadModelsList();
         document.getElementById('modelForm').reset();
         document.getElementById('fields-container').innerHTML = '';
@@ -368,44 +542,103 @@
     }
   });
 
-  // ── Lista de models existentes ──────────────────────────────────────────
+  // ── Lista de models existentes (com filtros e agrupamento) ──────────────
+  async function loadModuleOptions() {
+    const select = document.getElementById('mlModuleFilter');
+    const current = select.value;
+    try {
+      const res  = await fetch(`${API}/modules`);
+      const data = await res.json();
+      const modules = data.modules || [];
+      select.innerHTML = '<option value="">Todos os módulos</option>' +
+        modules.map(m => `<option value="${m}">${m}</option>`).join('');
+      if (modules.includes(current)) select.value = current;
+    } catch {
+      // Mantém só "Todos os módulos" se a chamada falhar — não bloqueia a tela
+    }
+  }
+
+  function renderModelRow(m) {
+    return `
+      <tr>
+        <td>${m.name}</td>
+        <td><span class="badge bg-secondary">${m.module}</span></td>
+        <td><code>${m.table_name}</code></td>
+        <td><small class="text-muted">${m.generated_file || '—'}</small></td>
+        <td><small>${m.created_at ? new Date(m.created_at).toLocaleString('pt-BR') : '—'}</small></td>
+        <td class="text-end">
+          <button class="btn btn-sm btn-outline-danger" onclick="window.removeModelDef(${m.id})" title="Remover definição">
+            <i class="bi bi-trash3"></i>
+          </button>
+        </td>
+      </tr>
+    `;
+  }
+
   async function loadModelsList() {
     const tbody = document.getElementById('modelsListBody');
+    const search   = document.getElementById('mlSearch').value.trim();
+    const moduleFl = document.getElementById('mlModuleFilter').value;
+    const groupBy  = document.getElementById('mlGroupByModule').checked;
+
+    const params = new URLSearchParams();
+    if (search)   params.set('search', search);
+    if (moduleFl) params.set('module', moduleFl);
+    if (groupBy)  params.set('group_by', 'module');
+
     try {
-      const res  = await fetch(`${API}/`);
+      const res  = await fetch(`${API}/?${params.toString()}`);
       const data = await res.json();
-      const models = data.models || [];
-      if (!models.length) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">Nenhum modelo criado via builder ainda.</td></tr>';
+
+      if (groupBy) {
+        const groups = data.groups || [];
+        if (!groups.length) {
+          tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">Nenhum modelo encontrado.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = groups.map(g => `
+          <tr class="table-light">
+            <td colspan="6">
+              <strong>${g.module}</strong>
+              <span class="badge bg-secondary ms-1">${g.models.length}</span>
+            </td>
+          </tr>
+          ${g.models.map(renderModelRow).join('')}
+        `).join('');
         return;
       }
-      tbody.innerHTML = models.map(m => `
-        <tr>
-          <td>${m.name}</td>
-          <td><span class="badge bg-secondary">${m.module}</span></td>
-          <td><code>${m.table_name}</code></td>
-          <td><small class="text-muted">${m.generated_file || '—'}</small></td>
-          <td><small>${m.created_at ? new Date(m.created_at).toLocaleString('pt-BR') : '—'}</small></td>
-          <td class="text-end">
-            <button class="btn btn-sm btn-outline-danger" onclick="window.removeModelDef(${m.id})" title="Remover definição">
-              <i class="bi bi-trash3"></i>
-            </button>
-          </td>
-        </tr>
-      `).join('');
+
+      const models = data.models || [];
+      if (!models.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">Nenhum modelo encontrado.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = models.map(renderModelRow).join('');
     } catch {
       tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger py-3">Erro ao carregar modelos.</td></tr>';
     }
   }
 
+  // Debounce simples para a busca por texto, sem disparar fetch a cada tecla
+  let _mlSearchTimer = null;
+  document.getElementById('mlSearch').addEventListener('input', () => {
+    clearTimeout(_mlSearchTimer);
+    _mlSearchTimer = setTimeout(loadModelsList, 300);
+  });
+  document.getElementById('mlModuleFilter').addEventListener('change', loadModelsList);
+  document.getElementById('mlGroupByModule').addEventListener('change', loadModelsList);
+
   window.removeModelDef = async function (id) {
     if (!confirm('Remover esta definição? O arquivo já gerado no disco NÃO será apagado.')) return;
     await fetch(`${API}/${id}`, { method: 'DELETE' });
+    loadModuleOptions();
     loadModelsList();
   };
 
+
   // ── Init ─────────────────────────────────────────────────────────────────
   addFieldRow({ name: 'nome', type: 'string' });
+  loadModuleOptions();
   loadModelsList();
 })();
 </script>
