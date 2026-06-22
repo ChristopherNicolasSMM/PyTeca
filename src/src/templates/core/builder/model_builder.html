@@ -1,0 +1,645 @@
+{% extends "core/base.html" %}
+
+{% block title %}Construtor de Modelos{% endblock %}
+
+{% block content %}
+<div class="pagetitle">
+  <h1>Construtor de Modelos</h1>
+  <nav>
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{{ url_for('web.dashboard') }}">Home</a></li>
+      <li class="breadcrumb-item active">Model Builder</li>
+    </ol>
+  </nav>
+</div>
+
+<section class="section">
+  <div class="row g-3">
+
+    <!-- ══════════════════════════════════════════════════════════════
+         Formulário de criação
+    ═══════════════════════════════════════════════════════════════ -->
+    <div class="col-lg-7">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title">Novo Modelo</h5>
+
+          <div class="alert alert-danger d-none" id="formErrors"></div>
+
+          <form id="modelForm" onsubmit="return false;">
+
+            <div class="row mb-3">
+              <label class="col-sm-3 col-form-label">Nome do Modelo</label>
+              <div class="col-sm-9">
+                <input type="text" class="form-control" name="name" id="fName" placeholder="Ex: Produto">
+                <div class="form-text">PascalCase, sem espaços. Ex: Produto, CategoriaItem.</div>
+              </div>
+            </div>
+
+            <div class="row mb-3">
+              <label class="col-sm-3 col-form-label">Módulo</label>
+              <div class="col-sm-9">
+                <input type="text" class="form-control" name="module" id="fModule" value="core">
+                <div class="form-text">Subpasta dentro de model/ (ex: bookstore, core).</div>
+              </div>
+            </div>
+
+            <div class="row mb-3">
+              <label class="col-sm-3 col-form-label">Nome da Tabela</label>
+              <div class="col-sm-9">
+                <input type="text" class="form-control" name="table_name" id="fTable" placeholder="ex: produtos">
+                <div class="form-text">snake_case, plural. Ex: produtos, categorias_item.</div>
+              </div>
+            </div>
+
+            <hr>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h6 class="mb-0">Campos</h6>
+              <button type="button" class="btn btn-sm btn-outline-primary" id="addFieldBtn">
+                <i class="bi bi-plus-lg me-1"></i>Adicionar Campo
+              </button>
+            </div>
+
+            <div id="fields-container"></div>
+
+            <hr>
+            <h6>Anotações</h6>
+
+            <div class="row mb-2">
+              <label class="col-sm-3 col-form-label">Campo de exibição</label>
+              <div class="col-sm-9">
+                <select class="form-select form-select-sm" id="fDisplayField"></select>
+                <div class="form-text">Campo usado quando este model aparece como FK em outro (dropdown).</div>
+              </div>
+            </div>
+
+            <div class="row mb-3">
+              <label class="col-sm-3 col-form-label">Campos com filtro dinâmico</label>
+              <div class="col-sm-9">
+                <select class="form-select form-select-sm" id="fChoicesFields" multiple size="3"></select>
+                <div class="form-text">
+                  Gera filtro <code>SELECT DISTINCT</code> automaticamente (ex.: gênero, categoria).
+                  Ctrl+clique para selecionar vários.
+                </div>
+              </div>
+            </div>
+
+            <div class="d-flex gap-2">
+              <button type="button" class="btn btn-outline-secondary" id="btnPreview">
+                <i class="bi bi-eye me-1"></i>Pré-visualizar código
+              </button>
+              <button type="button" class="btn btn-primary" id="btnCreate">
+                <i class="bi bi-magic me-1"></i>Criar Modelo e Gerar CRUD
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════
+         Preview de código
+    ═══════════════════════════════════════════════════════════════ -->
+    <div class="col-lg-5">
+      <div class="card h-100">
+        <div class="card-body d-flex flex-column">
+          <h5 class="card-title">
+            <i class="bi bi-code-square me-1"></i>Pré-visualização
+          </h5>
+          <div id="previewEmpty" class="text-muted text-center my-auto">
+            <i class="bi bi-file-earmark-code" style="font-size:2.5rem;opacity:.3;"></i>
+            <p class="mt-2 mb-0">Clique em "Pré-visualizar código" para ver o model.py gerado.</p>
+          </div>
+          <div id="previewWrap" class="d-none flex-grow-1">
+            <div class="ace-editor-wrap" style="height:520px;">
+              <div id="previewEditor" style="height:520px;font-size:13px;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════
+         Models já criados via builder
+    ═══════════════════════════════════════════════════════════════ -->
+    <div class="col-12">
+      <div class="card">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+            <h5 class="card-title mb-0">Modelos Criados via Builder</h5>
+            <div class="d-flex gap-2 align-items-center">
+              <input type="text" class="form-control form-control-sm" id="mlSearch"
+                     placeholder="Buscar por nome ou tabela..." style="width:220px;">
+              <select class="form-select form-select-sm" id="mlModuleFilter" style="width:160px;">
+                <option value="">Todos os módulos</option>
+              </select>
+              <div class="form-check form-switch ms-2">
+                <input class="form-check-input" type="checkbox" id="mlGroupByModule">
+                <label class="form-check-label small" for="mlGroupByModule">Agrupar por módulo</label>
+              </div>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle">
+              <thead>
+                <tr>
+                  <th>Nome</th>
+                  <th>Módulo</th>
+                  <th>Tabela</th>
+                  <th>Arquivo Gerado</th>
+                  <th>Criado em</th>
+                  <th class="text-end">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="modelsListBody">
+                <tr><td colspan="6" class="text-center text-muted py-3">Carregando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.2/ace.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.2/mode-python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.2/theme-tomorrow.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.2/theme-tomorrow_night.min.js"></script>
+
+<script>
+(function () {
+  'use strict';
+
+  const API = '/api/core/builder/model';
+  let fieldRowCount = 0;
+
+  // ── Ace para preview ────────────────────────────────────────────────────
+  const previewEditor = ace.edit('previewEditor');
+  previewEditor.session.setMode('ace/mode/python');
+  previewEditor.setReadOnly(true);
+  previewEditor.setOptions({ fontSize: '13px', showPrintMargin: false });
+  function syncAceTheme() {
+    previewEditor.setTheme(
+      document.documentElement.dataset.theme === 'dark' ? 'ace/theme/tomorrow_night' : 'ace/theme/tomorrow'
+    );
+  }
+  syncAceTheme();
+  new MutationObserver(syncAceTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+  // ── Linha de campo ───────────────────────────────────────────────────────
+  function addFieldRow(initial) {
+    initial = initial || {};
+    const id  = ++fieldRowCount;
+    const row = document.createElement('div');
+    row.className = 'field-row border rounded p-2 mb-2';
+    row.dataset.rowId = id;
+    row.innerHTML = `
+      <div class="row g-2 align-items-end">
+        <div class="col-sm-3">
+          <label class="form-label small mb-1">Nome</label>
+          <input type="text" class="form-control form-control-sm field-name" placeholder="ex: nome, preco" value="${initial.name || ''}">
+        </div>
+        <div class="col-sm-3">
+          <label class="form-label small mb-1">Tipo</label>
+          <select class="form-select form-select-sm field-type">
+            <option value="string">Texto curto</option>
+            <option value="text">Texto longo</option>
+            <option value="integer">Número inteiro</option>
+            <option value="float">Número decimal</option>
+            <option value="boolean">Sim/Não</option>
+            <option value="datetime">Data e hora</option>
+            <option value="foreign_key">Referência (FK)</option>
+          </select>
+        </div>
+        <div class="col-sm-3 field-default-wrap">
+          <label class="form-label small mb-1">Valor padrão</label>
+          <input type="text" class="form-control form-control-sm field-default" placeholder="opcional">
+        </div>
+        <div class="col-sm-2 fk-table-wrap d-none">
+          <label class="form-label small mb-1">Tabela referenciada</label>
+          <select class="form-select form-select-sm field-fk-table">
+            <option value="">Carregando...</option>
+          </select>
+        </div>
+        <div class="col-sm-1 d-flex flex-column align-items-center">
+          <label class="form-label small mb-1">Obrig.</label>
+          <input type="checkbox" class="form-check-input field-required">
+        </div>
+      </div>
+      <div class="row g-2 mt-1">
+        <div class="col-sm-3 fk-target-wrap d-none">
+          <label class="form-label small mb-1">
+            Coluna-alvo da FK
+            <i class="bi bi-info-circle text-muted" title="Coluna da tabela referenciada que esta FK aponta. Sempre a chave primária (id), a menos que exista outra coluna única (ex: CPF). Desabilitado quando só há uma opção válida."></i>
+          </label>
+          <select class="form-select form-select-sm field-fk-target" disabled>
+            <option value="">Selecione a tabela primeiro</option>
+          </select>
+        </div>
+        <div class="col-sm-3 fk-display-wrap d-none">
+          <label class="form-label small mb-1">
+            Campo de exibição/pesquisa
+            <i class="bi bi-info-circle text-muted" title="Campo da tabela referenciada usado em listas e na busca do dropdown FK (ex: nome, titulo). Nunca o ID."></i>
+          </label>
+          <select class="form-select form-select-sm field-fk-display">
+            <option value="">Selecione a tabela primeiro</option>
+          </select>
+        </div>
+        <div class="col-sm-1 fk-target-hint-wrap d-none">
+          <span class="badge bg-info-subtle text-info-emphasis fk-target-hint small" style="white-space:normal;"></span>
+        </div>
+        <div class="col-sm-3 offset-sm-2 text-end">
+          <button type="button" class="btn btn-sm btn-outline-danger btn-remove-field">
+            <i class="bi bi-trash3"></i> Remover
+          </button>
+        </div>
+      </div>
+    `;
+    document.getElementById('fields-container').appendChild(row);
+
+    const typeSelect      = row.querySelector('.field-type');
+    const fkWrap           = row.querySelector('.fk-table-wrap');
+    const fkTargetWrap      = row.querySelector('.fk-target-wrap');
+    const fkDisplayWrap     = row.querySelector('.fk-display-wrap');
+    const fkTargetHintWrap  = row.querySelector('.fk-target-hint-wrap');
+    const fkTableSelect    = row.querySelector('.field-fk-table');
+    const fkTargetSelect   = row.querySelector('.field-fk-target');
+    const fkDisplaySelect  = row.querySelector('.field-fk-display');
+    const fkTargetHint     = row.querySelector('.fk-target-hint');
+    const defaultWrap      = row.querySelector('.field-default-wrap');
+
+    function syncFkVisibility() {
+      const isFk = typeSelect.value === 'foreign_key';
+      fkWrap.classList.toggle('d-none', !isFk);
+      fkTargetWrap.classList.toggle('d-none', !isFk);
+      fkDisplayWrap.classList.toggle('d-none', !isFk);
+      defaultWrap.classList.toggle('d-none', isFk);
+      if (isFk && fkTableSelect.options.length <= 1) {
+        populateTableSelect(fkTableSelect);
+      }
+    }
+
+    // Ao escolher a tabela, carrega via API as colunas reais dela e popula
+    // tanto o select de "coluna-alvo da FK" (PK + colunas UNIQUE — único
+    // formato que SQL aceita como destino de FOREIGN KEY, idêntico em
+    // SQLite e PostgreSQL) quanto o de "campo de exibição/pesquisa".
+    fkTableSelect.addEventListener('change', () => {
+      populateFkTargetAndDisplay(fkTableSelect.value, fkTargetSelect, fkDisplaySelect, fkTargetHint, fkTargetHintWrap);
+    });
+
+    typeSelect.addEventListener('change', () => { syncFkVisibility(); refreshDependentSelects(); });
+    row.querySelector('.field-name').addEventListener('input', refreshDependentSelects);
+    row.querySelector('.btn-remove-field').addEventListener('click', () => { row.remove(); refreshDependentSelects(); });
+
+    if (initial.type) typeSelect.value = initial.type;
+    syncFkVisibility();
+    refreshDependentSelects();
+
+    // Reconstrução ao editar (preview/erro de validação mantém valores escolhidos)
+    if (initial.fk_table) {
+      populateTableSelect(fkTableSelect, initial.fk_table).then(() => {
+        fkTableSelect.value = initial.fk_table;
+        populateFkTargetAndDisplay(
+          initial.fk_table, fkTargetSelect, fkDisplaySelect, fkTargetHint, fkTargetHintWrap,
+          initial.fk_target_column, initial.display_field
+        );
+      });
+    }
+  }
+
+  // ── Carrega tabelas reais do banco (introspecção via SchemaInspector) ──────
+  let _tablesCache = null;
+  async function populateTableSelect(selectEl, preselect) {
+    if (!_tablesCache) {
+      try {
+        const res  = await fetch(`${API}/tables`);
+        const data = await res.json();
+        _tablesCache = data.tables || [];
+      } catch {
+        _tablesCache = [];
+      }
+    }
+    selectEl.innerHTML = '<option value="">Selecione...</option>' +
+      _tablesCache.map(t => `<option value="${t.name}">${t.name} (${t.column_count} colunas)</option>`).join('');
+    if (preselect) selectEl.value = preselect;
+  }
+
+  // ── Carrega coluna-alvo (PK + UNIQUE) e campo de exibição da tabela ────────
+  // Auto-desabilita o select de coluna-alvo quando só há uma candidata válida
+  // (o caso comum: apenas o id) — nada para o usuário decidir nesse caso.
+  async function populateFkTargetAndDisplay(tableName, targetSelect, displaySelect, hintBadge, hintWrap, preTarget, preDisplay) {
+    targetSelect.innerHTML  = '<option value="">Carregando...</option>';
+    displaySelect.innerHTML = '<option value="">Carregando...</option>';
+    hintWrap.classList.add('d-none');
+
+    if (!tableName) {
+      targetSelect.innerHTML  = '<option value="">Selecione a tabela primeiro</option>';
+      displaySelect.innerHTML = '<option value="">Selecione a tabela primeiro</option>';
+      targetSelect.disabled = true;
+      return;
+    }
+
+    try {
+      const res  = await fetch(`${API}/tables/${tableName}`);
+      const data = await res.json();
+      const targets  = data.fk_target_candidates || [];
+      const displays = data.display_field_candidates || [];
+
+      // ── Coluna-alvo da FK ────────────────────────────────────────────────
+      targetSelect.innerHTML = targets.map(c =>
+        `<option value="${c.name}">${c.name}${c.is_pk ? ' (chave primária)' : ' (único)'}</option>`
+      ).join('');
+
+      if (targets.length <= 1) {
+        // Só uma candidata válida (geralmente o id) — nada a decidir, trava a escolha.
+        targetSelect.disabled = true;
+        if (targets.length === 1) targetSelect.value = targets[0].name;
+      } else {
+        targetSelect.disabled = false;
+        targetSelect.value = preTarget || targets[0].name;
+        hintWrap.classList.remove('d-none');
+        hintBadge.textContent = `${targets.length} opções`;
+        hintBadge.title = 'Esta tabela tem mais de uma coluna que pode ser usada como alvo da FK (chave primária ou única).';
+      }
+
+      // ── Campo de exibição/pesquisa ───────────────────────────────────────
+      const suggested = displays.filter(c => c.suggested_display_field);
+      const others     = displays.filter(c => !c.suggested_display_field);
+      displaySelect.innerHTML =
+        (suggested.length ? `<optgroup label="Sugeridos">` +
+          suggested.map(c => `<option value="${c.name}">${c.name}</option>`).join('') +
+          `</optgroup>` : '') +
+        (others.length ? `<optgroup label="Outros campos">` +
+          others.map(c => `<option value="${c.name}">${c.name}${c.is_fk ? ' (FK)' : ''}</option>`).join('') +
+          `</optgroup>` : '');
+
+      if (preDisplay) {
+        displaySelect.value = preDisplay;
+      } else if (suggested.length) {
+        displaySelect.value = suggested[0].name;
+      }
+    } catch {
+      targetSelect.innerHTML  = '<option value="">Erro ao carregar</option>';
+      displaySelect.innerHTML = '<option value="">Erro ao carregar</option>';
+    }
+  }
+
+  document.getElementById('addFieldBtn').addEventListener('click', () => addFieldRow());
+
+  // ── Atualiza selects de display_field / choices com base nos campos atuais ─
+  function refreshDependentSelects() {
+    const names = collectFields()
+      .map(f => f.name)
+      .filter(Boolean);
+
+    const dField = document.getElementById('fDisplayField');
+    const prevD  = dField.value;
+    dField.innerHTML = '<option value="">(nenhum)</option>' +
+      names.map(n => `<option value="${n}">${n}</option>`).join('');
+    if (names.includes(prevD)) dField.value = prevD;
+
+    const cField = document.getElementById('fChoicesFields');
+    const prevSelected = Array.from(cField.selectedOptions).map(o => o.value);
+    cField.innerHTML = names.map(n => `<option value="${n}">${n}</option>`).join('');
+    Array.from(cField.options).forEach(o => { o.selected = prevSelected.includes(o.value); });
+  }
+
+  // ── Coleta dados do formulário ───────────────────────────────────────────
+  function collectFields() {
+    return Array.from(document.querySelectorAll('.field-row')).map(row => {
+      const type = row.querySelector('.field-type').value;
+      const data = {
+        name: row.querySelector('.field-name').value.trim(),
+        type,
+        nullable: !row.querySelector('.field-required').checked,
+      };
+      if (type === 'foreign_key') {
+        data.fk_table = row.querySelector('.field-fk-table').value.trim();
+        // Coluna real da tabela referenciada que esta FK aponta — PK por
+        // padrão, mas pode ser qualquer coluna UNIQUE (ex: CPF).
+        data.fk_target_column = row.querySelector('.field-fk-target').value.trim();
+        // Campo de exibição/pesquisa, escolhido a partir das colunas reais.
+        data.display_field = row.querySelector('.field-fk-display').value.trim();
+      } else {
+        const def = row.querySelector('.field-default').value.trim();
+        if (def) data.default = def;
+      }
+      return data;
+    });
+  }
+
+  function collectPayload() {
+    const choicesFields = Array.from(document.getElementById('fChoicesFields').selectedOptions).map(o => o.value);
+    return {
+      name: document.getElementById('fName').value.trim(),
+      module: document.getElementById('fModule').value.trim() || 'core',
+      table_name: document.getElementById('fTable').value.trim(),
+      fields: collectFields(),
+      annotations: {
+        display_field: document.getElementById('fDisplayField').value || undefined,
+        choices: choicesFields.map(f => ({ field: f, label: f.replace(/_/g, ' ') })),
+      },
+    };
+  }
+
+  function showErrors(errors) {
+    const box = document.getElementById('formErrors');
+    if (!errors || !errors.length) { box.classList.add('d-none'); return; }
+    box.innerHTML = '<strong>Corrija antes de continuar:</strong><ul class="mb-0 mt-1">' +
+      errors.map(e => `<li>${e}</li>`).join('') + '</ul>';
+    box.classList.remove('d-none');
+  }
+
+  // ── Preview ───────────────────────────────────────────────────────────────
+  // ── Validação client-side: nenhum FK pode seguir incompleto ────────────────
+  function validateFkFields() {
+    const errors = [];
+    document.querySelectorAll('.field-row').forEach(row => {
+      const type = row.querySelector('.field-type').value;
+      if (type !== 'foreign_key') return;
+      const name    = row.querySelector('.field-name').value.trim() || '(sem nome)';
+      const table   = row.querySelector('.field-fk-table').value.trim();
+      const target  = row.querySelector('.field-fk-target').value.trim();
+      const display = row.querySelector('.field-fk-display').value.trim();
+      if (!table) errors.push(`Campo "${name}": selecione a tabela referenciada.`);
+      else if (!target) errors.push(`Campo "${name}": selecione a coluna-alvo da FK.`);
+      else if (!display) errors.push(`Campo "${name}": selecione o campo de exibição/pesquisa (não pode ser o ID).`);
+    });
+    return errors;
+  }
+
+  document.getElementById('btnPreview').addEventListener('click', async () => {
+    const fkErrors = validateFkFields();
+    if (fkErrors.length) { showErrors(fkErrors); return; }
+
+    const payload = collectPayload();
+    const btn = document.getElementById('btnPreview');
+    btn.disabled = true;
+    try {
+      const res  = await fetch(`${API}/preview`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        showErrors(data.errors || [data.error]);
+        return;
+      }
+      showErrors([]);
+      document.getElementById('previewEmpty').classList.add('d-none');
+      document.getElementById('previewWrap').classList.remove('d-none');
+      previewEditor.setValue(data.code, -1);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  // ── Criar ────────────────────────────────────────────────────────────────
+  document.getElementById('btnCreate').addEventListener('click', async () => {
+    const fkErrors = validateFkFields();
+    if (fkErrors.length) { showErrors(fkErrors); return; }
+
+    const payload = collectPayload();
+    const btn = document.getElementById('btnCreate');
+    btn.disabled  = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Gerando...';
+
+    try {
+      const createRes  = await fetch(`${API}/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const createData = await createRes.json();
+      if (!createData.success) {
+        showErrors(createData.errors || [createData.error]);
+        return;
+      }
+      showErrors([]);
+
+      const genRes  = await fetch(`${API}/${createData.id}/generate`, { method: 'POST' });
+      const genData = await genRes.json();
+      if (genData.success) {
+        alert(genData.message || 'Modelo e CRUD gerados com sucesso! Reinicie o servidor para ver as novas rotas.');
+        loadModuleOptions();
+        loadModelsList();
+        document.getElementById('modelForm').reset();
+        document.getElementById('fields-container').innerHTML = '';
+        addFieldRow();
+      } else {
+        showErrors([genData.error || 'Falha desconhecida na geração do CRUD.']);
+      }
+    } catch (e) {
+      showErrors(['Erro de conexão: ' + e.message]);
+    } finally {
+      btn.disabled  = false;
+      btn.innerHTML = '<i class="bi bi-magic me-1"></i>Criar Modelo e Gerar CRUD';
+    }
+  });
+
+  // ── Lista de models existentes (com filtros e agrupamento) ──────────────
+  async function loadModuleOptions() {
+    const select = document.getElementById('mlModuleFilter');
+    const current = select.value;
+    try {
+      const res  = await fetch(`${API}/modules`);
+      const data = await res.json();
+      const modules = data.modules || [];
+      select.innerHTML = '<option value="">Todos os módulos</option>' +
+        modules.map(m => `<option value="${m}">${m}</option>`).join('');
+      if (modules.includes(current)) select.value = current;
+    } catch {
+      // Mantém só "Todos os módulos" se a chamada falhar — não bloqueia a tela
+    }
+  }
+
+  function renderModelRow(m) {
+    return `
+      <tr>
+        <td>${m.name}</td>
+        <td><span class="badge bg-secondary">${m.module}</span></td>
+        <td><code>${m.table_name}</code></td>
+        <td><small class="text-muted">${m.generated_file || '—'}</small></td>
+        <td><small>${m.created_at ? new Date(m.created_at).toLocaleString('pt-BR') : '—'}</small></td>
+        <td class="text-end">
+          <button class="btn btn-sm btn-outline-danger" onclick="window.removeModelDef(${m.id})" title="Remover definição">
+            <i class="bi bi-trash3"></i>
+          </button>
+        </td>
+      </tr>
+    `;
+  }
+
+  async function loadModelsList() {
+    const tbody = document.getElementById('modelsListBody');
+    const search   = document.getElementById('mlSearch').value.trim();
+    const moduleFl = document.getElementById('mlModuleFilter').value;
+    const groupBy  = document.getElementById('mlGroupByModule').checked;
+
+    const params = new URLSearchParams();
+    if (search)   params.set('search', search);
+    if (moduleFl) params.set('module', moduleFl);
+    if (groupBy)  params.set('group_by', 'module');
+
+    try {
+      const res  = await fetch(`${API}/?${params.toString()}`);
+      const data = await res.json();
+
+      if (groupBy) {
+        const groups = data.groups || [];
+        if (!groups.length) {
+          tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">Nenhum modelo encontrado.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = groups.map(g => `
+          <tr class="table-light">
+            <td colspan="6">
+              <strong>${g.module}</strong>
+              <span class="badge bg-secondary ms-1">${g.models.length}</span>
+            </td>
+          </tr>
+          ${g.models.map(renderModelRow).join('')}
+        `).join('');
+        return;
+      }
+
+      const models = data.models || [];
+      if (!models.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">Nenhum modelo encontrado.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = models.map(renderModelRow).join('');
+    } catch {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger py-3">Erro ao carregar modelos.</td></tr>';
+    }
+  }
+
+  // Debounce simples para a busca por texto, sem disparar fetch a cada tecla
+  let _mlSearchTimer = null;
+  document.getElementById('mlSearch').addEventListener('input', () => {
+    clearTimeout(_mlSearchTimer);
+    _mlSearchTimer = setTimeout(loadModelsList, 300);
+  });
+  document.getElementById('mlModuleFilter').addEventListener('change', loadModelsList);
+  document.getElementById('mlGroupByModule').addEventListener('change', loadModelsList);
+
+  window.removeModelDef = async function (id) {
+    if (!confirm('Remover esta definição? O arquivo já gerado no disco NÃO será apagado.')) return;
+    await fetch(`${API}/${id}`, { method: 'DELETE' });
+    loadModuleOptions();
+    loadModelsList();
+  };
+
+
+  // ── Init ─────────────────────────────────────────────────────────────────
+  addFieldRow({ name: 'nome', type: 'string' });
+  loadModuleOptions();
+  loadModelsList();
+})();
+</script>
+{% endblock %}
