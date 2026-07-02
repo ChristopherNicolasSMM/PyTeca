@@ -12,7 +12,7 @@ from db.database import db
 @display_field("username")
 class User(UserMixin, db.Model):
     """Modelo de usuário para autenticação"""
-
+ 
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, autoincrement=True)

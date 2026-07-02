@@ -234,8 +234,8 @@ def register_cli_commands(app):
         if admin:
             click.echo(f"Usuário {username} já existe.")
             return
-
-        admin = User(username=username, email=email, is_admin=True, is_active=True)
+  
+        admin = User(username=username, email=email, is_admin=True, is_active=True, nome=username, nome_completo=username, celular="0000000000")
         admin.set_password(password)
         db.session.add(admin)
         db.session.commit()
